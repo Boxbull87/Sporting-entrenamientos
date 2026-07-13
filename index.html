@@ -410,6 +410,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
 firebase.initializeApp(FIREBASE_CONFIG);
 const auth = firebase.auth();
 const db = firebase.firestore();
+db.settings({ experimentalForceLongPolling: true, useFetchStreams: false });
 
 let currentUser = null;   // firebase auth user
 let currentCoach = null;  // firestore coach doc {name, role, active, email}
