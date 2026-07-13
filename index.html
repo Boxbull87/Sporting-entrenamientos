@@ -456,13 +456,13 @@ document.getElementById("registerForm").onsubmit = async (e) => {
   errEl.textContent = "";
   try{
     const cred = await auth.createUserWithEmailAndPassword(email, pass);
-    // Is this the very first coach ever? If so, auto-promote to gestor + active.
-    const snap = await db.collection("coaches").limit(1).get();
-    const isFirst = snap.empty;
+    // El rol/estado NUNCA se decide en el cliente: las reglas de Firestore
+    // fuerzan a que toda cuenta nueva nazca como entrenador inactivo.
+    // El primer gestor se activa manualmente desde la consola de Firebase.
     await db.collection("coaches").doc(cred.user.uid).set({
       name, email,
-      role: isFirst ? ROLE_GESTOR : ROLE_COACH,
-      active: isFirst,
+      role: ROLE_COACH,
+      active: false,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
   }catch(err){
@@ -740,7 +740,7 @@ document.getElementById("stopAnim").onclick = () => { animRunning=false; if(anim
 
 function playFrames(frameList, cvs, cx, onDone){
   if(frameList.length===0) return;
-  if(frameList.length===1){ drawCourt.call(null); cx.clearRect(0,0,cvs.width,cvs.height); drawCourtOn(cx,cvs); drawTokensOn(cx,cvs,frameList[0]); return; }
+  if(frameList.length===1){ drawCourtOn(cx,cvs); drawTokensOn(cx,cvs,frameList[0]); return; }
   animRunning = true;
   let frameIdx = 0;
   const stepMs = 1400;
@@ -749,19 +749,24 @@ function playFrames(frameList, cvs, cx, onDone){
   function step(ts){
     if(!animRunning) return;
     if(start===null) start = ts;
-    const elapsed = ts - start;
-    let t = elapsed/stepMs;
-    if(t>1){ t=0; start=ts; frameIdx = (frameIdx+1) % (frameList.length-1===0?1:frameList.length-1); if(frameList.length===1){animRunning=false; return;} }
+    let t = (ts-start)/stepMs;
+    if(t>1) t=1;
+
     const from = frameList[frameIdx];
-    const to = frameList[(frameIdx+1)%frameList.length];
+    const to = frameList[frameIdx+1];
     const interp = from.map(tok=>{
       const match = to.find(x=>x.id===tok.id) || tok;
       return {...tok, x: tok.x+(match.x-tok.x)*t, y: tok.y+(match.y-tok.y)*t};
     });
     drawCourtOn(cx,cvs);
     drawTokensOn(cx,cvs,interp);
+
+    if(t>=1){
+      frameIdx++;
+      if(frameIdx>=frameList.length-1){ animRunning=false; onDone(); return; }
+      start = ts;
+    }
     animReq = requestAnimationFrame(step);
-    if(frameIdx>=frameList.length-1 && t>=1){ animRunning=false; onDone(); return; }
   }
   animReq = requestAnimationFrame(step);
 }
@@ -1086,7 +1091,9 @@ service cloud.firestore {
 
     match /coaches/{coachId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.auth.uid == coachId;
+      allow create: if isSignedIn() && request.auth.uid == coachId
+                    && request.resource.data.role == 'entrenador'
+                    && request.resource.data.active == false;
       allow update: if isGestor() || (isSignedIn() && request.auth.uid == coachId && request.resource.data.role == resource.data.role && request.resource.data.active == resource.data.active);
       allow delete: if isGestor();
     }
