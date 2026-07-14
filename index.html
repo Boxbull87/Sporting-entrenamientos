@@ -209,6 +209,15 @@ canvas.court{
 .board-toolbar .btn.accent{outline:2px solid #fff;outline-offset:-2px;}
 #modeHint,#fsModeHint{font-style:italic;}
 #fsModeHint{color:#f1f1f1;}
+/* La pizarra ampliada tiene fondo casi negro: los botones "ghost" (pensados para fondo claro)
+   y los textos "muted" quedan ilegibles ahí, así que se sobrescriben sus colores. */
+.board-fullscreen{color:#fff;}
+.board-fullscreen .btn{color:#fff;}
+.board-fullscreen .btn.ghost{background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.55);}
+.board-fullscreen .btn.ghost:hover{background:rgba(255,255,255,.18);}
+.board-fullscreen .btn.danger{background:#fff;color:var(--danger);border:1px solid var(--danger);}
+.board-fullscreen .muted{color:#e6e0d6;}
+.board-fullscreen .btn.accent{color:#fff;}
 
 .auth-screen{
   min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;
