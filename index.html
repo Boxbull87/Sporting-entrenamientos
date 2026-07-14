@@ -178,11 +178,11 @@ canvas.court{
 }
 .frames-list{display:flex;gap:8px;overflow-x:auto;padding:6px 2px;}
 .frame-chip{
-  flex-shrink:0;width:52px;height:36px;border-radius:6px;border:2px solid var(--border);
-  background:var(--pitch-light);color:#fff;font-size:.7rem;display:flex;align-items:center;justify-content:center;font-weight:700;
+  flex-shrink:0;width:104px;height:72px;border-radius:12px;border:4px solid var(--border);
+  background:var(--pitch-light);color:#fff;font-size:1.4rem;display:flex;align-items:center;justify-content:center;font-weight:700;
 }
 .frame-chip.active{border-color:var(--accent);}
-.frame-chip .rm{position:relative;top:-14px;left:18px;background:var(--danger);color:#fff;border-radius:50%;width:14px;height:14px;font-size:.6rem;line-height:14px;text-align:center;cursor:pointer;}
+.frame-chip .rm{position:relative;top:-28px;left:36px;background:var(--danger);color:#fff;border-radius:50%;width:28px;height:28px;font-size:1.2rem;line-height:28px;text-align:center;cursor:pointer;}
 
 /* sessions */
 .session-task{
@@ -205,10 +205,6 @@ canvas.court{
 .board-fullscreen #closeFullscreenBoard{position:absolute;top:14px;right:14px;}
 .board-fullscreen canvas.court{width:min(94vw,115vh);max-width:min(94vw,115vh);max-height:82vh;}
 .fs-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:center;}
-#fsRecordStatus{color:#ff6b6b;font-weight:700;}
-#fsRecordBtn.recording{background:#eb5757;color:#fff;}
-#fsVideoWrap{display:flex;flex-direction:column;align-items:center;gap:10px;max-width:min(94vw,115vh);}
-#fsRecordedVideo{width:100%;max-width:min(94vw,70vh);border-radius:8px;background:#000;}
 
 .auth-screen{
   min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;
@@ -469,15 +465,8 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
 <div id="boardFullscreen" class="board-fullscreen hidden">
   <button class="btn small ghost" id="closeFullscreenBoard">✕ Cerrar</button>
   <div class="fs-toolbar">
-    <button type="button" class="btn small" id="fsRecordBtn">⏺ Grabar vídeo</button>
-    <span class="muted" id="fsRecordStatus" style="display:none;">● Grabando…</span>
-  </div>
-  <div id="fsVideoWrap" class="hidden">
-    <video id="fsRecordedVideo" controls playsinline></video>
-    <div class="fs-toolbar">
-      <a id="fsDownloadVideo" class="btn small accent" download="pizarra-tactica.webm">⬇ Descargar vídeo</a>
-      <button type="button" class="btn small ghost" id="fsDiscardVideo">✕ Descartar vídeo</button>
-    </div>
+    <button type="button" class="btn accent small" id="fsSaveFrame">💾 Guardar fotograma</button>
+    <span class="muted" id="fsFrameCount">0 fotogramas</span>
   </div>
 </div>
 
@@ -931,11 +920,7 @@ canvas.addEventListener("touchmove", e=>{
 }, {passive:false});
 canvas.addEventListener("touchend", ()=> dragTokenId=null);
 
-document.getElementById("saveFrame").onclick = () => {
-  if(tokens.length===0){ alert("Añade al menos un jugador antes de guardar un fotograma."); return; }
-  frames.push({ tokens: JSON.parse(JSON.stringify(tokens)), arrows: JSON.parse(JSON.stringify(arrows)) });
-  renderFramesList();
-};
+document.getElementById("saveFrame").onclick = () => saveCurrentFrame();
 function updateFrameCount(){
   document.getElementById("frameCount").textContent = frames.length + " fotogramas";
 }
@@ -954,64 +939,14 @@ document.getElementById("stopAnim").onclick = () => { animRunning=false; if(anim
 
 /* ---- Pantalla completa (reutiliza el mismo <canvas>, así se conservan los eventos táctiles) ---- */
 let fsReturnParent = null, fsReturnNext = null;
-let mediaRecorder = null, recordedChunks = [], recordedVideoUrl = null, isRecording = false;
 
-function resetRecordingUI(){
-  isRecording = false;
-  document.getElementById("fsRecordBtn").textContent = "⏺ Grabar vídeo";
-  document.getElementById("fsRecordBtn").classList.remove("recording");
-  document.getElementById("fsRecordStatus").style.display = "none";
-  document.getElementById("fsVideoWrap").classList.add("hidden");
-  if(recordedVideoUrl){ URL.revokeObjectURL(recordedVideoUrl); recordedVideoUrl = null; }
-  document.getElementById("fsRecordedVideo").src = "";
+function saveCurrentFrame(){
+  if(tokens.length===0){ alert("Añade al menos un jugador antes de guardar un fotograma."); return; }
+  frames.push({ tokens: JSON.parse(JSON.stringify(tokens)), arrows: JSON.parse(JSON.stringify(arrows)) });
+  renderFramesList();
+  document.getElementById("fsFrameCount").textContent = frames.length + " fotogramas";
 }
-
-function startRecording(cvs){
-  if(!cvs.captureStream){ alert("Tu navegador no permite grabar el vídeo de la pizarra."); return; }
-  recordedChunks = [];
-  const stream = cvs.captureStream(30);
-  let mimeType = "video/webm";
-  if(window.MediaRecorder && MediaRecorder.isTypeSupported("video/webm;codecs=vp9")) mimeType = "video/webm;codecs=vp9";
-  else if(window.MediaRecorder && MediaRecorder.isTypeSupported("video/webm;codecs=vp8")) mimeType = "video/webm;codecs=vp8";
-  try{
-    mediaRecorder = new MediaRecorder(stream, {mimeType});
-  }catch(e){
-    alert("No se ha podido iniciar la grabación en este dispositivo.");
-    return;
-  }
-  mediaRecorder.ondataavailable = e => { if(e.data && e.data.size>0) recordedChunks.push(e.data); };
-  mediaRecorder.onstop = () => {
-    const blob = new Blob(recordedChunks, {type:"video/webm"});
-    recordedVideoUrl = URL.createObjectURL(blob);
-    const videoEl = document.getElementById("fsRecordedVideo");
-    videoEl.src = recordedVideoUrl;
-    document.getElementById("fsDownloadVideo").href = recordedVideoUrl;
-    document.getElementById("fsVideoWrap").classList.remove("hidden");
-  };
-  mediaRecorder.start();
-  isRecording = true;
-  document.getElementById("fsRecordBtn").textContent = "⏹ Detener grabación";
-  document.getElementById("fsRecordBtn").classList.add("recording");
-  document.getElementById("fsRecordStatus").style.display = "inline";
-  document.getElementById("fsVideoWrap").classList.add("hidden");
-}
-function stopRecording(){
-  if(mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
-  isRecording = false;
-  document.getElementById("fsRecordBtn").textContent = "⏺ Grabar vídeo";
-  document.getElementById("fsRecordBtn").classList.remove("recording");
-  document.getElementById("fsRecordStatus").style.display = "none";
-}
-document.getElementById("fsRecordBtn").onclick = () => {
-  const cvs = document.getElementById("boardFullscreen").querySelector("canvas.court");
-  if(!cvs) return;
-  if(isRecording) stopRecording();
-  else{
-    resetRecordingUI();
-    startRecording(cvs);
-  }
-};
-document.getElementById("fsDiscardVideo").onclick = () => resetRecordingUI();
+document.getElementById("fsSaveFrame").onclick = saveCurrentFrame;
 
 function openBoardFullscreen(cvs){
   if(!cvs) return;
@@ -1020,13 +955,12 @@ function openBoardFullscreen(cvs){
   const overlay = document.getElementById("boardFullscreen");
   overlay.insertBefore(cvs, overlay.querySelector(".fs-toolbar"));
   overlay.classList.remove("hidden");
-  resetRecordingUI();
+  document.getElementById("fsFrameCount").textContent = frames.length + " fotogramas";
   redrawBoard();
 }
 function closeBoardFullscreen(){
   const overlay = document.getElementById("boardFullscreen");
   const cvs = overlay.querySelector("canvas.court");
-  if(isRecording) stopRecording();
   if(cvs && fsReturnParent){
     if(fsReturnNext && fsReturnNext.parentNode===fsReturnParent) fsReturnParent.insertBefore(cvs, fsReturnNext);
     else fsReturnParent.appendChild(cvs);
