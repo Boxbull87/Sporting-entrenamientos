@@ -28,7 +28,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1756,6 +1756,7 @@ function renderSavedSessions(){
       if(!t) return '<li class="muted">(tarea eliminada)</li>';
       return `<li><a href="javascript:void(0)" onclick="viewTask('${id}')" style="color:var(--accent);font-weight:600;text-decoration:none;">${escapeHtml(t.title)}</a>${t.duration?` <span class="muted">· ${t.duration} min</span>`:""}</li>`;
     });
+    const canDelete = currentCoach && (currentCoach.role===ROLE_GESTOR || s.createdBy===currentUser.uid);
     return `
     <div class="card" style="margin-bottom:10px;">
       <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -1768,10 +1769,21 @@ function renderSavedSessions(){
       </ol>
       <p class="muted" style="font-size:.78rem;margin-top:-2px;">Toca una tarea para ver sus notas y la pizarra táctica.</p>
       ${s.notes ? `<p class="muted" style="font-size:.85rem;">${escapeHtml(s.notes)}</p>` : ""}
-      <button class="btn ghost small" style="margin-top:8px;" onclick="exportSessionPDF('${s.id}')">📄 Exportar a PDF</button>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+        <button class="btn ghost small" onclick="exportSessionPDF('${s.id}')">📄 Exportar a PDF</button>
+        ${canDelete ? `<button class="btn danger small" onclick="deleteSession('${s.id}')">🗑 Borrar sesión</button>` : ""}
+      </div>
     </div>`;
   }).join("");
 }
+window.deleteSession = async (id) => {
+  if(!confirm("¿Borrar esta sesión definitivamente? Las tareas que contiene no se verán afectadas.")) return;
+  try{
+    await db.collection("sessions").doc(id).delete();
+  }catch(err){
+    alert("No se ha podido borrar la sesión: " + err.message);
+  }
+};
 
 /* ============================================================
    EXPORTAR SESIÓN A PDF
@@ -1918,13 +1930,47 @@ document.getElementById("btnExportTasksExcel").onclick = () => {
   ws["!cols"] = [
     {wch:28}, {wch:16}, {wch:12}, {wch:14}, {wch:18}, {wch:50}, {wch:40}
   ];
-  // Convertir la columna "Enlace" en hipervínculos reales
-  rows.forEach((row, i) => {
-    const cellRef = XLSX.utils.encode_cell({r:i+1, c:6});
-    if(ws[cellRef]){
-      ws[cellRef].l = { Target: row[6], Tooltip: "Abrir en Sporting FS Almería" };
+  ws["!rows"] = [{hpt:24}];
+
+  const BORDER_COLOR = "E6E0D6";
+  const thinBorder = { style:"thin", color:{ rgb: BORDER_COLOR } };
+  const cellBorder = { top:thinBorder, bottom:thinBorder, left:thinBorder, right:thinBorder };
+
+  const range = XLSX.utils.decode_range(ws["!ref"]);
+
+  // Cabecera: fondo rojo del club, texto blanco y negrita
+  for(let C=range.s.c; C<=range.e.c; C++){
+    const ref = XLSX.utils.encode_cell({r:0, c:C});
+    if(!ws[ref]) continue;
+    ws[ref].s = {
+      fill: { fgColor: { rgb: "D81E2C" } },
+      font: { bold:true, color:{ rgb:"FFFFFF" }, sz:11 },
+      alignment: { vertical:"center", horizontal:"center", wrapText:true },
+      border: cellBorder
+    };
+  }
+
+  // Filas de datos: bandas alternas + hipervínculo real en la columna Enlace
+  for(let R=1; R<=range.e.r; R++){
+    const zebra = (R % 2 === 0);
+    for(let C=range.s.c; C<=range.e.c; C++){
+      const ref = XLSX.utils.encode_cell({r:R, c:C});
+      if(!ws[ref]) continue;
+      const isLinkCol = (C===6);
+      ws[ref].s = {
+        fill: { fgColor: { rgb: zebra ? "F7F3EC" : "FFFFFF" } },
+        font: isLinkCol ? { color:{rgb:"2F80ED"}, underline:true, sz:10 } : { color:{rgb:"1A1A1A"}, sz:10 },
+        alignment: { vertical:"center", wrapText: (C===5) },
+        border: cellBorder
+      };
+      if(isLinkCol){
+        ws[ref].l = { Target: ws[ref].v, Tooltip: "Abrir en Sporting FS Almería" };
+      }
     }
-  });
+  }
+
+  // Autofiltro solo en las columnas de datos (Título → Descripción), sin incluir Enlace
+  ws["!autofilter"] = { ref: `A1:F${range.e.r+1}` };
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Banco de tareas");
