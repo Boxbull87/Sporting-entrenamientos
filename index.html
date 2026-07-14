@@ -204,6 +204,11 @@ canvas.court{
 }
 .board-fullscreen #closeFullscreenBoard{position:absolute;top:14px;right:14px;}
 .board-fullscreen canvas.court{width:min(94vw,115vh);max-width:min(94vw,115vh);max-height:82vh;}
+.fs-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:center;}
+#fsRecordStatus{color:#ff6b6b;font-weight:700;}
+#fsRecordBtn.recording{background:#eb5757;color:#fff;}
+#fsVideoWrap{display:flex;flex-direction:column;align-items:center;gap:10px;max-width:min(94vw,115vh);}
+#fsRecordedVideo{width:100%;max-width:min(94vw,70vh);border-radius:8px;background:#000;}
 
 .auth-screen{
   min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;
@@ -344,6 +349,12 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
               <button type="button" class="btn small" id="addPlayerB"><span class="swatch" style="background:#eb5757;"></span>+ Jugador equipo B</button>
               <button type="button" class="btn small ghost" id="addBall"><span class="swatch" style="background:#ffd166;"></span>+ Balón</button>
               <button type="button" class="btn small ghost" id="addCone"><span class="swatch" style="background:#ff7a30;"></span>+ Cono</button>
+            </div>
+            <div class="board-toolbar">
+              <button type="button" class="btn small ghost" id="addGoalkeeperA"><span class="swatch" style="background:#fff200;"></span>+ Portero amarillo</button>
+              <button type="button" class="btn small ghost" id="addGoalkeeperB"><span class="swatch" style="background:#27ae60;"></span>+ Portero verde</button>
+              <button type="button" class="btn small ghost" id="addGoal">🥅 + Portería</button>
+              <button type="button" class="btn small ghost" id="rotateGoal">🔄 Rotar portería</button>
               <button type="button" class="btn small danger" id="clearBoard">Vaciar pizarra</button>
             </div>
             <div class="board-toolbar">
@@ -457,6 +468,17 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
 <!-- ---------- Board fullscreen overlay (más grande / apaisado en móvil) ---------- -->
 <div id="boardFullscreen" class="board-fullscreen hidden">
   <button class="btn small ghost" id="closeFullscreenBoard">✕ Cerrar</button>
+  <div class="fs-toolbar">
+    <button type="button" class="btn small" id="fsRecordBtn">⏺ Grabar vídeo</button>
+    <span class="muted" id="fsRecordStatus" style="display:none;">● Grabando…</span>
+  </div>
+  <div id="fsVideoWrap" class="hidden">
+    <video id="fsRecordedVideo" controls playsinline></video>
+    <div class="fs-toolbar">
+      <a id="fsDownloadVideo" class="btn small accent" download="pizarra-tactica.webm">⬇ Descargar vídeo</a>
+      <button type="button" class="btn small ghost" id="fsDiscardVideo">✕ Descartar vídeo</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -685,6 +707,7 @@ let arrowMode = false;
 let arrowStart = null;
 let animRunning = false;
 let animReq = null;
+let lastGoalId = null;
 
 function relPos(clientX, clientY){
   const rect = canvas.getBoundingClientRect();
@@ -697,7 +720,12 @@ function relPos(clientX, clientY){
 // ---- Helpers de compatibilidad: los fotogramas guardan {tokens, arrows} ----
 function frameTokens(frame){ return Array.isArray(frame) ? frame : (frame.tokens || []); }
 function frameArrows(frame){ return Array.isArray(frame) ? [] : (frame.arrows || []); }
-function tokenRadius(type){ return type==="ball" ? 9 : type==="cone" ? 10 : 14; }
+function tokenRadius(type){
+  if(type==="ball") return 15;
+  if(type==="cone") return 16;
+  if(type==="goal") return 30;
+  return 20; // jugadores A/B y porteros
+}
 
 const COURT_IMG = new Image();
 COURT_IMG.src = COURT_DATA_URI;
@@ -712,11 +740,50 @@ function drawCourtOn(cx,cvs){
     cx.fillStyle="#0f3d2e"; cx.fillRect(0,0,w,h);
   }
 }
+function drawGoalOn(cx, x, y, dir){
+  const hw = 26, dep = 18; // medio-ancho de la boca y profundidad de la red
+  let angle = 0;
+  if(dir==="down") angle = 0;
+  else if(dir==="up") angle = Math.PI;
+  else if(dir==="right") angle = -Math.PI/2;
+  else if(dir==="left") angle = Math.PI/2;
+  cx.save();
+  cx.translate(x,y);
+  cx.rotate(angle);
+  // fondo de la red (semitransparente)
+  cx.fillStyle = "rgba(255,255,255,0.18)";
+  cx.fillRect(-hw, -dep, hw*2, dep);
+  // hachurado de red
+  cx.strokeStyle = "rgba(255,255,255,0.55)"; cx.lineWidth = 1;
+  for(let i=-hw+6;i<hw;i+=8){ cx.beginPath(); cx.moveTo(i,-dep); cx.lineTo(i,0); cx.stroke(); }
+  for(let j=-dep+6;j<0;j+=6){ cx.beginPath(); cx.moveTo(-hw,j); cx.lineTo(hw,j); cx.stroke(); }
+  // postes y larguero
+  cx.strokeStyle = "#fff"; cx.lineWidth = 3;
+  cx.beginPath();
+  cx.moveTo(-hw, 0);
+  cx.lineTo(-hw, -dep);
+  cx.lineTo(hw, -dep);
+  cx.lineTo(hw, 0);
+  cx.stroke();
+  // línea de gol (boca), resaltada
+  cx.setLineDash([4,3]); cx.strokeStyle = "#fff176"; cx.lineWidth = 2;
+  cx.beginPath(); cx.moveTo(-hw,0); cx.lineTo(hw,0); cx.stroke();
+  cx.setLineDash([]);
+  cx.restore();
+}
+function tokenColor(type){
+  if(type==="A") return "#2f80ed";
+  if(type==="B") return "#eb5757";
+  if(type==="ball") return "#ffd166";
+  if(type==="GA") return "#fff200";
+  if(type==="GB") return "#27ae60";
+  return "#ccc";
+}
 function drawTokensOn(cx,cvs,list){
   list.forEach(t=>{
     const x=t.x*cvs.width, y=t.y*cvs.height;
     if(t.type==="cone"){
-      const s = 11;
+      const s = 12;
       cx.beginPath();
       cx.moveTo(x, y-s);
       cx.lineTo(x-s, y+s*0.8);
@@ -727,10 +794,15 @@ function drawTokensOn(cx,cvs,list){
       cx.lineWidth = 1.5; cx.strokeStyle = "#fff"; cx.stroke();
       return;
     }
+    if(t.type==="goal"){
+      drawGoalOn(cx, x, y, t.dir || "down");
+      return;
+    }
     cx.beginPath(); cx.arc(x,y, tokenRadius(t.type), 0, Math.PI*2);
-    cx.fillStyle = t.type==="A"?"#2f80ed":t.type==="B"?"#eb5757":"#ffd166";
+    cx.fillStyle = tokenColor(t.type);
     cx.fill(); cx.lineWidth=2; cx.strokeStyle="#fff"; cx.stroke();
-    if(t.type!=="ball"){ cx.fillStyle="#fff"; cx.font="bold 11px sans-serif"; cx.textAlign="center"; cx.textBaseline="middle"; cx.fillText(t.num,x,y); }
+    if(t.type==="GA"||t.type==="GB"){ cx.fillStyle="#0b1f18"; cx.font="bold 15px sans-serif"; cx.textAlign="center"; cx.textBaseline="middle"; cx.fillText("P",x,y); }
+    else if(t.type!=="ball"){ cx.fillStyle="#fff"; cx.font="bold 15px sans-serif"; cx.textAlign="center"; cx.textBaseline="middle"; cx.fillText(t.num,x,y); }
   });
 }
 function drawArrowsOn(cx,cvs,list){
@@ -758,12 +830,15 @@ function redrawBoard(){
 function addToken(type){
   tokenSeq++;
   const sameTeam = tokens.filter(t=>t.type===type).length;
+  const isPlayerLike = (type==="A"||type==="B"||type==="GA"||type==="GB");
   tokens.push({
     id:"t"+tokenSeq, type,
-    num: (type==="ball"||type==="cone") ? "" : sameTeam+1,
-    x: type==="A" ? 0.25 : type==="B" ? 0.75 : type==="cone" ? 0.5 : 0.5,
-    y: type==="cone" ? (0.2 + (sameTeam%5)*0.15) : 0.15 + (sameTeam%6)*0.13
+    num: isPlayerLike ? sameTeam+1 : "",
+    dir: type==="goal" ? "down" : undefined,
+    x: type==="A" ? 0.25 : type==="B" ? 0.75 : type==="GA" ? 0.5 : type==="GB" ? 0.5 : type==="cone" ? 0.5 : type==="goal" ? 0.5 : 0.5,
+    y: type==="cone" ? (0.2 + (sameTeam%5)*0.15) : type==="GA" ? 0.06 : type==="GB" ? 0.94 : type==="goal" ? 0.05 : 0.15 + (sameTeam%6)*0.13
   });
+  if(type==="goal") lastGoalId = "t"+tokenSeq;
   redrawBoard();
   updateFrameCount();
 }
@@ -774,9 +849,23 @@ document.getElementById("addBall").onclick = () => {
   addToken("ball");
 };
 document.getElementById("addCone").onclick = () => addToken("cone");
+document.getElementById("addGoalkeeperA").onclick = () => addToken("GA");
+document.getElementById("addGoalkeeperB").onclick = () => addToken("GB");
+document.getElementById("addGoal").onclick = () => addToken("goal");
+document.getElementById("rotateGoal").onclick = () => {
+  const goals = tokens.filter(t=>t.type==="goal");
+  if(goals.length===0){ alert("Añade primero una portería."); return; }
+  const target = goals.find(g=>g.id===lastGoalId) || goals[goals.length-1];
+  const order = ["down","right","up","left"];
+  const idx = order.indexOf(target.dir||"down");
+  target.dir = order[(idx+1)%order.length];
+  lastGoalId = target.id;
+  redrawBoard();
+};
 document.getElementById("clearBoard").onclick = () => {
   if(!confirm("¿Vaciar la pizarra y borrar los fotogramas guardados?")) return;
   tokens = []; frames = []; arrows = []; tokenSeq = 0; arrowSeq = 0;
+  lastGoalId = null;
   setArrowMode(false);
   redrawBoard(); renderFramesList();
 };
@@ -808,7 +897,11 @@ function pointerDown(x,y){
     const t = tokens[i];
     const tx = t.x*canvas.width, ty = t.y*canvas.height;
     const r = tokenRadius(t.type);
-    if(Math.hypot(px-tx, py-ty) <= r+4){ dragTokenId = t.id; return; }
+    if(Math.hypot(px-tx, py-ty) <= r+10){
+      dragTokenId = t.id;
+      if(t.type==="goal") lastGoalId = t.id;
+      return;
+    }
   }
 }
 canvas.addEventListener("mousedown", e=>{
@@ -861,17 +954,79 @@ document.getElementById("stopAnim").onclick = () => { animRunning=false; if(anim
 
 /* ---- Pantalla completa (reutiliza el mismo <canvas>, así se conservan los eventos táctiles) ---- */
 let fsReturnParent = null, fsReturnNext = null;
+let mediaRecorder = null, recordedChunks = [], recordedVideoUrl = null, isRecording = false;
+
+function resetRecordingUI(){
+  isRecording = false;
+  document.getElementById("fsRecordBtn").textContent = "⏺ Grabar vídeo";
+  document.getElementById("fsRecordBtn").classList.remove("recording");
+  document.getElementById("fsRecordStatus").style.display = "none";
+  document.getElementById("fsVideoWrap").classList.add("hidden");
+  if(recordedVideoUrl){ URL.revokeObjectURL(recordedVideoUrl); recordedVideoUrl = null; }
+  document.getElementById("fsRecordedVideo").src = "";
+}
+
+function startRecording(cvs){
+  if(!cvs.captureStream){ alert("Tu navegador no permite grabar el vídeo de la pizarra."); return; }
+  recordedChunks = [];
+  const stream = cvs.captureStream(30);
+  let mimeType = "video/webm";
+  if(window.MediaRecorder && MediaRecorder.isTypeSupported("video/webm;codecs=vp9")) mimeType = "video/webm;codecs=vp9";
+  else if(window.MediaRecorder && MediaRecorder.isTypeSupported("video/webm;codecs=vp8")) mimeType = "video/webm;codecs=vp8";
+  try{
+    mediaRecorder = new MediaRecorder(stream, {mimeType});
+  }catch(e){
+    alert("No se ha podido iniciar la grabación en este dispositivo.");
+    return;
+  }
+  mediaRecorder.ondataavailable = e => { if(e.data && e.data.size>0) recordedChunks.push(e.data); };
+  mediaRecorder.onstop = () => {
+    const blob = new Blob(recordedChunks, {type:"video/webm"});
+    recordedVideoUrl = URL.createObjectURL(blob);
+    const videoEl = document.getElementById("fsRecordedVideo");
+    videoEl.src = recordedVideoUrl;
+    document.getElementById("fsDownloadVideo").href = recordedVideoUrl;
+    document.getElementById("fsVideoWrap").classList.remove("hidden");
+  };
+  mediaRecorder.start();
+  isRecording = true;
+  document.getElementById("fsRecordBtn").textContent = "⏹ Detener grabación";
+  document.getElementById("fsRecordBtn").classList.add("recording");
+  document.getElementById("fsRecordStatus").style.display = "inline";
+  document.getElementById("fsVideoWrap").classList.add("hidden");
+}
+function stopRecording(){
+  if(mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+  isRecording = false;
+  document.getElementById("fsRecordBtn").textContent = "⏺ Grabar vídeo";
+  document.getElementById("fsRecordBtn").classList.remove("recording");
+  document.getElementById("fsRecordStatus").style.display = "none";
+}
+document.getElementById("fsRecordBtn").onclick = () => {
+  const cvs = document.getElementById("boardFullscreen").querySelector("canvas.court");
+  if(!cvs) return;
+  if(isRecording) stopRecording();
+  else{
+    resetRecordingUI();
+    startRecording(cvs);
+  }
+};
+document.getElementById("fsDiscardVideo").onclick = () => resetRecordingUI();
+
 function openBoardFullscreen(cvs){
   if(!cvs) return;
   fsReturnParent = cvs.parentNode;
   fsReturnNext = cvs.nextSibling;
-  document.getElementById("boardFullscreen").appendChild(cvs);
-  document.getElementById("boardFullscreen").classList.remove("hidden");
+  const overlay = document.getElementById("boardFullscreen");
+  overlay.insertBefore(cvs, overlay.querySelector(".fs-toolbar"));
+  overlay.classList.remove("hidden");
+  resetRecordingUI();
   redrawBoard();
 }
 function closeBoardFullscreen(){
   const overlay = document.getElementById("boardFullscreen");
   const cvs = overlay.querySelector("canvas.court");
+  if(isRecording) stopRecording();
   if(cvs && fsReturnParent){
     if(fsReturnNext && fsReturnNext.parentNode===fsReturnParent) fsReturnParent.insertBefore(cvs, fsReturnNext);
     else fsReturnParent.appendChild(cvs);
@@ -970,6 +1125,7 @@ function resetTaskForm(){
   document.getElementById("taskForm").reset();
   document.getElementById("cancelEdit").classList.add("hidden");
   tokens = []; frames = []; arrows = []; tokenSeq = 0; arrowSeq = 0;
+  lastGoalId = null;
   setArrowMode(false);
   redrawBoard(); renderFramesList();
 }
@@ -989,6 +1145,7 @@ window.editTask = (id) => {
   arrows = frames.length ? JSON.parse(JSON.stringify(frameArrows(frames[frames.length-1]))) : [];
   tokenSeq = tokens.reduce((m,tk)=> Math.max(m, parseInt((tk.id||"t0").slice(1))||0), 0);
   arrowSeq = arrows.reduce((m,a)=> Math.max(m, parseInt((a.id||"a0").slice(1))||0), 0);
+  lastGoalId = null;
   setArrowMode(false);
   redrawBoard(); renderFramesList();
   document.getElementById("cancelEdit").classList.remove("hidden");
