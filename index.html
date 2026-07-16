@@ -1809,81 +1809,175 @@ window.exportSessionPDF = function(sessionId){
   const doc = new jsPDF({unit:"mm", format:"a4"});
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
-  const margin = 14;
-  let y = margin;
+  const margin = 12;
+  const headerH = 20;
+  const RED = [216,30,44];
+  const LABEL_BG = [236,236,236];
+  const BORDER = [50,50,50];
+  const TEXT = [20,20,20];
+  let y = headerH + 8;
 
+  function drawBanner(){
+    doc.setFillColor(RED[0],RED[1],RED[2]);
+    doc.rect(0,0,pageW,headerH,'F');
+    const cy = headerH/2, r = 7, cx = margin + r;
+    doc.setFillColor(255,255,255);
+    doc.circle(cx,cy,r,'F');
+    try{ doc.addImage(CREST_DATA_URI,'PNG', cx-r+0.8, cy-r+0.8, (r-0.8)*2, (r-0.8)*2); }catch(e){}
+    doc.setFont("helvetica","bold"); doc.setFontSize(14);
+    doc.setTextColor(255,255,255);
+    doc.text("ENTREGA SESIÓN", cx+r+6, cy+1.6);
+  }
+  function newPage(){
+    doc.addPage();
+    drawBanner();
+    y = headerH + 8;
+  }
   function ensureSpace(h){
-    if(y + h > pageH - margin){ doc.addPage(); y = margin; }
+    if(y + h > pageH - margin){ newPage(); }
+  }
+  drawBanner();
+
+  function sectionBar(text){
+    ensureSpace(9);
+    doc.setFillColor(RED[0],RED[1],RED[2]);
+    doc.rect(margin, y, pageW-margin*2, 7, 'F');
+    doc.setFont("helvetica","bold"); doc.setFontSize(9.5);
+    doc.setTextColor(255,255,255);
+    doc.text(text.toUpperCase(), margin+3, y+5);
+    y += 7;
+  }
+  function labelValueRow(label, value){
+    const labelW = 42, valueW = pageW-margin*2-labelW;
+    doc.setFont("helvetica","normal"); doc.setFontSize(9.5);
+    const valueLines = doc.splitTextToSize(String(value||""), valueW-4);
+    const rowH = Math.max(7, valueLines.length*4.6+2.4);
+    ensureSpace(rowH);
+    doc.setFillColor(LABEL_BG[0],LABEL_BG[1],LABEL_BG[2]);
+    doc.rect(margin, y, labelW, rowH, 'F');
+    doc.setDrawColor(BORDER[0],BORDER[1],BORDER[2]); doc.setLineWidth(0.25);
+    doc.rect(margin, y, labelW, rowH);
+    doc.rect(margin+labelW, y, valueW, rowH);
+    doc.setFont("helvetica","bold"); doc.setTextColor(TEXT[0],TEXT[1],TEXT[2]);
+    doc.text(label, margin+2.5, y+5);
+    doc.setFont("helvetica","normal");
+    doc.text(valueLines, margin+labelW+2.5, y+5);
+    y += rowH;
+  }
+  function fullBox(label, value){
+    const fullW = pageW-margin*2;
+    ensureSpace(6);
+    doc.setFillColor(LABEL_BG[0],LABEL_BG[1],LABEL_BG[2]);
+    doc.rect(margin, y, fullW, 6, 'F');
+    doc.setDrawColor(BORDER[0],BORDER[1],BORDER[2]); doc.setLineWidth(0.25);
+    doc.rect(margin, y, fullW, 6);
+    doc.setFont("helvetica","bold"); doc.setFontSize(9.5); doc.setTextColor(TEXT[0],TEXT[1],TEXT[2]);
+    doc.text(label, margin+2.5, y+4.3);
+    y += 6;
+    doc.setFont("helvetica","normal");
+    const lines = doc.splitTextToSize(String(value||""), fullW-5);
+    const boxH = Math.max(7, lines.length*4.6+3);
+    ensureSpace(boxH);
+    doc.rect(margin, y, fullW, boxH);
+    doc.text(lines, margin+2.5, y+5);
+    y += boxH;
+  }
+  function multiColHeader(labels){
+    const fullW = pageW-margin*2, colW = fullW/labels.length;
+    ensureSpace(6);
+    doc.setDrawColor(BORDER[0],BORDER[1],BORDER[2]); doc.setLineWidth(0.25);
+    doc.setFont("helvetica","bold"); doc.setFontSize(8.5); doc.setTextColor(TEXT[0],TEXT[1],TEXT[2]);
+    labels.forEach((h,i)=>{
+      doc.rect(margin+i*colW, y, colW, 6);
+      doc.text(h, margin+i*colW+2, y+4.2);
+    });
+    y += 6;
+  }
+  function multiColValues(values){
+    const fullW = pageW-margin*2, colW = fullW/values.length;
+    ensureSpace(6);
+    doc.setDrawColor(BORDER[0],BORDER[1],BORDER[2]); doc.setLineWidth(0.25);
+    doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(TEXT[0],TEXT[1],TEXT[2]);
+    values.forEach((v,i)=>{
+      doc.rect(margin+i*colW, y, colW, 6);
+      doc.text(String(v||""), margin+i*colW+2, y+4.2);
+    });
+    y += 6;
   }
 
-  doc.setFont("helvetica","bold"); doc.setFontSize(17);
-  doc.setTextColor(20,20,20);
-  doc.text(s.name || "Sesión de entrenamiento", margin, y); y += 7;
+  // ---- DETALLES DE LA SESIÓN ----
+  sectionBar("Detalles de la sesión");
+  labelValueRow("Título", s.name || "");
+  labelValueRow("Fecha", s.date || "");
+  labelValueRow("Entrenador", s.createdByName || "");
+  const materiales = Array.from(new Set(
+    (s.taskIds||[]).map(id=>tasks.find(t=>t.id===id)).filter(Boolean).map(t=>t.material).filter(Boolean)
+  )).join(", ");
+  fullBox("Materiales", materiales);
+  fullBox("Objetivos / Notas", s.notes || "");
+  y += 4;
 
-  doc.setFont("helvetica","normal"); doc.setFontSize(10);
-  doc.setTextColor(107,101,95);
-  const metaLine = [s.date ? `Fecha: ${s.date}` : null, s.createdByName ? `Entrenador: ${s.createdByName}` : null].filter(Boolean).join("   ·   ");
-  if(metaLine){ doc.text(metaLine, margin, y); y += 6; }
-
-  if(s.notes){
-    doc.setFont("helvetica","italic"); doc.setFontSize(10); doc.setTextColor(60,60,60);
-    const noteLines = doc.splitTextToSize(s.notes, pageW-margin*2);
-    ensureSpace(noteLines.length*4.6+4);
-    doc.text(noteLines, margin, y); y += noteLines.length*4.6 + 4;
-  }
-
-  doc.setDrawColor(216,30,44); doc.setLineWidth(0.7);
-  doc.line(margin, y, pageW-margin, y); y += 8;
-
+  // ---- Tareas, agrupadas por categoría (sección de entrenamiento) ----
   const taskIds = s.taskIds || [];
   if(taskIds.length===0){
-    doc.setFont("helvetica","normal"); doc.setFontSize(11); doc.setTextColor(107,101,95);
-    doc.text("Esta sesión no tiene tareas añadidas.", margin, y);
+    sectionBar("Sin tareas");
+    doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.setTextColor(TEXT[0],TEXT[1],TEXT[2]);
+    doc.text("Esta sesión no tiene tareas añadidas.", margin, y+5);
+    y += 10;
   }
 
+  let lastCat = null;
   taskIds.forEach((id, i) => {
     const t = tasks.find(x=>x.id===id);
     if(!t) return;
+    const catName = catName_(t.categoryId) || "Sin categoría";
 
-    ensureSpace(14);
-    doc.setFont("helvetica","bold"); doc.setFontSize(13); doc.setTextColor(20,20,20);
-    const titleLines = doc.splitTextToSize(`${i+1}. ${t.title||"(sin título)"}`, pageW-margin*2);
-    doc.text(titleLines, margin, y); y += titleLines.length*5.5 + 1;
-
-    const metaParts = [];
-    if(catName_(t.categoryId)) metaParts.push(catName_(t.categoryId));
-    if(t.duration) metaParts.push(t.duration+" min");
-    if(t.players) metaParts.push(t.players);
-    if(t.material) metaParts.push(t.material);
-    if(metaParts.length){
-      doc.setFont("helvetica","normal"); doc.setFontSize(9.5); doc.setTextColor(107,101,95);
-      doc.text(metaParts.join("   ·   "), margin, y); y += 5.5;
+    if(catName !== lastCat){
+      lastCat = catName;
+      y += 2;
+      sectionBar("Detalles de la sección");
+      labelValueRow("Nombre", catName);
+      multiColHeader(["Equipos","Otros"]);
+      multiColValues(["",""]);
+      y += 2;
     }
 
-    if(t.description){
-      doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.setTextColor(40,40,40);
-      const descLines = doc.splitTextToSize(t.description, pageW-margin*2);
-      ensureSpace(descLines.length*4.6);
-      doc.text(descLines, margin, y); y += descLines.length*4.6 + 4;
-    }
+    sectionBar("Detalles del ejercicio");
+    labelValueRow("Título", `${i+1}. ${t.title || "(sin título)"}`);
+    labelValueRow("Estrategia", "");
+    fullBox("Objetivos", "");
+    multiColHeader(["Espacio","Tiempo","Situación de Juego","Coordinación"]);
+    multiColValues(["", t.duration ? t.duration+" min" : "", t.players || "", ""]);
+    multiColHeader(["Habilidades Coordinativas","Intención / Acción Táctica"]);
+    multiColValues(["",""]);
 
     const frameList = (t.animation && t.animation.frames) || [];
     if(frameList.length>0){
+      sectionBar("Descripción gráfica");
       const imgData = renderFrameToImage(frameList[0]);
-      const imgW = 110; // mm
+      const imgW = pageW - margin*2;
       const imgH = imgW * (700/980);
-      ensureSpace(imgH + 6);
-      doc.setDrawColor(230,224,214); doc.setLineWidth(0.3);
+      ensureSpace(imgH + 4);
+      doc.setDrawColor(BORDER[0],BORDER[1],BORDER[2]); doc.setLineWidth(0.3);
       doc.rect(margin, y, imgW, imgH);
       doc.addImage(imgData, "PNG", margin, y, imgW, imgH);
-      y += imgH + 8;
-    } else {
-      y += 4;
+      y += imgH + 4;
     }
 
-    ensureSpace(2);
-    doc.setDrawColor(230,224,214); doc.setLineWidth(0.2);
-    doc.line(margin, y, pageW-margin, y); y += 8;
+    if(t.description){
+      sectionBar("Consigna / Explicación");
+      const fullW = pageW-margin*2;
+      doc.setFont("helvetica","normal"); doc.setFontSize(9.5);
+      const lines = doc.splitTextToSize(t.description, fullW-5);
+      const boxH = Math.max(8, lines.length*4.6+4);
+      ensureSpace(boxH);
+      doc.setDrawColor(BORDER[0],BORDER[1],BORDER[2]); doc.setLineWidth(0.25);
+      doc.rect(margin, y, fullW, boxH);
+      doc.setTextColor(TEXT[0],TEXT[1],TEXT[2]);
+      doc.text(lines, margin+2.5, y+5);
+      y += boxH;
+    }
+    y += 4;
   });
 
   const safeName = (s.name || "sesion").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^\w\-]+/g,"_");
