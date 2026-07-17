@@ -1102,10 +1102,7 @@ wire2("addPlayerA","fsAddPlayerA", ()=>addToken("A"));
 wire2("addPlayerB","fsAddPlayerB", ()=>addToken("B"));
 wire2("addPlayerC","fsAddPlayerC", ()=>addToken("C"));
 wire2("addPlayerD","fsAddPlayerD", ()=>addToken("D"));
-wire2("addBall","fsAddBall", ()=>{
-  if(tokens.some(t=>t.type==="ball")){ alert("Ya has añadido un balón."); return; }
-  addToken("ball");
-});
+wire2("addBall","fsAddBall", ()=>addToken("ball"));
 wire2("addCone","fsAddCone", ()=>addToken("cone"));
 wire2("addGoalkeeperA","fsAddGoalkeeperA", ()=>addToken("GA"));
 wire2("addGoalkeeperB","fsAddGoalkeeperB", ()=>addToken("GB"));
