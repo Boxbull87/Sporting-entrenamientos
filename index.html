@@ -349,10 +349,6 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
               <input type="number" id="taskDuration" min="1" value="15">
             </div>
             <div>
-              <label>Situación de juego</label>
-              <input type="text" id="taskPlayers" placeholder="Ej: 5v5, GK+4">
-            </div>
-            <div>
               <label>Material</label>
               <input type="text" id="taskMaterial" placeholder="Conos, petos...">
             </div>
@@ -377,6 +373,8 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
               <input type="number" id="taskPlayersMax" min="1" placeholder="Ej: 10">
             </div>
           </div>
+          <label style="margin-top:10px;">Objetivos</label>
+          <textarea id="taskObjectives" placeholder="- Objetivo 1&#10;- Objetivo 2&#10;- Objetivo 3"></textarea>
           <label style="margin-top:10px;">Descripción / consignas</label>
           <textarea id="taskDesc" placeholder="Explica el objetivo, la organización y las claves de la tarea..."></textarea>
 
@@ -459,6 +457,8 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
             <input type="date" id="sessionDate">
           </div>
         </div>
+        <label style="margin-top:10px;">Objetivos de la sesión</label>
+        <textarea id="sessionObjectives" placeholder="- Objetivo 1&#10;- Objetivo 2&#10;- Objetivo 3"></textarea>
         <label style="margin-top:10px;">Notas</label>
         <textarea id="sessionNotes" placeholder="Observaciones para el equipo técnico..."></textarea>
 
@@ -1551,7 +1551,7 @@ document.getElementById("taskForm").onsubmit = async (e) => {
     categoryId: document.getElementById("taskCategory").value || null,
     phase: document.getElementById("taskPhase").value || null,
     duration: Number(document.getElementById("taskDuration").value) || 0,
-    players: document.getElementById("taskPlayers").value.trim(),
+    objectives: document.getElementById("taskObjectives").value.trim(),
     material: document.getElementById("taskMaterial").value.trim(),
     description: document.getElementById("taskDesc").value.trim(),
     levelFrom, levelTo, playersMin, playersMax,
@@ -1599,7 +1599,7 @@ window.editTask = (id) => {
   document.getElementById("taskCategory").value = t.categoryId || "";
   document.getElementById("taskPhase").value = t.phase || "principal";
   document.getElementById("taskDuration").value = t.duration || 15;
-  document.getElementById("taskPlayers").value = t.players || "";
+  document.getElementById("taskObjectives").value = t.objectives || "";
   document.getElementById("taskMaterial").value = t.material || "";
   document.getElementById("taskDesc").value = t.description || "";
   document.getElementById("taskLevelFrom").value = t.levelFrom || AGE_LEVELS[0];
@@ -1657,7 +1657,7 @@ function renderTaskList(){
           ${catName ? `<span class="badge">${escapeHtml(catName)}</span>` : ""}
           ${phaseLabel(t) ? `<span class="badge">${escapeHtml(phaseLabel(t))}</span>` : ""}
           ${t.duration ? `<span class="badge outline">${t.duration} min</span>`:""}
-          ${t.players ? `<span class="badge outline">${escapeHtml(t.players)}</span>`:""}
+          ${t.objectives ? `<span class="badge outline">📋 Objetivos</span>`:""}
           ${levelRangeLabel(t) ? `<span class="badge outline">🎂 ${escapeHtml(levelRangeLabel(t))}</span>`:""}
           ${playersRangeLabel(t) ? `<span class="badge outline">👥 ${escapeHtml(playersRangeLabel(t))} jug.</span>`:""}
           ${frameCount ? `<span class="badge outline">🎯 ${frameCount} fotog.</span>`:""}
@@ -1684,13 +1684,14 @@ window.viewTask = (id) => {
     ${catName_(t.categoryId) ? `<span class="badge">${escapeHtml(catName_(t.categoryId))}</span> ` : ""}
     ${phaseLabel(t) ? `<span class="badge">${escapeHtml(phaseLabel(t))}</span> ` : ""}
     ${t.duration ? `<span class="badge outline">⏱ ${t.duration} min</span> `:""}
-    ${t.players ? `<span class="badge outline">👥 ${escapeHtml(t.players)}</span> `:""}
     ${levelRangeLabel(t) ? `<span class="badge outline">🎂 ${escapeHtml(levelRangeLabel(t))}</span> `:""}
     ${playersRangeLabel(t) ? `<span class="badge outline">👥 ${escapeHtml(playersRangeLabel(t))} jug.</span> `:""}
     ${t.material ? `<span class="badge outline">🧰 ${escapeHtml(t.material)}</span>`:""}
   `;
   document.getElementById("viewTaskDesc").innerHTML = `
-    <strong style="font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);">Descripción / consignas</strong>
+    ${t.objectives ? `<strong style="font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);">Objetivos</strong>
+    <div style="margin-top:4px;white-space:pre-wrap;">${escapeHtml(t.objectives)}</div>` : ""}
+    <strong style="font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-top:${t.objectives?"10px":"0"};display:block;">Descripción / consignas</strong>
     <div style="margin-top:4px;white-space:pre-wrap;">${escapeHtml(t.description || "(Sin descripción)")}</div>
   `;
   const boardWrap = document.getElementById("viewTaskBoardWrap");
@@ -1869,6 +1870,7 @@ document.getElementById("btnSaveSession").onclick = async () => {
   const payload = {
     name,
     date: document.getElementById("sessionDate").value || null,
+    objectives: document.getElementById("sessionObjectives").value.trim(),
     notes: document.getElementById("sessionNotes").value.trim(),
     taskIds: flatIds,
     blocks: {
@@ -1898,6 +1900,7 @@ function resetSessionForm(){
   editingSessionId = null;
   document.getElementById("sessionName").value = "";
   document.getElementById("sessionDate").value = "";
+  document.getElementById("sessionObjectives").value = "";
   document.getElementById("sessionNotes").value = "";
   sessionBlocks = { calentamiento: [], principal: [], vuelta: [] };
   renderSessionTaskList();
@@ -1912,6 +1915,7 @@ window.editSession = (id) => {
   editingSessionId = id;
   document.getElementById("sessionName").value = s.name || "";
   document.getElementById("sessionDate").value = s.date || "";
+  document.getElementById("sessionObjectives").value = s.objectives || "";
   document.getElementById("sessionNotes").value = s.notes || "";
   if(s.blocks){
     sessionBlocks = {
@@ -1957,6 +1961,7 @@ function sessionCardHtml(s){
     </div>
     ${taskListHtml}
     <p class="muted" style="font-size:.78rem;margin-top:-2px;">Toca una tarea para ver sus notas y la pizarra táctica.</p>
+    ${s.objectives ? `<p style="font-size:.85rem;white-space:pre-wrap;"><strong>Objetivos:</strong><br>${escapeHtml(s.objectives)}</p>` : ""}
     ${s.notes ? `<p class="muted" style="font-size:.85rem;">${escapeHtml(s.notes)}</p>` : ""}
     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
       <button class="btn ghost small" onclick="exportSessionPDF('${s.id}')">📄 Exportar a PDF</button>
@@ -2126,7 +2131,8 @@ window.exportSessionPDF = function(sessionId){
     (s.taskIds||[]).map(id=>tasks.find(t=>t.id===id)).filter(Boolean).map(t=>t.material).filter(Boolean)
   )).join(", ");
   fullBox("Materiales", materiales);
-  fullBox("Objetivos / Notas", s.notes || "");
+  fullBox("Objetivos", s.objectives || "");
+  fullBox("Notas", s.notes || "");
   y += 4;
 
   // ---- Tareas, agrupadas por bloque de sesión (Calentamiento / Parte principal / Vuelta a la calma) ----
@@ -2134,9 +2140,9 @@ window.exportSessionPDF = function(sessionId){
     sectionBar("Detalles del ejercicio");
     labelValueRow("Título", `${i+1}. ${t.title || "(sin título)"}`);
     labelValueRow("Estrategia", "");
-    fullBox("Objetivos", "");
+    fullBox("Objetivos", t.objectives || "");
     multiColHeader(["Categoría (edad)","Tiempo","Situación de Juego","Nº Jugadores"]);
-    multiColValues([levelRangeLabel(t) || "", t.duration ? t.duration+" min" : "", t.players || "", playersRangeLabel(t) || ""]);
+    multiColValues([levelRangeLabel(t) || "", t.duration ? t.duration+" min" : "", "", playersRangeLabel(t) || ""]);
     multiColHeader(["Habilidades Coordinativas","Intención / Acción Táctica"]);
     multiColValues(["",""]);
 
@@ -2249,14 +2255,14 @@ document.getElementById("btnExportTasksExcel").onclick = () => {
   if(tasks.length===0){ alert("No hay tareas que exportar todavía."); return; }
 
   const baseUrl = location.origin + location.pathname;
-  const header = ["Título","Categoría","Fase","Categoría de edad","Duración (min)","Situación de juego","Nº jugadores (rango)","Material","Descripción","Enlace"];
+  const header = ["Título","Categoría","Fase","Categoría de edad","Duración (min)","Objetivos","Nº jugadores (rango)","Material","Descripción","Enlace"];
   const rows = tasks.map(t => [
     t.title || "",
     catName_(t.categoryId) || "",
     phaseLabel(t) || "",
     levelRangeLabel(t) || "",
     t.duration || "",
-    t.players || "",
+    t.objectives || "",
     playersRangeLabel(t) || "",
     t.material || "",
     t.description || "",
@@ -2265,7 +2271,7 @@ document.getElementById("btnExportTasksExcel").onclick = () => {
 
   const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
   ws["!cols"] = [
-    {wch:28}, {wch:16}, {wch:16}, {wch:20}, {wch:12}, {wch:16}, {wch:16}, {wch:18}, {wch:50}, {wch:40}
+    {wch:28}, {wch:16}, {wch:16}, {wch:20}, {wch:12}, {wch:34}, {wch:16}, {wch:18}, {wch:50}, {wch:40}
   ];
   ws["!rows"] = [{hpt:24}];
 
@@ -2298,7 +2304,7 @@ document.getElementById("btnExportTasksExcel").onclick = () => {
       ws[ref].s = {
         fill: { fgColor: { rgb: zebra ? "F7F3EC" : "FFFFFF" } },
         font: isLinkCol ? { color:{rgb:"2F80ED"}, underline:true, sz:10 } : { color:{rgb:"1A1A1A"}, sz:10 },
-        alignment: { vertical:"center", wrapText: (C===8) },
+        alignment: { vertical:"center", wrapText: (C===5 || C===8) },
         border: cellBorder
       };
       if(isLinkCol){
