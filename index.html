@@ -447,8 +447,8 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
 
     <!-- ---------- SESSIONS TAB ---------- -->
     <div id="tab-sessions" class="hidden">
-      <div class="card">
-        <h2 style="font-size:1.05rem;">🗓️ Crear sesión de entrenamiento</h2>
+      <div class="card" id="sessionEditorPanel">
+        <h2 style="font-size:1.05rem;" id="sessionEditorTitle">🗓️ Crear sesión de entrenamiento</h2>
         <div class="row">
           <div>
             <label>Nombre de la sesión</label>
@@ -487,7 +487,10 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
         <h3 style="margin-top:14px;font-size:.9rem;">Tareas seleccionadas</h3>
         <div id="sessionTaskList"><p class="muted">Ninguna tarea añadida todavía.</p></div>
         <p class="muted" id="sessionTotalTime"></p>
-        <button class="btn accent" id="btnSaveSession" style="margin-top:8px;">Guardar sesión</button>
+        <div style="margin-top:8px;display:flex;gap:8px;">
+          <button class="btn accent" id="btnSaveSession">Guardar sesión</button>
+          <button type="button" class="btn ghost hidden" id="cancelSessionEdit">Cancelar edición</button>
+        </div>
         <div id="sessionMsg"></div>
       </div>
 
@@ -1781,6 +1784,7 @@ window.setCoachActive = async (id, active) => {
    SESSIONS
 ============================================================= */
 let sessionBlocks = { calentamiento: [], principal: [], vuelta: [] };
+let editingSessionId = null;
 
 document.getElementById("sessionAddCategory").onchange = renderSessionTaskOptions;
 document.getElementById("sessionFilterPhase").onchange = () => {
@@ -1865,68 +1869,126 @@ document.getElementById("btnSaveSession").onclick = async () => {
   const flatIds = [...sessionBlocks.calentamiento, ...sessionBlocks.principal, ...sessionBlocks.vuelta];
   if(!name){ msgEl.innerHTML = '<p class="error-msg">Ponle un nombre a la sesión.</p>'; return; }
   if(flatIds.length===0){ msgEl.innerHTML = '<p class="error-msg">Añade al menos una tarea.</p>'; return; }
+  const payload = {
+    name,
+    date: document.getElementById("sessionDate").value || null,
+    notes: document.getElementById("sessionNotes").value.trim(),
+    taskIds: flatIds,
+    blocks: {
+      calentamiento: [...sessionBlocks.calentamiento],
+      principal: [...sessionBlocks.principal],
+      vuelta: [...sessionBlocks.vuelta]
+    }
+  };
   try{
-    await db.collection("sessions").add({
-      name,
-      date: document.getElementById("sessionDate").value || null,
-      notes: document.getElementById("sessionNotes").value.trim(),
-      taskIds: flatIds,
-      blocks: {
-        calentamiento: [...sessionBlocks.calentamiento],
-        principal: [...sessionBlocks.principal],
-        vuelta: [...sessionBlocks.vuelta]
-      },
-      createdBy: currentUser.uid,
-      createdByName: currentCoach.name,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    msgEl.innerHTML = '<p class="ok-msg">Sesión guardada.</p>';
-    document.getElementById("sessionName").value = "";
-    document.getElementById("sessionDate").value = "";
-    document.getElementById("sessionNotes").value = "";
-    sessionBlocks = { calentamiento: [], principal: [], vuelta: [] };
-    renderSessionTaskList();
+    if(editingSessionId){
+      await db.collection("sessions").doc(editingSessionId).update(payload);
+      msgEl.innerHTML = '<p class="ok-msg">Sesión actualizada.</p>';
+    } else {
+      payload.createdBy = currentUser.uid;
+      payload.createdByName = currentCoach.name;
+      payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection("sessions").add(payload);
+      msgEl.innerHTML = '<p class="ok-msg">Sesión guardada.</p>';
+    }
+    resetSessionForm();
   }catch(err){
     msgEl.innerHTML = '<p class="error-msg">Error: '+err.message+'</p>';
   }
 };
 
+function resetSessionForm(){
+  editingSessionId = null;
+  document.getElementById("sessionName").value = "";
+  document.getElementById("sessionDate").value = "";
+  document.getElementById("sessionNotes").value = "";
+  sessionBlocks = { calentamiento: [], principal: [], vuelta: [] };
+  renderSessionTaskList();
+  document.getElementById("sessionEditorTitle").textContent = "🗓️ Crear sesión de entrenamiento";
+  document.getElementById("cancelSessionEdit").classList.add("hidden");
+}
+document.getElementById("cancelSessionEdit").onclick = () => { resetSessionForm(); document.getElementById("sessionMsg").innerHTML = ""; };
+
+window.editSession = (id) => {
+  const s = sessions.find(x=>x.id===id);
+  if(!s) return;
+  editingSessionId = id;
+  document.getElementById("sessionName").value = s.name || "";
+  document.getElementById("sessionDate").value = s.date || "";
+  document.getElementById("sessionNotes").value = s.notes || "";
+  if(s.blocks){
+    sessionBlocks = {
+      calentamiento: [...(s.blocks.calentamiento||[])],
+      principal: [...(s.blocks.principal||[])],
+      vuelta: [...(s.blocks.vuelta||[])]
+    };
+  } else {
+    // Sesiones antiguas sin bloques: se cargan todas en "Parte principal"
+    sessionBlocks = { calentamiento: [], principal: [...(s.taskIds||[])], vuelta: [] };
+  }
+  renderSessionTaskList();
+  document.getElementById("sessionEditorTitle").textContent = "✏️ Editando sesión: " + (s.name || "");
+  document.getElementById("cancelSessionEdit").classList.remove("hidden");
+  document.getElementById("sessionMsg").innerHTML = "";
+  document.querySelector('.tab[data-tab="sessions"]').click();
+  document.getElementById("sessionEditorPanel").scrollIntoView({behavior:"smooth"});
+};
+
+function sessionCardHtml(s){
+  function taskLi(id){
+    const t = tasks.find(x=>x.id===id);
+    if(!t) return '<li class="muted">(tarea eliminada)</li>';
+    return `<li><a href="javascript:void(0)" onclick="viewTask('${id}')" style="color:var(--accent);font-weight:600;text-decoration:none;">${escapeHtml(t.title)}</a>${t.duration?` <span class="muted">· ${t.duration} min</span>`:""}</li>`;
+  }
+  let taskListHtml;
+  if(s.blocks){
+    taskListHtml = Object.keys(SESSION_BLOCKS).map(block=>{
+      const ids = s.blocks[block] || [];
+      if(ids.length===0) return "";
+      return `<h4 style="margin:8px 0 2px 0;font-size:.8rem;color:var(--accent);">${SESSION_BLOCKS[block]}</h4>
+      <ol style="margin:0 0 4px 18px;padding:0;font-size:.88rem;">${ids.map(taskLi).join("")}</ol>`;
+    }).join("");
+  } else {
+    taskListHtml = `<ol style="margin:0 0 6px 18px;padding:0;font-size:.88rem;">${(s.taskIds||[]).map(taskLi).join("")}</ol>`;
+  }
+  const canManage = currentCoach && (currentCoach.role===ROLE_GESTOR || s.createdBy===currentUser.uid);
+  return `
+  <div class="card" style="margin-bottom:10px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <h3 style="font-size:.95rem;">${escapeHtml(s.name)}</h3>
+      <span class="muted">${s.date||""}</span>
+    </div>
+    ${taskListHtml}
+    <p class="muted" style="font-size:.78rem;margin-top:-2px;">Toca una tarea para ver sus notas y la pizarra táctica.</p>
+    ${s.notes ? `<p class="muted" style="font-size:.85rem;">${escapeHtml(s.notes)}</p>` : ""}
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+      <button class="btn ghost small" onclick="exportSessionPDF('${s.id}')">📄 Exportar a PDF</button>
+      ${canManage ? `<button class="btn ghost small" onclick="editSession('${s.id}')">✏️ Editar sesión</button>` : ""}
+      ${canManage ? `<button class="btn danger small" onclick="deleteSession('${s.id}')">🗑 Borrar sesión</button>` : ""}
+    </div>
+  </div>`;
+}
+
 function renderSavedSessions(){
   const wrap = document.getElementById("sessionsSaved");
   if(sessions.length===0){ wrap.innerHTML = '<div class="empty">Todavía no se han guardado sesiones.</div>'; return; }
-  wrap.innerHTML = sessions.map(s=>{
-    function taskLi(id){
-      const t = tasks.find(x=>x.id===id);
-      if(!t) return '<li class="muted">(tarea eliminada)</li>';
-      return `<li><a href="javascript:void(0)" onclick="viewTask('${id}')" style="color:var(--accent);font-weight:600;text-decoration:none;">${escapeHtml(t.title)}</a>${t.duration?` <span class="muted">· ${t.duration} min</span>`:""}</li>`;
-    }
-    let taskListHtml;
-    if(s.blocks){
-      taskListHtml = Object.keys(SESSION_BLOCKS).map(block=>{
-        const ids = s.blocks[block] || [];
-        if(ids.length===0) return "";
-        return `<h4 style="margin:8px 0 2px 0;font-size:.8rem;color:var(--accent);">${SESSION_BLOCKS[block]}</h4>
-        <ol style="margin:0 0 4px 18px;padding:0;font-size:.88rem;">${ids.map(taskLi).join("")}</ol>`;
-      }).join("");
-    } else {
-      taskListHtml = `<ol style="margin:0 0 6px 18px;padding:0;font-size:.88rem;">${(s.taskIds||[]).map(taskLi).join("")}</ol>`;
-    }
-    const canDelete = currentCoach && (currentCoach.role===ROLE_GESTOR || s.createdBy===currentUser.uid);
+  const groups = {};
+  sessions.forEach(s=>{
+    const key = s.createdByName || "Sin entrenador";
+    if(!groups[key]) groups[key] = [];
+    groups[key].push(s);
+  });
+  const coachNames = Object.keys(groups).sort((a,b)=>a.localeCompare(b,'es'));
+  wrap.innerHTML = coachNames.map((name, idx)=>{
+    const list = groups[name];
+    const cardsHtml = list.map(sessionCardHtml).join("");
     return `
-    <div class="card" style="margin-bottom:10px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <h3 style="font-size:.95rem;">${escapeHtml(s.name)}</h3>
-        <span class="muted">${s.date||""}</span>
-      </div>
-      <p class="muted" style="margin:2px 0 8px 0;">Por ${escapeHtml(s.createdByName||"")}</p>
-      ${taskListHtml}
-      <p class="muted" style="font-size:.78rem;margin-top:-2px;">Toca una tarea para ver sus notas y la pizarra táctica.</p>
-      ${s.notes ? `<p class="muted" style="font-size:.85rem;">${escapeHtml(s.notes)}</p>` : ""}
-      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
-        <button class="btn ghost small" onclick="exportSessionPDF('${s.id}')">📄 Exportar a PDF</button>
-        ${canDelete ? `<button class="btn danger small" onclick="deleteSession('${s.id}')">🗑 Borrar sesión</button>` : ""}
-      </div>
-    </div>`;
+    <details class="coach-group" style="margin-bottom:10px;" ${idx===0 ? "open" : ""}>
+      <summary style="cursor:pointer;font-weight:700;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);">
+        ${escapeHtml(name)} <span class="muted" style="font-weight:400;">(${list.length} sesión${list.length===1?"":"es"})</span>
+      </summary>
+      <div style="margin-top:8px;">${cardsHtml}</div>
+    </details>`;
   }).join("");
 }
 window.deleteSession = async (id) => {
