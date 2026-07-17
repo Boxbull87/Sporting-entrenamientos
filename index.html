@@ -334,6 +334,14 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
               <label>Categoría</label>
               <select id="taskCategory"></select>
             </div>
+            <div>
+              <label>Fase de la sesión</label>
+              <select id="taskPhase">
+                <option value="calentamiento">Calentamiento</option>
+                <option value="principal" selected>Parte principal</option>
+                <option value="vuelta">Vuelta a la calma</option>
+              </select>
+            </div>
           </div>
           <div class="row" style="margin-top:10px;">
             <div>
@@ -457,6 +465,12 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
         <h3 style="margin-top:14px;font-size:.9rem;">Añadir tareas</h3>
         <div class="filterbar">
           <select id="sessionAddCategory"><option value="">Todas las categorías</option></select>
+          <select id="sessionFilterPhase">
+            <option value="">Todas las fases</option>
+            <option value="calentamiento">Calentamiento</option>
+            <option value="principal">Parte principal</option>
+            <option value="vuelta">Vuelta a la calma</option>
+          </select>
           <select id="sessionFilterLevel"></select>
           <input type="number" id="sessionFilterPlayers" placeholder="Jugadores disponibles" min="1">
         </div>
@@ -622,6 +636,9 @@ function playersRangeLabel(t){
   if(min!=null) return `Desde ${min}`;
   if(max!=null) return `Hasta ${max}`;
   return "";
+}
+function phaseLabel(t){
+  return (t && t.phase && SESSION_BLOCKS[t.phase]) ? SESSION_BLOCKS[t.phase] : "";
 }
 
 /* ============================================================
@@ -1532,6 +1549,7 @@ document.getElementById("taskForm").onsubmit = async (e) => {
   const payload = {
     title: document.getElementById("taskTitle").value.trim(),
     categoryId: document.getElementById("taskCategory").value || null,
+    phase: document.getElementById("taskPhase").value || null,
     duration: Number(document.getElementById("taskDuration").value) || 0,
     players: document.getElementById("taskPlayers").value.trim(),
     material: document.getElementById("taskMaterial").value.trim(),
@@ -1579,6 +1597,7 @@ window.editTask = (id) => {
   editingTaskId = id;
   document.getElementById("taskTitle").value = t.title || "";
   document.getElementById("taskCategory").value = t.categoryId || "";
+  document.getElementById("taskPhase").value = t.phase || "principal";
   document.getElementById("taskDuration").value = t.duration || 15;
   document.getElementById("taskPlayers").value = t.players || "";
   document.getElementById("taskMaterial").value = t.material || "";
@@ -1636,6 +1655,7 @@ function renderTaskList(){
         <h4>${escapeHtml(t.title)}</h4>
         <div class="task-meta">
           ${catName ? `<span class="badge">${escapeHtml(catName)}</span>` : ""}
+          ${phaseLabel(t) ? `<span class="badge">${escapeHtml(phaseLabel(t))}</span>` : ""}
           ${t.duration ? `<span class="badge outline">${t.duration} min</span>`:""}
           ${t.players ? `<span class="badge outline">${escapeHtml(t.players)}</span>`:""}
           ${levelRangeLabel(t) ? `<span class="badge outline">🎂 ${escapeHtml(levelRangeLabel(t))}</span>`:""}
@@ -1662,6 +1682,7 @@ window.viewTask = (id) => {
   document.getElementById("viewTaskTitle").textContent = t.title;
   document.getElementById("viewTaskMeta").innerHTML = `
     ${catName_(t.categoryId) ? `<span class="badge">${escapeHtml(catName_(t.categoryId))}</span> ` : ""}
+    ${phaseLabel(t) ? `<span class="badge">${escapeHtml(phaseLabel(t))}</span> ` : ""}
     ${t.duration ? `<span class="badge outline">⏱ ${t.duration} min</span> `:""}
     ${t.players ? `<span class="badge outline">👥 ${escapeHtml(t.players)}</span> `:""}
     ${levelRangeLabel(t) ? `<span class="badge outline">🎂 ${escapeHtml(levelRangeLabel(t))}</span> `:""}
@@ -1762,14 +1783,21 @@ window.setCoachActive = async (id, active) => {
 let sessionBlocks = { calentamiento: [], principal: [], vuelta: [] };
 
 document.getElementById("sessionAddCategory").onchange = renderSessionTaskOptions;
+document.getElementById("sessionFilterPhase").onchange = () => {
+  const phase = document.getElementById("sessionFilterPhase").value;
+  if(phase) document.getElementById("sessionAddBlock").value = phase;
+  renderSessionTaskOptions();
+};
 document.getElementById("sessionFilterLevel").onchange = renderSessionTaskOptions;
 document.getElementById("sessionFilterPlayers").oninput = renderSessionTaskOptions;
 function renderSessionTaskOptions(){
   const catFilter = document.getElementById("sessionAddCategory").value;
+  const phaseFilter = document.getElementById("sessionFilterPhase").value;
   const levelFilter = document.getElementById("sessionFilterLevel").value;
   const playersFilter = document.getElementById("sessionFilterPlayers").value ? Number(document.getElementById("sessionFilterPlayers").value) : null;
   const list = tasks.filter(t=>{
     if(catFilter && t.categoryId!==catFilter) return false;
+    if(phaseFilter && t.phase!==phaseFilter) return false;
     if(levelFilter && t.levelFrom && t.levelTo){
       const idxSel = AGE_LEVELS.indexOf(levelFilter);
       const idxF = AGE_LEVELS.indexOf(t.levelFrom);
@@ -2162,10 +2190,11 @@ document.getElementById("btnExportTasksExcel").onclick = () => {
   if(tasks.length===0){ alert("No hay tareas que exportar todavía."); return; }
 
   const baseUrl = location.origin + location.pathname;
-  const header = ["Título","Categoría","Categoría de edad","Duración (min)","Situación de juego","Nº jugadores (rango)","Material","Descripción","Enlace"];
+  const header = ["Título","Categoría","Fase","Categoría de edad","Duración (min)","Situación de juego","Nº jugadores (rango)","Material","Descripción","Enlace"];
   const rows = tasks.map(t => [
     t.title || "",
     catName_(t.categoryId) || "",
+    phaseLabel(t) || "",
     levelRangeLabel(t) || "",
     t.duration || "",
     t.players || "",
@@ -2177,7 +2206,7 @@ document.getElementById("btnExportTasksExcel").onclick = () => {
 
   const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
   ws["!cols"] = [
-    {wch:28}, {wch:16}, {wch:20}, {wch:12}, {wch:16}, {wch:16}, {wch:18}, {wch:50}, {wch:40}
+    {wch:28}, {wch:16}, {wch:16}, {wch:20}, {wch:12}, {wch:16}, {wch:16}, {wch:18}, {wch:50}, {wch:40}
   ];
   ws["!rows"] = [{hpt:24}];
 
@@ -2186,7 +2215,7 @@ document.getElementById("btnExportTasksExcel").onclick = () => {
   const cellBorder = { top:thinBorder, bottom:thinBorder, left:thinBorder, right:thinBorder };
 
   const range = XLSX.utils.decode_range(ws["!ref"]);
-  const LINK_COL = 8; // "Enlace" es la última columna (índice 0-based)
+  const LINK_COL = 9; // "Enlace" es la última columna (índice 0-based)
 
   // Cabecera: fondo rojo del club, texto blanco y negrita
   for(let C=range.s.c; C<=range.e.c; C++){
@@ -2210,7 +2239,7 @@ document.getElementById("btnExportTasksExcel").onclick = () => {
       ws[ref].s = {
         fill: { fgColor: { rgb: zebra ? "F7F3EC" : "FFFFFF" } },
         font: isLinkCol ? { color:{rgb:"2F80ED"}, underline:true, sz:10 } : { color:{rgb:"1A1A1A"}, sz:10 },
-        alignment: { vertical:"center", wrapText: (C===7) },
+        alignment: { vertical:"center", wrapText: (C===8) },
         border: cellBorder
       };
       if(isLinkCol){
@@ -2220,7 +2249,7 @@ document.getElementById("btnExportTasksExcel").onclick = () => {
   }
 
   // Autofiltro solo en las columnas de datos (Título → Descripción), sin incluir Enlace
-  ws["!autofilter"] = { ref: `A1:H${range.e.r+1}` };
+  ws["!autofilter"] = { ref: `A1:I${range.e.r+1}` };
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Banco de tareas");
