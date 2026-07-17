@@ -341,12 +341,32 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
               <input type="number" id="taskDuration" min="1" value="15">
             </div>
             <div>
-              <label>Nº jugadores</label>
+              <label>Situación de juego</label>
               <input type="text" id="taskPlayers" placeholder="Ej: 5v5, GK+4">
             </div>
             <div>
               <label>Material</label>
               <input type="text" id="taskMaterial" placeholder="Conos, petos...">
+            </div>
+          </div>
+          <div class="row" style="margin-top:10px;">
+            <div>
+              <label>Categoría de edad – Desde</label>
+              <select id="taskLevelFrom"></select>
+            </div>
+            <div>
+              <label>Categoría de edad – Hasta</label>
+              <select id="taskLevelTo"></select>
+            </div>
+          </div>
+          <div class="row" style="margin-top:10px;">
+            <div>
+              <label>Nº jugadores – Mínimo</label>
+              <input type="number" id="taskPlayersMin" min="1" placeholder="Ej: 4">
+            </div>
+            <div>
+              <label>Nº jugadores – Máximo</label>
+              <input type="number" id="taskPlayersMax" min="1" placeholder="Ej: 10">
             </div>
           </div>
           <label style="margin-top:10px;">Descripción / consignas</label>
@@ -437,7 +457,16 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
         <h3 style="margin-top:14px;font-size:.9rem;">Añadir tareas</h3>
         <div class="filterbar">
           <select id="sessionAddCategory"><option value="">Todas las categorías</option></select>
+          <select id="sessionFilterLevel"></select>
+          <input type="number" id="sessionFilterPlayers" placeholder="Jugadores disponibles" min="1">
+        </div>
+        <div class="filterbar" style="margin-top:6px;">
           <select id="sessionAddTask"></select>
+          <select id="sessionAddBlock">
+            <option value="calentamiento">Calentamiento</option>
+            <option value="principal" selected>Parte principal</option>
+            <option value="vuelta">Vuelta a la calma</option>
+          </select>
           <button class="btn small" id="btnAddToSession">Añadir</button>
         </div>
 
@@ -559,6 +588,41 @@ let sessions = [];
 const ROLE_GESTOR = "gestor";
 const ROLE_EDITOR = "editor";
 const ROLE_COACH = "entrenador";
+
+/* ============================================================
+   CATEGORÍAS DE EDAD Y BLOQUES DE SESIÓN
+============================================================= */
+const AGE_LEVELS = ["Prebenjamín","Benjamín","Alevín","Infantil","Cadete","Juvenil","Senior"];
+const SESSION_BLOCKS = {calentamiento:"Calentamiento", principal:"Parte principal", vuelta:"Vuelta a la calma"};
+
+function levelOptionsHTML(){
+  return AGE_LEVELS.map(l=>`<option value="${l}">${l}</option>`).join("");
+}
+function populateLevelSelects(){
+  const from = document.getElementById("taskLevelFrom");
+  const to = document.getElementById("taskLevelTo");
+  const filt = document.getElementById("sessionFilterLevel");
+  if(from){ from.innerHTML = levelOptionsHTML(); from.value = AGE_LEVELS[0]; }
+  if(to){ to.innerHTML = levelOptionsHTML(); to.value = AGE_LEVELS[AGE_LEVELS.length-1]; }
+  if(filt){ filt.innerHTML = '<option value="">Todas las categorías de edad</option>' + levelOptionsHTML(); }
+}
+populateLevelSelects();
+
+function levelRangeLabel(t){
+  if(!t) return "";
+  if(t.levelFrom && t.levelTo){
+    return t.levelFrom===t.levelTo ? t.levelFrom : `${t.levelFrom} – ${t.levelTo}`;
+  }
+  return t.levelFrom || t.levelTo || "";
+}
+function playersRangeLabel(t){
+  if(!t) return "";
+  const min = t.playersMin, max = t.playersMax;
+  if(min!=null && max!=null) return min===max ? `${min}` : `${min}–${max}`;
+  if(min!=null) return `Desde ${min}`;
+  if(max!=null) return `Hasta ${max}`;
+  return "";
+}
 
 /* ============================================================
    AUTH FLOWS
@@ -1455,6 +1519,16 @@ document.getElementById("taskForm").onsubmit = async (e) => {
   e.preventDefault();
   const msgEl = document.getElementById("taskFormMsg");
   msgEl.innerHTML = "";
+  let levelFrom = document.getElementById("taskLevelFrom").value || null;
+  let levelTo = document.getElementById("taskLevelTo").value || null;
+  if(levelFrom && levelTo && AGE_LEVELS.indexOf(levelFrom) > AGE_LEVELS.indexOf(levelTo)){
+    [levelFrom, levelTo] = [levelTo, levelFrom];
+  }
+  let playersMin = document.getElementById("taskPlayersMin").value ? Number(document.getElementById("taskPlayersMin").value) : null;
+  let playersMax = document.getElementById("taskPlayersMax").value ? Number(document.getElementById("taskPlayersMax").value) : null;
+  if(playersMin!=null && playersMax!=null && playersMin > playersMax){
+    [playersMin, playersMax] = [playersMax, playersMin];
+  }
   const payload = {
     title: document.getElementById("taskTitle").value.trim(),
     categoryId: document.getElementById("taskCategory").value || null,
@@ -1462,6 +1536,7 @@ document.getElementById("taskForm").onsubmit = async (e) => {
     players: document.getElementById("taskPlayers").value.trim(),
     material: document.getElementById("taskMaterial").value.trim(),
     description: document.getElementById("taskDesc").value.trim(),
+    levelFrom, levelTo, playersMin, playersMax,
     animation: { frames: frames },
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   };
@@ -1488,6 +1563,8 @@ function resetTaskForm(){
   editingTaskId = null;
   document.getElementById("taskForm").reset();
   document.getElementById("cancelEdit").classList.add("hidden");
+  document.getElementById("taskLevelFrom").value = AGE_LEVELS[0];
+  document.getElementById("taskLevelTo").value = AGE_LEVELS[AGE_LEVELS.length-1];
   tokens = []; frames = []; arrows = []; texts = []; shapes = []; paths = [];
   tokenSeq = 0; arrowSeq = 0; textSeq = 0; shapeSeq = 0; pathSeq = 0;
   historyStack = []; selected = null; dragObj = null;
@@ -1506,6 +1583,10 @@ window.editTask = (id) => {
   document.getElementById("taskPlayers").value = t.players || "";
   document.getElementById("taskMaterial").value = t.material || "";
   document.getElementById("taskDesc").value = t.description || "";
+  document.getElementById("taskLevelFrom").value = t.levelFrom || AGE_LEVELS[0];
+  document.getElementById("taskLevelTo").value = t.levelTo || AGE_LEVELS[AGE_LEVELS.length-1];
+  document.getElementById("taskPlayersMin").value = t.playersMin != null ? t.playersMin : "";
+  document.getElementById("taskPlayersMax").value = t.playersMax != null ? t.playersMax : "";
   frames = (t.animation && t.animation.frames) ? JSON.parse(JSON.stringify(t.animation.frames)) : [];
   tokens = frames.length ? JSON.parse(JSON.stringify(frameTokens(frames[frames.length-1]))) : [];
   arrows = frames.length ? JSON.parse(JSON.stringify(frameArrows(frames[frames.length-1]))) : [];
@@ -1557,6 +1638,8 @@ function renderTaskList(){
           ${catName ? `<span class="badge">${escapeHtml(catName)}</span>` : ""}
           ${t.duration ? `<span class="badge outline">${t.duration} min</span>`:""}
           ${t.players ? `<span class="badge outline">${escapeHtml(t.players)}</span>`:""}
+          ${levelRangeLabel(t) ? `<span class="badge outline">🎂 ${escapeHtml(levelRangeLabel(t))}</span>`:""}
+          ${playersRangeLabel(t) ? `<span class="badge outline">👥 ${escapeHtml(playersRangeLabel(t))} jug.</span>`:""}
           ${frameCount ? `<span class="badge outline">🎯 ${frameCount} fotog.</span>`:""}
         </div>
       </div>
@@ -1581,6 +1664,8 @@ window.viewTask = (id) => {
     ${catName_(t.categoryId) ? `<span class="badge">${escapeHtml(catName_(t.categoryId))}</span> ` : ""}
     ${t.duration ? `<span class="badge outline">⏱ ${t.duration} min</span> `:""}
     ${t.players ? `<span class="badge outline">👥 ${escapeHtml(t.players)}</span> `:""}
+    ${levelRangeLabel(t) ? `<span class="badge outline">🎂 ${escapeHtml(levelRangeLabel(t))}</span> `:""}
+    ${playersRangeLabel(t) ? `<span class="badge outline">👥 ${escapeHtml(playersRangeLabel(t))} jug.</span> `:""}
     ${t.material ? `<span class="badge outline">🧰 ${escapeHtml(t.material)}</span>`:""}
   `;
   document.getElementById("viewTaskDesc").innerHTML = `
@@ -1674,64 +1759,95 @@ window.setCoachActive = async (id, active) => {
 /* ============================================================
    SESSIONS
 ============================================================= */
-let sessionTasks = []; // array of task ids in order
+let sessionBlocks = { calentamiento: [], principal: [], vuelta: [] };
 
 document.getElementById("sessionAddCategory").onchange = renderSessionTaskOptions;
+document.getElementById("sessionFilterLevel").onchange = renderSessionTaskOptions;
+document.getElementById("sessionFilterPlayers").oninput = renderSessionTaskOptions;
 function renderSessionTaskOptions(){
   const catFilter = document.getElementById("sessionAddCategory").value;
-  const list = tasks.filter(t=> !catFilter || t.categoryId===catFilter);
-  document.getElementById("sessionAddTask").innerHTML = list.map(t=>`<option value="${t.id}">${escapeHtml(t.title)}</option>`).join("") || '<option value="">No hay tareas</option>';
+  const levelFilter = document.getElementById("sessionFilterLevel").value;
+  const playersFilter = document.getElementById("sessionFilterPlayers").value ? Number(document.getElementById("sessionFilterPlayers").value) : null;
+  const list = tasks.filter(t=>{
+    if(catFilter && t.categoryId!==catFilter) return false;
+    if(levelFilter && t.levelFrom && t.levelTo){
+      const idxSel = AGE_LEVELS.indexOf(levelFilter);
+      const idxF = AGE_LEVELS.indexOf(t.levelFrom);
+      const idxT = AGE_LEVELS.indexOf(t.levelTo);
+      if(idxSel < idxF || idxSel > idxT) return false;
+    }
+    if(playersFilter!=null){
+      if(t.playersMin!=null && playersFilter < t.playersMin) return false;
+      if(t.playersMax!=null && playersFilter > t.playersMax) return false;
+    }
+    return true;
+  });
+  document.getElementById("sessionAddTask").innerHTML = list.map(t=>`<option value="${t.id}">${escapeHtml(t.title)}</option>`).join("") || '<option value="">No hay tareas que coincidan</option>';
 }
 
 document.getElementById("btnAddToSession").onclick = () => {
   const id = document.getElementById("sessionAddTask").value;
   if(!id) return;
-  sessionTasks.push(id);
+  const block = document.getElementById("sessionAddBlock").value;
+  sessionBlocks[block].push(id);
   renderSessionTaskList();
 };
 
 function renderSessionTaskList(){
   const wrap = document.getElementById("sessionTaskList");
-  if(sessionTasks.length===0){ wrap.innerHTML = '<p class="muted">Ninguna tarea añadida todavía.</p>'; document.getElementById("sessionTotalTime").textContent=""; return; }
+  const totalTasks = sessionBlocks.calentamiento.length + sessionBlocks.principal.length + sessionBlocks.vuelta.length;
+  if(totalTasks===0){ wrap.innerHTML = '<p class="muted">Ninguna tarea añadida todavía.</p>'; document.getElementById("sessionTotalTime").textContent=""; return; }
   let total = 0;
-  wrap.innerHTML = sessionTasks.map((id,i)=>{
-    const t = tasks.find(x=>x.id===id);
-    if(!t) return "";
-    total += (t.duration||0);
-    return `
-    <div class="session-task">
-      <div class="order-btns">
-        <button type="button" onclick="moveSessionTask(${i},-1)">▲</button>
-        <button type="button" onclick="moveSessionTask(${i},1)">▼</button>
-      </div>
-      <div style="flex:1;">
-        <strong>${i+1}. ${escapeHtml(t.title)}</strong>
-        <div class="muted">${t.duration||0} min ${catName_(t.categoryId)?"· "+escapeHtml(catName_(t.categoryId)):""}</div>
-      </div>
-      <button class="btn small danger" onclick="removeSessionTask(${i})">Quitar</button>
-    </div>`;
+  wrap.innerHTML = Object.keys(SESSION_BLOCKS).map(block=>{
+    const ids = sessionBlocks[block];
+    if(ids.length===0) return "";
+    const items = ids.map((id,i)=>{
+      const t = tasks.find(x=>x.id===id);
+      if(!t) return "";
+      total += (t.duration||0);
+      return `
+      <div class="session-task">
+        <div class="order-btns">
+          <button type="button" onclick="moveSessionTask('${block}',${i},-1)">▲</button>
+          <button type="button" onclick="moveSessionTask('${block}',${i},1)">▼</button>
+        </div>
+        <div style="flex:1;">
+          <strong>${i+1}. ${escapeHtml(t.title)}</strong>
+          <div class="muted">${t.duration||0} min ${catName_(t.categoryId)?"· "+escapeHtml(catName_(t.categoryId)):""}</div>
+        </div>
+        <button class="btn small danger" onclick="removeSessionTask('${block}',${i})">Quitar</button>
+      </div>`;
+    }).join("");
+    return `<h4 style="margin:12px 0 4px 0;font-size:.85rem;color:var(--accent);">${SESSION_BLOCKS[block]}</h4>${items}`;
   }).join("");
   document.getElementById("sessionTotalTime").textContent = "Duración total estimada: " + total + " min";
 }
-window.moveSessionTask = (i, dir) => {
+window.moveSessionTask = (block, i, dir) => {
+  const arr = sessionBlocks[block];
   const j = i+dir;
-  if(j<0 || j>=sessionTasks.length) return;
-  [sessionTasks[i],sessionTasks[j]] = [sessionTasks[j],sessionTasks[i]];
+  if(j<0 || j>=arr.length) return;
+  [arr[i],arr[j]] = [arr[j],arr[i]];
   renderSessionTaskList();
 };
-window.removeSessionTask = (i) => { sessionTasks.splice(i,1); renderSessionTaskList(); };
+window.removeSessionTask = (block, i) => { sessionBlocks[block].splice(i,1); renderSessionTaskList(); };
 
 document.getElementById("btnSaveSession").onclick = async () => {
   const msgEl = document.getElementById("sessionMsg");
   const name = document.getElementById("sessionName").value.trim();
+  const flatIds = [...sessionBlocks.calentamiento, ...sessionBlocks.principal, ...sessionBlocks.vuelta];
   if(!name){ msgEl.innerHTML = '<p class="error-msg">Ponle un nombre a la sesión.</p>'; return; }
-  if(sessionTasks.length===0){ msgEl.innerHTML = '<p class="error-msg">Añade al menos una tarea.</p>'; return; }
+  if(flatIds.length===0){ msgEl.innerHTML = '<p class="error-msg">Añade al menos una tarea.</p>'; return; }
   try{
     await db.collection("sessions").add({
       name,
       date: document.getElementById("sessionDate").value || null,
       notes: document.getElementById("sessionNotes").value.trim(),
-      taskIds: sessionTasks,
+      taskIds: flatIds,
+      blocks: {
+        calentamiento: [...sessionBlocks.calentamiento],
+        principal: [...sessionBlocks.principal],
+        vuelta: [...sessionBlocks.vuelta]
+      },
       createdBy: currentUser.uid,
       createdByName: currentCoach.name,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -1740,7 +1856,7 @@ document.getElementById("btnSaveSession").onclick = async () => {
     document.getElementById("sessionName").value = "";
     document.getElementById("sessionDate").value = "";
     document.getElementById("sessionNotes").value = "";
-    sessionTasks = [];
+    sessionBlocks = { calentamiento: [], principal: [], vuelta: [] };
     renderSessionTaskList();
   }catch(err){
     msgEl.innerHTML = '<p class="error-msg">Error: '+err.message+'</p>';
@@ -1751,11 +1867,22 @@ function renderSavedSessions(){
   const wrap = document.getElementById("sessionsSaved");
   if(sessions.length===0){ wrap.innerHTML = '<div class="empty">Todavía no se han guardado sesiones.</div>'; return; }
   wrap.innerHTML = sessions.map(s=>{
-    const taskItems = (s.taskIds||[]).map(id=>{
+    function taskLi(id){
       const t = tasks.find(x=>x.id===id);
       if(!t) return '<li class="muted">(tarea eliminada)</li>';
       return `<li><a href="javascript:void(0)" onclick="viewTask('${id}')" style="color:var(--accent);font-weight:600;text-decoration:none;">${escapeHtml(t.title)}</a>${t.duration?` <span class="muted">· ${t.duration} min</span>`:""}</li>`;
-    });
+    }
+    let taskListHtml;
+    if(s.blocks){
+      taskListHtml = Object.keys(SESSION_BLOCKS).map(block=>{
+        const ids = s.blocks[block] || [];
+        if(ids.length===0) return "";
+        return `<h4 style="margin:8px 0 2px 0;font-size:.8rem;color:var(--accent);">${SESSION_BLOCKS[block]}</h4>
+        <ol style="margin:0 0 4px 18px;padding:0;font-size:.88rem;">${ids.map(taskLi).join("")}</ol>`;
+      }).join("");
+    } else {
+      taskListHtml = `<ol style="margin:0 0 6px 18px;padding:0;font-size:.88rem;">${(s.taskIds||[]).map(taskLi).join("")}</ol>`;
+    }
     const canDelete = currentCoach && (currentCoach.role===ROLE_GESTOR || s.createdBy===currentUser.uid);
     return `
     <div class="card" style="margin-bottom:10px;">
@@ -1764,9 +1891,7 @@ function renderSavedSessions(){
         <span class="muted">${s.date||""}</span>
       </div>
       <p class="muted" style="margin:2px 0 8px 0;">Por ${escapeHtml(s.createdByName||"")}</p>
-      <ol style="margin:0 0 6px 18px;padding:0;font-size:.88rem;">
-        ${taskItems.join("")}
-      </ol>
+      ${taskListHtml}
       <p class="muted" style="font-size:.78rem;margin-top:-2px;">Toca una tarea para ver sus notas y la pizarra táctica.</p>
       ${s.notes ? `<p class="muted" style="font-size:.85rem;">${escapeHtml(s.notes)}</p>` : ""}
       <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
@@ -1917,37 +2042,14 @@ window.exportSessionPDF = function(sessionId){
   fullBox("Objetivos / Notas", s.notes || "");
   y += 4;
 
-  // ---- Tareas, agrupadas por categoría (sección de entrenamiento) ----
-  const taskIds = s.taskIds || [];
-  if(taskIds.length===0){
-    sectionBar("Sin tareas");
-    doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.setTextColor(TEXT[0],TEXT[1],TEXT[2]);
-    doc.text("Esta sesión no tiene tareas añadidas.", margin, y+5);
-    y += 10;
-  }
-
-  let lastCat = null;
-  taskIds.forEach((id, i) => {
-    const t = tasks.find(x=>x.id===id);
-    if(!t) return;
-    const catName = catName_(t.categoryId) || "Sin categoría";
-
-    if(catName !== lastCat){
-      lastCat = catName;
-      y += 2;
-      sectionBar("Detalles de la sección");
-      labelValueRow("Nombre", catName);
-      multiColHeader(["Equipos","Otros"]);
-      multiColValues(["",""]);
-      y += 2;
-    }
-
+  // ---- Tareas, agrupadas por bloque de sesión (Calentamiento / Parte principal / Vuelta a la calma) ----
+  function renderTaskPDF(t, i){
     sectionBar("Detalles del ejercicio");
     labelValueRow("Título", `${i+1}. ${t.title || "(sin título)"}`);
     labelValueRow("Estrategia", "");
     fullBox("Objetivos", "");
-    multiColHeader(["Espacio","Tiempo","Situación de Juego","Coordinación"]);
-    multiColValues(["", t.duration ? t.duration+" min" : "", t.players || "", ""]);
+    multiColHeader(["Categoría (edad)","Tiempo","Situación de Juego","Nº Jugadores"]);
+    multiColValues([levelRangeLabel(t) || "", t.duration ? t.duration+" min" : "", t.players || "", playersRangeLabel(t) || ""]);
     multiColHeader(["Habilidades Coordinativas","Intención / Acción Táctica"]);
     multiColValues(["",""]);
 
@@ -1978,7 +2080,58 @@ window.exportSessionPDF = function(sessionId){
       y += boxH;
     }
     y += 4;
-  });
+  }
+
+  let exerciseCounter = 0;
+  if(s.blocks){
+    Object.keys(SESSION_BLOCKS).forEach(blockKey=>{
+      const ids = s.blocks[blockKey] || [];
+      if(ids.length===0) return;
+      y += 2;
+      sectionBar("Detalles de la sección");
+      labelValueRow("Nombre", SESSION_BLOCKS[blockKey]);
+      multiColHeader(["Equipos","Otros"]);
+      multiColValues(["",""]);
+      y += 2;
+      ids.forEach(id=>{
+        const t = tasks.find(x=>x.id===id);
+        if(!t) return;
+        exerciseCounter++;
+        renderTaskPDF(t, exerciseCounter-1);
+      });
+    });
+    if(exerciseCounter===0){
+      sectionBar("Sin tareas");
+      doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.setTextColor(TEXT[0],TEXT[1],TEXT[2]);
+      doc.text("Esta sesión no tiene tareas añadidas.", margin, y+5);
+      y += 10;
+    }
+  } else {
+    // Sesiones antiguas sin bloques: se agrupan por categoría del ejercicio, como antes
+    const taskIds = s.taskIds || [];
+    if(taskIds.length===0){
+      sectionBar("Sin tareas");
+      doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.setTextColor(TEXT[0],TEXT[1],TEXT[2]);
+      doc.text("Esta sesión no tiene tareas añadidas.", margin, y+5);
+      y += 10;
+    }
+    let lastCat = null;
+    taskIds.forEach((id, i) => {
+      const t = tasks.find(x=>x.id===id);
+      if(!t) return;
+      const catName = catName_(t.categoryId) || "Sin categoría";
+      if(catName !== lastCat){
+        lastCat = catName;
+        y += 2;
+        sectionBar("Detalles de la sección");
+        labelValueRow("Nombre", catName);
+        multiColHeader(["Equipos","Otros"]);
+        multiColValues(["",""]);
+        y += 2;
+      }
+      renderTaskPDF(t, i);
+    });
+  }
 
   const safeName = (s.name || "sesion").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^\w\-]+/g,"_");
   doc.save(`${safeName}.pdf`);
@@ -2009,12 +2162,14 @@ document.getElementById("btnExportTasksExcel").onclick = () => {
   if(tasks.length===0){ alert("No hay tareas que exportar todavía."); return; }
 
   const baseUrl = location.origin + location.pathname;
-  const header = ["Título","Categoría","Duración (min)","Nº jugadores","Material","Descripción","Enlace"];
+  const header = ["Título","Categoría","Categoría de edad","Duración (min)","Situación de juego","Nº jugadores (rango)","Material","Descripción","Enlace"];
   const rows = tasks.map(t => [
     t.title || "",
     catName_(t.categoryId) || "",
+    levelRangeLabel(t) || "",
     t.duration || "",
     t.players || "",
+    playersRangeLabel(t) || "",
     t.material || "",
     t.description || "",
     baseUrl + "#task=" + encodeURIComponent(t.id)
@@ -2022,7 +2177,7 @@ document.getElementById("btnExportTasksExcel").onclick = () => {
 
   const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
   ws["!cols"] = [
-    {wch:28}, {wch:16}, {wch:12}, {wch:14}, {wch:18}, {wch:50}, {wch:40}
+    {wch:28}, {wch:16}, {wch:20}, {wch:12}, {wch:16}, {wch:16}, {wch:18}, {wch:50}, {wch:40}
   ];
   ws["!rows"] = [{hpt:24}];
 
@@ -2031,6 +2186,7 @@ document.getElementById("btnExportTasksExcel").onclick = () => {
   const cellBorder = { top:thinBorder, bottom:thinBorder, left:thinBorder, right:thinBorder };
 
   const range = XLSX.utils.decode_range(ws["!ref"]);
+  const LINK_COL = 8; // "Enlace" es la última columna (índice 0-based)
 
   // Cabecera: fondo rojo del club, texto blanco y negrita
   for(let C=range.s.c; C<=range.e.c; C++){
@@ -2050,11 +2206,11 @@ document.getElementById("btnExportTasksExcel").onclick = () => {
     for(let C=range.s.c; C<=range.e.c; C++){
       const ref = XLSX.utils.encode_cell({r:R, c:C});
       if(!ws[ref]) continue;
-      const isLinkCol = (C===6);
+      const isLinkCol = (C===LINK_COL);
       ws[ref].s = {
         fill: { fgColor: { rgb: zebra ? "F7F3EC" : "FFFFFF" } },
         font: isLinkCol ? { color:{rgb:"2F80ED"}, underline:true, sz:10 } : { color:{rgb:"1A1A1A"}, sz:10 },
-        alignment: { vertical:"center", wrapText: (C===5) },
+        alignment: { vertical:"center", wrapText: (C===7) },
         border: cellBorder
       };
       if(isLinkCol){
@@ -2064,7 +2220,7 @@ document.getElementById("btnExportTasksExcel").onclick = () => {
   }
 
   // Autofiltro solo en las columnas de datos (Título → Descripción), sin incluir Enlace
-  ws["!autofilter"] = { ref: `A1:F${range.e.r+1}` };
+  ws["!autofilter"] = { ref: `A1:H${range.e.r+1}` };
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Banco de tareas");
