@@ -475,14 +475,14 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
           <input type="number" id="sessionFilterPlayers" placeholder="Jugadores disponibles" min="1">
         </div>
         <div class="filterbar" style="margin-top:6px;">
-          <select id="sessionAddTask"></select>
+          <label class="muted" style="align-self:center;">Añadir al bloque:</label>
           <select id="sessionAddBlock">
             <option value="calentamiento">Calentamiento</option>
             <option value="principal" selected>Parte principal</option>
             <option value="vuelta">Vuelta a la calma</option>
           </select>
-          <button class="btn small" id="btnAddToSession">Añadir</button>
         </div>
+        <div id="sessionTaskBrowser"><p class="muted">Cargando tareas...</p></div>
 
         <h3 style="margin-top:14px;font-size:.9rem;">Tareas seleccionadas</h3>
         <div id="sessionTaskList"><p class="muted">Ninguna tarea añadida todavía.</p></div>
@@ -785,7 +785,7 @@ function attachRealtimeListeners(){
   db.collection("tasks").orderBy("createdAt","desc").onSnapshot(snap=>{
     tasks = snap.docs.map(d=>({id:d.id, ...d.data()}));
     renderTaskList();
-    renderSessionTaskOptions();
+    renderSessionTaskBrowser();
     handleDeepLink();
   });
 
@@ -1784,15 +1784,16 @@ window.setCoachActive = async (id, active) => {
 let sessionBlocks = { calentamiento: [], principal: [], vuelta: [] };
 let editingSessionId = null;
 
-document.getElementById("sessionAddCategory").onchange = renderSessionTaskOptions;
+document.getElementById("sessionAddCategory").onchange = renderSessionTaskBrowser;
 document.getElementById("sessionFilterPhase").onchange = () => {
   const phase = document.getElementById("sessionFilterPhase").value;
   if(phase) document.getElementById("sessionAddBlock").value = phase;
-  renderSessionTaskOptions();
+  renderSessionTaskBrowser();
 };
-document.getElementById("sessionFilterLevel").onchange = renderSessionTaskOptions;
-document.getElementById("sessionFilterPlayers").oninput = renderSessionTaskOptions;
-function renderSessionTaskOptions(){
+document.getElementById("sessionFilterLevel").onchange = renderSessionTaskBrowser;
+document.getElementById("sessionFilterPlayers").oninput = renderSessionTaskBrowser;
+function renderSessionTaskBrowser(){
+  const wrap = document.getElementById("sessionTaskBrowser");
   const catFilter = document.getElementById("sessionAddCategory").value;
   const phaseFilter = document.getElementById("sessionFilterPhase").value;
   const levelFilter = document.getElementById("sessionFilterLevel").value;
@@ -1812,15 +1813,40 @@ function renderSessionTaskOptions(){
     }
     return true;
   });
-  document.getElementById("sessionAddTask").innerHTML = list.map(t=>`<option value="${t.id}">${escapeHtml(t.title)}</option>`).join("") || '<option value="">No hay tareas que coincidan</option>';
+  if(list.length===0){ wrap.innerHTML = '<div class="empty">No hay tareas que coincidan con los filtros.</div>'; return; }
+  const inSession = new Set([...sessionBlocks.calentamiento, ...sessionBlocks.principal, ...sessionBlocks.vuelta]);
+  wrap.innerHTML = list.map(t=>{
+    const catName = catName_(t.categoryId);
+    const frameCount = (t.animation && t.animation.frames) ? t.animation.frames.length : 0;
+    const already = inSession.has(t.id);
+    return `
+    <div class="task-item">
+      <div>
+        <h4>${escapeHtml(t.title)}</h4>
+        <div class="task-meta">
+          ${catName ? `<span class="badge">${escapeHtml(catName)}</span>` : ""}
+          ${phaseLabel(t) ? `<span class="badge">${escapeHtml(phaseLabel(t))}</span>` : ""}
+          ${t.duration ? `<span class="badge outline">${t.duration} min</span>`:""}
+          ${t.objectives ? `<span class="badge outline">📋 Objetivos</span>`:""}
+          ${levelRangeLabel(t) ? `<span class="badge outline">🎂 ${escapeHtml(levelRangeLabel(t))}</span>`:""}
+          ${playersRangeLabel(t) ? `<span class="badge outline">👥 ${escapeHtml(playersRangeLabel(t))} jug.</span>`:""}
+          ${frameCount ? `<span class="badge outline">🎯 ${frameCount} fotog.</span>`:""}
+        </div>
+      </div>
+      <div class="task-actions">
+        <button class="btn small ghost" onclick="viewTask('${t.id}')">Ver</button>
+        ${already
+          ? `<button class="btn small ghost" disabled>✔ En la sesión</button>`
+          : `<button class="btn small accent" onclick="addTaskToSession('${t.id}')">➕ Añadir</button>`}
+      </div>
+    </div>`;
+  }).join("");
 }
-
-document.getElementById("btnAddToSession").onclick = () => {
-  const id = document.getElementById("sessionAddTask").value;
-  if(!id) return;
+window.addTaskToSession = (id) => {
   const block = document.getElementById("sessionAddBlock").value;
   sessionBlocks[block].push(id);
   renderSessionTaskList();
+  renderSessionTaskBrowser();
 };
 
 function renderSessionTaskList(){
@@ -1859,7 +1885,7 @@ window.moveSessionTask = (block, i, dir) => {
   [arr[i],arr[j]] = [arr[j],arr[i]];
   renderSessionTaskList();
 };
-window.removeSessionTask = (block, i) => { sessionBlocks[block].splice(i,1); renderSessionTaskList(); };
+window.removeSessionTask = (block, i) => { sessionBlocks[block].splice(i,1); renderSessionTaskList(); renderSessionTaskBrowser(); };
 
 document.getElementById("btnSaveSession").onclick = async () => {
   const msgEl = document.getElementById("sessionMsg");
@@ -1904,6 +1930,7 @@ function resetSessionForm(){
   document.getElementById("sessionNotes").value = "";
   sessionBlocks = { calentamiento: [], principal: [], vuelta: [] };
   renderSessionTaskList();
+  renderSessionTaskBrowser();
   document.getElementById("sessionEditorTitle").textContent = "🗓️ Crear sesión de entrenamiento";
   document.getElementById("cancelSessionEdit").classList.add("hidden");
 }
@@ -1928,6 +1955,7 @@ window.editSession = (id) => {
     sessionBlocks = { calentamiento: [], principal: [...(s.taskIds||[])], vuelta: [] };
   }
   renderSessionTaskList();
+  renderSessionTaskBrowser();
   document.getElementById("sessionEditorTitle").textContent = "✏️ Editando sesión: " + (s.name || "");
   document.getElementById("cancelSessionEdit").classList.remove("hidden");
   document.getElementById("sessionMsg").innerHTML = "";
