@@ -197,6 +197,18 @@ textarea{resize:vertical;min-height:70px;}
 
 /* filters */
 .filterbar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+.checkbox-list{
+  border:1px solid var(--border);border-radius:8px;padding:8px 10px;
+  max-height:130px;overflow-y:auto;background:#fff;
+}
+.checkbox-list label{
+  display:flex;align-items:center;gap:7px;font-weight:400;text-transform:none;
+  font-family:'Inter',sans-serif;font-size:.85rem;color:var(--ink);
+  letter-spacing:0;margin:0 0 6px 0;cursor:pointer;
+}
+.checkbox-list label:last-child{margin-bottom:0;}
+.checkbox-list input[type=checkbox]{width:auto;margin:0;}
+.checkbox-list .empty-hint{font-size:.8rem;color:var(--muted);}
 .filterbar select,.filterbar input{width:auto;min-width:130px;}
 
 /* coach list */
@@ -417,8 +429,8 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
               <input type="text" id="taskTitle" required>
             </div>
             <div>
-              <label>Categoría</label>
-              <select id="taskCategory"></select>
+              <label>Categorías</label>
+              <div id="taskCategoryCheckboxes" class="checkbox-list"></div>
             </div>
             <div>
               <label>Fase de la sesión</label>
@@ -1211,7 +1223,19 @@ window.deleteCategory = async (id) => {
 
 function renderCategorySelects(){
   const opts = categories.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
-  document.getElementById("taskCategory").innerHTML = opts || '<option value="">Sin categorías</option>';
+  const box = document.getElementById("taskCategoryCheckboxes");
+  const previouslyChecked = new Set(
+    Array.from(box.querySelectorAll("input[type=checkbox]:checked")).map(el=>el.value)
+  );
+  if(categories.length===0){
+    box.innerHTML = '<span class="empty-hint">Todavía no hay categorías.</span>';
+  } else {
+    box.innerHTML = categories.map(c=>`
+      <label>
+        <input type="checkbox" value="${c.id}" ${previouslyChecked.has(c.id) ? "checked" : ""}>
+        ${escapeHtml(c.name)}
+      </label>`).join("");
+  }
   document.getElementById("filterCategory").innerHTML = '<option value="">Todas las categorías</option>' + opts;
   document.getElementById("sessionAddCategory").innerHTML = '<option value="">Todas las categorías</option>' + opts;
 }
@@ -1927,9 +1951,13 @@ document.getElementById("taskForm").onsubmit = async (e) => {
   if(playersMin!=null && playersMax!=null && playersMin > playersMax){
     [playersMin, playersMax] = [playersMax, playersMin];
   }
+  const categoryIds = Array.from(
+    document.querySelectorAll('#taskCategoryCheckboxes input[type=checkbox]:checked')
+  ).map(el => el.value);
   const payload = {
     title: document.getElementById("taskTitle").value.trim(),
-    categoryId: document.getElementById("taskCategory").value || null,
+    categoryIds,
+    categoryId: categoryIds[0] || null,
     phase: document.getElementById("taskPhase").value || null,
     duration: Number(document.getElementById("taskDuration").value) || 0,
     objectives: document.getElementById("taskObjectives").value.trim(),
@@ -1977,7 +2005,10 @@ window.editTask = (id) => {
   if(!t) return;
   editingTaskId = id;
   document.getElementById("taskTitle").value = t.title || "";
-  document.getElementById("taskCategory").value = t.categoryId || "";
+  const editIds = new Set(taskCategoryIds(t));
+  document.querySelectorAll('#taskCategoryCheckboxes input[type=checkbox]').forEach(el=>{
+    el.checked = editIds.has(el.value);
+  });
   document.getElementById("taskPhase").value = t.phase || "principal";
   document.getElementById("taskDuration").value = t.duration || 15;
   document.getElementById("taskObjectives").value = t.objectives || "";
@@ -2021,21 +2052,21 @@ function renderTaskList(){
   const catFilter = document.getElementById("filterCategory").value;
   const search = document.getElementById("filterSearch").value.toLowerCase();
   let list = tasks.filter(t=>{
-    if(catFilter && t.categoryId!==catFilter) return false;
+    if(catFilter && !taskCategoryIds(t).includes(catFilter)) return false;
     if(search && !(t.title||"").toLowerCase().includes(search)) return false;
     return true;
   });
   if(list.length===0){ wrap.innerHTML = '<div class="empty">🔍 No hay tareas que coincidan.</div>'; return; }
   const canEditContent = currentCoach.role === ROLE_GESTOR || currentCoach.role === ROLE_EDITOR;
   wrap.innerHTML = list.map(t=>{
-    const catName = catName_(t.categoryId);
+    const catNames = taskCategoryNames(t);
     const frameCount = (t.animation && t.animation.frames) ? t.animation.frames.length : 0;
     return `
     <div class="task-item">
       <div>
         <h4>${escapeHtml(t.title)}</h4>
         <div class="task-meta">
-          ${catName ? `<span class="badge">${escapeHtml(catName)}</span>` : ""}
+          ${catNames.map(n=>`<span class="badge">${escapeHtml(n)}</span>`).join("")}
           ${phaseLabel(t) ? `<span class="badge b-phase">${escapeHtml(phaseLabel(t))}</span>` : ""}
           ${t.duration ? `<span class="badge outline b-duration">${t.duration} min</span>`:""}
           ${t.objectives ? `<span class="badge outline">📋 Objetivos</span>`:""}
@@ -2053,6 +2084,14 @@ function renderTaskList(){
   }).join("");
 }
 function catName_(id){ const c = categories.find(x=>x.id===id); return c ? c.name : ""; }
+function taskCategoryIds(t){
+  if(t && Array.isArray(t.categoryIds) && t.categoryIds.length) return t.categoryIds;
+  if(t && t.categoryId) return [t.categoryId];
+  return [];
+}
+function taskCategoryNames(t){
+  return taskCategoryIds(t).map(catName_).filter(Boolean);
+}
 
 /* ---------- View task modal ---------- */
 window.viewTask = (id) => {
@@ -2062,7 +2101,7 @@ window.viewTask = (id) => {
   history.replaceState(null, "", location.pathname + location.search + "#task=" + encodeURIComponent(id));
   document.getElementById("viewTaskTitle").textContent = t.title;
   document.getElementById("viewTaskMeta").innerHTML = `
-    ${catName_(t.categoryId) ? `<span class="badge">${escapeHtml(catName_(t.categoryId))}</span> ` : ""}
+    ${taskCategoryNames(t).map(n=>`<span class="badge">${escapeHtml(n)}</span> `).join("")}
     ${phaseLabel(t) ? `<span class="badge b-phase">${escapeHtml(phaseLabel(t))}</span> ` : ""}
     ${t.duration ? `<span class="badge outline b-duration">⏱ ${t.duration} min</span> `:""}
     ${levelRangeLabel(t) ? `<span class="badge outline b-level">🎂 ${escapeHtml(levelRangeLabel(t))}</span> `:""}
@@ -2180,7 +2219,7 @@ function renderSessionTaskBrowser(){
   const levelFilter = document.getElementById("sessionFilterLevel").value;
   const playersFilter = document.getElementById("sessionFilterPlayers").value ? Number(document.getElementById("sessionFilterPlayers").value) : null;
   const list = tasks.filter(t=>{
-    if(catFilter && t.categoryId!==catFilter) return false;
+    if(catFilter && !taskCategoryIds(t).includes(catFilter)) return false;
     if(phaseFilter && t.phase!==phaseFilter) return false;
     if(levelFilter && t.levelFrom && t.levelTo){
       const idxSel = AGE_LEVELS.indexOf(levelFilter);
@@ -2197,7 +2236,7 @@ function renderSessionTaskBrowser(){
   if(list.length===0){ wrap.innerHTML = '<div class="empty">🔍 No hay tareas que coincidan con los filtros.</div>'; return; }
   const inSession = new Set([...sessionBlocks.calentamiento, ...sessionBlocks.principal, ...sessionBlocks.vuelta]);
   wrap.innerHTML = list.map(t=>{
-    const catName = catName_(t.categoryId);
+    const catNames = taskCategoryNames(t);
     const frameCount = (t.animation && t.animation.frames) ? t.animation.frames.length : 0;
     const already = inSession.has(t.id);
     return `
@@ -2205,7 +2244,7 @@ function renderSessionTaskBrowser(){
       <div>
         <h4>${escapeHtml(t.title)}</h4>
         <div class="task-meta">
-          ${catName ? `<span class="badge">${escapeHtml(catName)}</span>` : ""}
+          ${catNames.map(n=>`<span class="badge">${escapeHtml(n)}</span>`).join("")}
           ${phaseLabel(t) ? `<span class="badge b-phase">${escapeHtml(phaseLabel(t))}</span>` : ""}
           ${t.duration ? `<span class="badge outline b-duration">${t.duration} min</span>`:""}
           ${t.objectives ? `<span class="badge outline">📋 Objetivos</span>`:""}
@@ -2250,7 +2289,7 @@ function renderSessionTaskList(){
         </div>
         <div style="flex:1;">
           <strong>${i+1}. ${escapeHtml(t.title)}</strong>
-          <div class="muted">${t.duration||0} min ${catName_(t.categoryId)?"· "+escapeHtml(catName_(t.categoryId)):""}</div>
+          <div class="muted">${t.duration||0} min ${taskCategoryNames(t).length?"· "+escapeHtml(taskCategoryNames(t).join(", ")):""}</div>
         </div>
         <button class="btn small danger" onclick="removeSessionTask('${block}',${i})">Quitar</button>
       </div>`;
@@ -2621,7 +2660,7 @@ window.exportSessionPDF = function(sessionId){
     taskIds.forEach((id, i) => {
       const t = tasks.find(x=>x.id===id);
       if(!t) return;
-      const catName = catName_(t.categoryId) || "Sin categoría";
+      const catName = taskCategoryNames(t).join(", ") || "Sin categoría";
       if(catName !== lastCat){
         lastCat = catName;
         y += 2;
@@ -2667,7 +2706,7 @@ document.getElementById("btnExportTasksExcel").onclick = () => {
   const header = ["Título","Categoría","Fase","Categoría de edad","Duración (min)","Objetivos","Nº jugadores (rango)","Material","Descripción","Enlace"];
   const rows = tasks.map(t => [
     t.title || "",
-    catName_(t.categoryId) || "",
+    taskCategoryNames(t).join(", ") || "",
     phaseLabel(t) || "",
     levelRangeLabel(t) || "",
     t.duration || "",
