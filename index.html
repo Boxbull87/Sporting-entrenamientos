@@ -117,21 +117,50 @@ input,select,textarea{font-family:inherit;}
 }
 .tab.active{background:var(--accent);color:#fff;}
 
+/* ---------- Home menu ---------- */
+.home-hero{
+  text-align:center;padding:26px 16px 22px 16px;
+  background:linear-gradient(160deg,var(--ink) 0%, var(--pitch) 55%, var(--accent-dark) 140%);
+  color:#fff;border-radius:var(--radius);margin-bottom:18px;
+}
+.home-hero-crest{width:60px;height:60px;object-fit:contain;filter:drop-shadow(0 2px 6px rgba(0,0,0,.5));margin-bottom:8px;}
+.home-hero-title{color:#fff;font-size:1.25rem;margin-bottom:2px;border:none;padding-left:0;}
+.home-hero-sub{color:rgba(255,255,255,.75);font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;font-family:'Roboto Mono',monospace;}
+.home-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;}
+.home-card{
+  display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;
+  background:var(--card);border:1px solid var(--border);border-top:4px solid var(--accent);
+  border-radius:var(--radius);padding:22px 12px;box-shadow:0 1px 3px rgba(0,0,0,.06);
+  transition:transform .15s ease, box-shadow .15s ease;
+}
+.home-card:hover{transform:translateY(-3px);box-shadow:0 8px 18px rgba(0,0,0,.13);}
+.home-card:nth-child(2){border-top-color:#2f80ed;}
+.home-card:nth-child(3){border-top-color:#27ae60;}
+.home-card-icon{font-size:2rem;line-height:1;}
+.home-card-label{font-family:'Oswald',sans-serif;text-transform:uppercase;letter-spacing:.03em;font-weight:600;font-size:.9rem;color:var(--ink);}
+.home-card-desc{font-size:.72rem;color:var(--muted);}
+
 .card{
   background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
-  padding:16px;margin-bottom:14px;
+  padding:16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.04);
 }
 .row{display:flex;gap:10px;flex-wrap:wrap;}
 .row > *{flex:1;min-width:140px;}
 label{display:block;font-size:.72rem;font-weight:700;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em;font-family:'Roboto Mono',monospace;}
 input[type=text],input[type=email],input[type=password],input[type=number],input[type=date],select,textarea{
   width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:8px;font-size:.92rem;background:#fff;
+  transition:border-color .15s ease, box-shadow .15s ease;
+}
+input:focus,select:focus,textarea:focus{
+  outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(216,30,44,.12);
 }
 textarea{resize:vertical;min-height:70px;}
 .btn{
   background:var(--ink);color:#fff;border:none;padding:10px 16px;border-radius:8px;
   font-weight:600;font-size:.85rem;font-family:'Oswald',sans-serif;text-transform:uppercase;letter-spacing:.03em;
+  transition:filter .15s ease, transform .1s ease;
 }
+.btn:active{transform:scale(.97);}
 .btn:hover{background:var(--pitch-light);}
 .btn.accent{background:linear-gradient(135deg,var(--accent),var(--accent-dark));color:#fff;}
 .btn.accent:hover{filter:brightness(1.1);}
@@ -141,7 +170,11 @@ textarea{resize:vertical;min-height:70px;}
 .btn:disabled{opacity:.45;cursor:not-allowed;}
 
 .badge{display:inline-block;background:var(--accent);color:#fff;font-size:.66rem;font-weight:700;padding:3px 9px;border-radius:5px;font-family:'Roboto Mono',monospace;text-transform:uppercase;letter-spacing:.03em;}
+.badge.b-phase{background:#2f80ed;}
 .badge.outline{background:transparent;border:1px solid var(--border);color:var(--muted);font-family:'Roboto Mono',monospace;font-size:.66rem;border-radius:5px;text-transform:uppercase;letter-spacing:.03em;}
+.badge.outline.b-level{border-color:#27ae60;color:#1e8449;}
+.badge.outline.b-players{border-color:#9b59b6;color:#7d3c98;}
+.badge.outline.b-duration{border-color:#2f80ed;color:#2f80ed;}
 .muted{color:var(--muted);font-size:.85rem;}
 .hidden{display:none !important;}
 .error-msg{color:var(--danger);font-size:.82rem;margin-top:6px;}
@@ -153,8 +186,10 @@ textarea{resize:vertical;min-height:70px;}
 /* task list */
 .task-item{
   display:flex;justify-content:space-between;align-items:flex-start;gap:10px;
-  padding:12px 0;border-bottom:1px solid var(--border);
+  padding:12px 10px;border-bottom:1px solid var(--border);border-radius:8px;
+  transition:background .15s ease;
 }
+.task-item:hover{background:#faf8f5;}
 .task-item:last-child{border-bottom:none;}
 .task-item h4{margin:0 0 3px 0;font-size:.97rem;}
 .task-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px;}
@@ -173,7 +208,7 @@ textarea{resize:vertical;min-height:70px;}
 
 /* whiteboard */
 .board-wrap{display:flex;flex-direction:column;gap:10px;}
-.board-toolbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+.board-toolbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;background:#faf8f5;border:1px solid var(--border);border-radius:8px;padding:6px 8px;margin-bottom:6px;}
 .board-toolbar .swatch{width:16px;height:16px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:middle;}
 canvas.court{
   width:100%;max-width:560px;aspect-ratio:1.4/1;background:#0f3d2e;border-radius:8px;touch-action:none;display:block;margin:0 auto;
@@ -220,6 +255,7 @@ canvas.court{
 .board-fullscreen .btn.danger{background:#fff;color:var(--danger);border:1px solid var(--danger);}
 .board-fullscreen .muted{color:#e6e0d6;}
 .board-fullscreen .btn.accent{color:#fff;}
+.board-fullscreen .board-toolbar{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.18);}
 
 .auth-screen{
   min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;
@@ -301,7 +337,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
 <!-- ================= APP ================= -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><img class="crest crest-img" alt="Escudo"> Sporting FS Almería</div>
+    <div class="brand" id="brandHomeBtn" style="cursor:pointer;" title="Ir al menú principal"><img class="crest crest-img" alt="Escudo"> Sporting FS Almería</div>
     <div class="userbox">
       <span id="userName"></span>
       <span id="userRolePill" class="pill">Entrenador</span>
@@ -310,15 +346,42 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
   </div>
 
   <div class="tabs">
-    <button class="tab active" data-tab="tasks">Tareas</button>
+    <button class="tab active" data-tab="home">🏠 Inicio</button>
+    <button class="tab" data-tab="tasks">Tareas</button>
     <button class="tab" data-tab="sessions">Sesiones</button>
     <button class="tab hidden" id="tabCoachesBtn" data-tab="coaches">Entrenadores</button>
   </div>
 
   <div class="wrap">
 
+    <!-- ---------- HOME MENU ---------- -->
+    <div id="tab-home">
+      <div class="home-hero">
+        <img class="crest-img home-hero-crest" alt="Escudo">
+        <h1 class="home-hero-title">Sporting FS Almería</h1>
+        <p class="home-hero-sub">Panel de entrenamiento</p>
+      </div>
+      <div class="home-grid">
+        <button type="button" class="home-card" data-goto="tasks">
+          <span class="home-card-icon">📋</span>
+          <span class="home-card-label">Banco de tareas</span>
+          <span class="home-card-desc">Crea y consulta ejercicios</span>
+        </button>
+        <button type="button" class="home-card" data-goto="sessions">
+          <span class="home-card-icon">🗓️</span>
+          <span class="home-card-label">Sesiones</span>
+          <span class="home-card-desc">Organiza tus entrenamientos</span>
+        </button>
+        <button type="button" class="home-card hidden" id="homeCoachesBtn" data-goto="coaches">
+          <span class="home-card-icon">👥</span>
+          <span class="home-card-label">Entrenadores</span>
+          <span class="home-card-desc">Gestiona el equipo técnico</span>
+        </button>
+      </div>
+    </div>
+
     <!-- ---------- TASKS TAB ---------- -->
-    <div id="tab-tasks">
+    <div id="tab-tasks" class="hidden">
       <div class="card" id="editorPanel">
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <h2 style="font-size:1.05rem;">📋 Nueva tarea</h2>
@@ -754,6 +817,7 @@ function initAppUI(){
   document.getElementById("editorPanel").classList.toggle("hidden", !canEditContent);
   document.getElementById("btnNewCategory").classList.toggle("hidden", !canEditContent);
   document.getElementById("tabCoachesBtn").classList.toggle("hidden", !isGestor);
+  document.getElementById("homeCoachesBtn").classList.toggle("hidden", !isGestor);
 
   if(!listenersAttached){
     attachRealtimeListeners();
@@ -766,11 +830,21 @@ document.querySelectorAll(".tab").forEach(btn=>{
   btn.onclick = () => {
     document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));
     btn.classList.add("active");
-    ["tasks","sessions","coaches"].forEach(t=>{
+    ["home","tasks","sessions","coaches"].forEach(t=>{
       document.getElementById("tab-"+t).classList.toggle("hidden", t!==btn.dataset.tab);
     });
+    window.scrollTo({top:0, behavior:"smooth"});
   };
 });
+document.querySelectorAll(".home-card[data-goto]").forEach(card=>{
+  card.onclick = () => {
+    const target = document.querySelector(`.tab[data-tab="${card.dataset.goto}"]`);
+    if(target) target.click();
+  };
+});
+document.getElementById("brandHomeBtn").onclick = () => {
+  document.querySelector('.tab[data-tab="home"]').click();
+};
 
 /* ============================================================
    REALTIME LISTENERS
@@ -1644,7 +1718,7 @@ function renderTaskList(){
     if(search && !(t.title||"").toLowerCase().includes(search)) return false;
     return true;
   });
-  if(list.length===0){ wrap.innerHTML = '<div class="empty">No hay tareas que coincidan.</div>'; return; }
+  if(list.length===0){ wrap.innerHTML = '<div class="empty">🔍 No hay tareas que coincidan.</div>'; return; }
   const canEditContent = currentCoach.role === ROLE_GESTOR || currentCoach.role === ROLE_EDITOR;
   wrap.innerHTML = list.map(t=>{
     const catName = catName_(t.categoryId);
@@ -1655,11 +1729,11 @@ function renderTaskList(){
         <h4>${escapeHtml(t.title)}</h4>
         <div class="task-meta">
           ${catName ? `<span class="badge">${escapeHtml(catName)}</span>` : ""}
-          ${phaseLabel(t) ? `<span class="badge">${escapeHtml(phaseLabel(t))}</span>` : ""}
-          ${t.duration ? `<span class="badge outline">${t.duration} min</span>`:""}
+          ${phaseLabel(t) ? `<span class="badge b-phase">${escapeHtml(phaseLabel(t))}</span>` : ""}
+          ${t.duration ? `<span class="badge outline b-duration">${t.duration} min</span>`:""}
           ${t.objectives ? `<span class="badge outline">📋 Objetivos</span>`:""}
-          ${levelRangeLabel(t) ? `<span class="badge outline">🎂 ${escapeHtml(levelRangeLabel(t))}</span>`:""}
-          ${playersRangeLabel(t) ? `<span class="badge outline">👥 ${escapeHtml(playersRangeLabel(t))} jug.</span>`:""}
+          ${levelRangeLabel(t) ? `<span class="badge outline b-level">🎂 ${escapeHtml(levelRangeLabel(t))}</span>`:""}
+          ${playersRangeLabel(t) ? `<span class="badge outline b-players">👥 ${escapeHtml(playersRangeLabel(t))} jug.</span>`:""}
           ${frameCount ? `<span class="badge outline">🎯 ${frameCount} fotog.</span>`:""}
         </div>
       </div>
@@ -1682,10 +1756,10 @@ window.viewTask = (id) => {
   document.getElementById("viewTaskTitle").textContent = t.title;
   document.getElementById("viewTaskMeta").innerHTML = `
     ${catName_(t.categoryId) ? `<span class="badge">${escapeHtml(catName_(t.categoryId))}</span> ` : ""}
-    ${phaseLabel(t) ? `<span class="badge">${escapeHtml(phaseLabel(t))}</span> ` : ""}
-    ${t.duration ? `<span class="badge outline">⏱ ${t.duration} min</span> `:""}
-    ${levelRangeLabel(t) ? `<span class="badge outline">🎂 ${escapeHtml(levelRangeLabel(t))}</span> `:""}
-    ${playersRangeLabel(t) ? `<span class="badge outline">👥 ${escapeHtml(playersRangeLabel(t))} jug.</span> `:""}
+    ${phaseLabel(t) ? `<span class="badge b-phase">${escapeHtml(phaseLabel(t))}</span> ` : ""}
+    ${t.duration ? `<span class="badge outline b-duration">⏱ ${t.duration} min</span> `:""}
+    ${levelRangeLabel(t) ? `<span class="badge outline b-level">🎂 ${escapeHtml(levelRangeLabel(t))}</span> `:""}
+    ${playersRangeLabel(t) ? `<span class="badge outline b-players">👥 ${escapeHtml(playersRangeLabel(t))} jug.</span> `:""}
     ${t.material ? `<span class="badge outline">🧰 ${escapeHtml(t.material)}</span>`:""}
   `;
   document.getElementById("viewTaskDesc").innerHTML = `
@@ -1747,7 +1821,7 @@ document.getElementById("btnCloseViewModal").onclick = () => {
 ============================================================= */
 function renderCoachList(){
   const wrap = document.getElementById("coachList");
-  if(coaches.length===0){ wrap.innerHTML = '<div class="empty">No hay entrenadores.</div>'; return; }
+  if(coaches.length===0){ wrap.innerHTML = '<div class="empty">👥 No hay entrenadores.</div>'; return; }
   wrap.innerHTML = coaches.map(c=>{
     const isMe = c.id === currentUser.uid;
     return `
@@ -1813,7 +1887,7 @@ function renderSessionTaskBrowser(){
     }
     return true;
   });
-  if(list.length===0){ wrap.innerHTML = '<div class="empty">No hay tareas que coincidan con los filtros.</div>'; return; }
+  if(list.length===0){ wrap.innerHTML = '<div class="empty">🔍 No hay tareas que coincidan con los filtros.</div>'; return; }
   const inSession = new Set([...sessionBlocks.calentamiento, ...sessionBlocks.principal, ...sessionBlocks.vuelta]);
   wrap.innerHTML = list.map(t=>{
     const catName = catName_(t.categoryId);
@@ -1825,11 +1899,11 @@ function renderSessionTaskBrowser(){
         <h4>${escapeHtml(t.title)}</h4>
         <div class="task-meta">
           ${catName ? `<span class="badge">${escapeHtml(catName)}</span>` : ""}
-          ${phaseLabel(t) ? `<span class="badge">${escapeHtml(phaseLabel(t))}</span>` : ""}
-          ${t.duration ? `<span class="badge outline">${t.duration} min</span>`:""}
+          ${phaseLabel(t) ? `<span class="badge b-phase">${escapeHtml(phaseLabel(t))}</span>` : ""}
+          ${t.duration ? `<span class="badge outline b-duration">${t.duration} min</span>`:""}
           ${t.objectives ? `<span class="badge outline">📋 Objetivos</span>`:""}
-          ${levelRangeLabel(t) ? `<span class="badge outline">🎂 ${escapeHtml(levelRangeLabel(t))}</span>`:""}
-          ${playersRangeLabel(t) ? `<span class="badge outline">👥 ${escapeHtml(playersRangeLabel(t))} jug.</span>`:""}
+          ${levelRangeLabel(t) ? `<span class="badge outline b-level">🎂 ${escapeHtml(levelRangeLabel(t))}</span>`:""}
+          ${playersRangeLabel(t) ? `<span class="badge outline b-players">👥 ${escapeHtml(playersRangeLabel(t))} jug.</span>`:""}
           ${frameCount ? `<span class="badge outline">🎯 ${frameCount} fotog.</span>`:""}
         </div>
       </div>
@@ -2001,7 +2075,7 @@ function sessionCardHtml(s){
 
 function renderSavedSessions(){
   const wrap = document.getElementById("sessionsSaved");
-  if(sessions.length===0){ wrap.innerHTML = '<div class="empty">Todavía no se han guardado sesiones.</div>'; return; }
+  if(sessions.length===0){ wrap.innerHTML = '<div class="empty">🗓️ Todavía no se han guardado sesiones.</div>'; return; }
   const groups = {};
   sessions.forEach(s=>{
     const key = s.createdByName || "Sin entrenador";
