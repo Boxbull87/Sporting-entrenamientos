@@ -12,8 +12,6 @@
   3) Activa Authentication > Email/Password.
   4) Activa Firestore Database (modo producción) y pega las reglas
      que encontrarás al final de este fichero, en el comentario REGLAS_FIRESTORE.
-  5) Activa Storage (para los documentos del Modelo de juego) y pega las
-     reglas del comentario REGLAS_STORAGE.
 ============================================================= -->
 <script>
   const FIREBASE_CONFIG = {
@@ -29,7 +27,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 
@@ -592,21 +589,20 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
     <!-- ---------- MODELO DE JUEGO TAB ---------- -->
     <div id="tab-modelo" class="hidden">
       <div class="card" id="modeloUploadPanel">
-        <h2 style="font-size:1.05rem;">🧩 Subir documento</h2>
-        <p class="muted">Excel, PDF u otros documentos del modelo de juego del club.</p>
+        <h2 style="font-size:1.05rem;">🧩 Añadir documento</h2>
+        <p class="muted">Sube el archivo (Excel, PDF...) a Google Drive o Dropbox, comparte el enlace y pégalo aquí.</p>
         <div class="row">
           <div>
             <label>Título del documento</label>
             <input type="text" id="modeloTitle" placeholder="Ej: Modelo de juego Alevín 2025">
           </div>
           <div>
-            <label>Archivo</label>
-            <input type="file" id="modeloFile" accept=".pdf,.xls,.xlsx,.doc,.docx">
+            <label>Enlace (Google Drive, Dropbox...)</label>
+            <input type="url" id="modeloUrl" placeholder="https://drive.google.com/...">
           </div>
         </div>
-        <button class="btn accent" id="btnUploadModelo" style="margin-top:10px;">📤 Subir</button>
+        <button class="btn accent" id="btnUploadModelo" style="margin-top:10px;">➕ Añadir enlace</button>
         <div id="modeloUploadMsg"></div>
-        <div id="modeloUploadProgress" class="muted" style="margin-top:6px;"></div>
       </div>
       <div class="card">
         <h2 style="font-size:1.05rem;">Documentos del club</h2>
@@ -818,7 +814,6 @@ firebase.initializeApp(FIREBASE_CONFIG);
 document.querySelectorAll(".crest-img").forEach(img => img.src = CREST_DATA_URI);
 const auth = firebase.auth();
 const db = firebase.firestore();
-const storage = firebase.storage();
 db.settings({ experimentalForceLongPolling: true, useFetchStreams: false });
 
 let currentUser = null;   // firebase auth user
@@ -3040,78 +3035,51 @@ function renderSavedPlaySessions(){
 }
 
 /* ============================================================
-   MODELO DE JUEGO (subida y descarga de documentos)
+   MODELO DE JUEGO (enlaces a documentos: Google Drive, Dropbox...)
 ============================================================= */
 document.getElementById("btnUploadModelo").onclick = async () => {
   const msgEl = document.getElementById("modeloUploadMsg");
-  const progEl = document.getElementById("modeloUploadProgress");
-  msgEl.innerHTML = ""; progEl.textContent = "";
-  const fileInput = document.getElementById("modeloFile");
-  const file = fileInput.files[0];
+  msgEl.innerHTML = "";
   const title = document.getElementById("modeloTitle").value.trim();
-  if(!file){ msgEl.innerHTML = '<p class="error-msg">Selecciona un archivo primero.</p>'; return; }
-  const safeName = file.name.replace(/[^\w.\-]+/g,"_");
-  const path = `gameModel/${Date.now()}_${safeName}`;
-  const ref = storage.ref().child(path);
-  const uploadTask = ref.put(file);
-  uploadTask.on("state_changed", (snap)=>{
-    const pct = Math.round((snap.bytesTransferred/snap.totalBytes)*100);
-    progEl.textContent = `Subiendo... ${pct}%`;
-  }, (err)=>{
-    msgEl.innerHTML = '<p class="error-msg">Error al subir: '+err.message+'</p>';
-    progEl.textContent = "";
-  }, async ()=>{
-    const downloadURL = await ref.getDownloadURL();
+  const url = document.getElementById("modeloUrl").value.trim();
+  if(!title){ msgEl.innerHTML = '<p class="error-msg">Ponle un título al documento.</p>'; return; }
+  if(!url){ msgEl.innerHTML = '<p class="error-msg">Pega el enlace del documento (Google Drive, Dropbox...).</p>'; return; }
+  try{
     await db.collection("gameModelFiles").add({
-      title: title || file.name,
-      fileName: file.name,
-      contentType: file.type || "",
-      size: file.size || 0,
-      storagePath: path,
-      downloadURL,
+      title,
+      url,
       uploadedBy: currentUser.uid,
       uploadedByName: currentCoach.name,
       uploadedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
-    msgEl.innerHTML = '<p class="ok-msg">Documento subido correctamente.</p>';
-    progEl.textContent = "";
+    msgEl.innerHTML = '<p class="ok-msg">Documento añadido correctamente.</p>';
     document.getElementById("modeloTitle").value = "";
-    fileInput.value = "";
-  });
+    document.getElementById("modeloUrl").value = "";
+  }catch(err){
+    msgEl.innerHTML = '<p class="error-msg">Error al guardar: '+err.message+'</p>';
+  }
 };
 
-function humanFileSize(bytes){
-  if(!bytes) return "";
-  const units = ["B","KB","MB","GB"];
-  let i = 0, size = bytes;
-  while(size>=1024 && i<units.length-1){ size/=1024; i++; }
-  return size.toFixed(size<10 && i>0 ? 1 : 0) + " " + units[i];
-}
 function renderModeloList(){
   const wrap = document.getElementById("modeloList");
-  if(gameModelFiles.length===0){ wrap.innerHTML = '<div class="empty">📄 Todavía no se han subido documentos.</div>'; return; }
+  if(gameModelFiles.length===0){ wrap.innerHTML = '<div class="empty">📄 Todavía no se han añadido documentos.</div>'; return; }
   const canManage = currentCoach && (currentCoach.role===ROLE_GESTOR || currentCoach.role===ROLE_EDITOR);
   wrap.innerHTML = gameModelFiles.map(f=>`
     <div class="task-item">
       <div>
-        <h4>📄 ${escapeHtml(f.title || f.fileName)}</h4>
+        <h4>📄 ${escapeHtml(f.title)}</h4>
         <div class="task-meta">
-          <span class="badge outline">${escapeHtml(f.fileName||"")}</span>
-          ${f.size ? `<span class="badge outline b-duration">${humanFileSize(f.size)}</span>`:""}
-          <span class="muted" style="align-self:center;">Subido por ${escapeHtml(f.uploadedByName||"")}</span>
+          <span class="muted" style="align-self:center;">Añadido por ${escapeHtml(f.uploadedByName||"")}</span>
         </div>
       </div>
       <div class="task-actions">
-        <a class="btn small accent" href="${f.downloadURL}" target="_blank" rel="noopener">⬇ Descargar</a>
-        ${canManage ? `<button class="btn small danger" onclick="deleteModeloFile('${f.id}','${escapeHtml(f.storagePath||"")}')">Eliminar</button>` : ""}
+        <a class="btn small accent" href="${escapeHtml(f.url)}" target="_blank" rel="noopener">⬇ Abrir / Descargar</a>
+        ${canManage ? `<button class="btn small danger" onclick="deleteModeloFile('${f.id}')">Eliminar</button>` : ""}
       </div>
     </div>`).join("");
 }
-window.deleteModeloFile = async (id, storagePath) => {
+window.deleteModeloFile = async (id) => {
   if(!confirm("¿Eliminar este documento definitivamente?")) return;
-  try{
-    if(storagePath) await storage.ref().child(storagePath).delete();
-  }catch(e){ /* si el archivo ya no existe en Storage, seguimos borrando el registro */ }
   await db.collection("gameModelFiles").doc(id).delete();
 };
 
@@ -3209,25 +3177,6 @@ service cloud.firestore {
       allow read: if isActive();
       allow create: if isEditor();
       allow update, delete: if isEditor();
-    }
-  }
-}
--->
-
-<!--
-REGLAS_STORAGE (pégalas en Storage > Reglas, para los documentos del Modelo de juego):
-
-rules_version = '2';
-service firebase.storage {
-  match /b/{bucket}/o {
-    function isSignedIn() { return request.auth != null; }
-    function myCoach() { return firestore.get(/databases/(default)/documents/coaches/$(request.auth.uid)); }
-    function isActive() { return isSignedIn() && myCoach().data.active == true; }
-    function isEditor() { return isActive() && (myCoach().data.role == 'gestor' || myCoach().data.role == 'editor'); }
-
-    match /gameModel/{fileName} {
-      allow read: if isActive();
-      allow write, delete: if isEditor();
     }
   }
 }
