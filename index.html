@@ -389,7 +389,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
       <div class="home-grid">
         <button type="button" class="home-card" data-goto="tasks">
           <span class="home-card-icon">📋</span>
-          <span class="home-card-label">Banco de tareas</span>
+          <span class="home-card-label">Tareas</span>
           <span class="home-card-desc">Crea y consulta ejercicios</span>
         </button>
         <button type="button" class="home-card" data-goto="sessions">
@@ -417,7 +417,27 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
 
     <!-- ---------- TASKS TAB ---------- -->
     <div id="tab-tasks" class="hidden">
-      <div class="card" id="editorPanel">
+
+      <!-- ---------- TAREAS: submenú ---------- -->
+      <div id="tasksHome">
+        <div class="home-grid">
+          <button type="button" class="home-card" id="tasksGoNew">
+            <span class="home-card-icon">➕</span>
+            <span class="home-card-label">Nueva tarea</span>
+            <span class="home-card-desc">Crea un ejercicio nuevo</span>
+          </button>
+          <button type="button" class="home-card" id="tasksGoBank">
+            <span class="home-card-icon">📂</span>
+            <span class="home-card-label">Banco de tareas</span>
+            <span class="home-card-desc">Consulta por categorías</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ---------- TAREAS: Nueva tarea ---------- -->
+      <div id="tasksNewTaskView" class="hidden">
+        <button type="button" class="btn ghost small" id="tasksNewBack" style="margin-bottom:10px;">← Volver</button>
+        <div class="card" id="editorPanel">
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <h2 style="font-size:1.05rem;">📋 Nueva tarea</h2>
           <button class="btn ghost small" id="btnNewCategory">+ Categoría</button>
@@ -526,18 +546,32 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
           </div>
           <div id="taskFormMsg"></div>
         </form>
+        </div>
       </div>
 
-      <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-          <h2 style="font-size:1.05rem;">Banco de tareas</h2>
-          <button class="btn ghost small" id="btnExportTasksExcel">📊 Exportar a Excel</button>
+      <!-- ---------- TAREAS: Banco de tareas (categorías) ---------- -->
+      <div id="tasksBankView" class="hidden">
+        <button type="button" class="btn ghost small" id="tasksBankBack" style="margin-bottom:10px;">← Volver</button>
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <h2 style="font-size:1.05rem;">📂 Banco de tareas</h2>
+            <button class="btn ghost small" id="btnExportTasksExcel">📊 Exportar a Excel</button>
+          </div>
+          <p class="muted">Elige una categoría para ver sus tareas.</p>
+          <div id="taskCategoryList"><div class="empty">Cargando categorías...</div></div>
         </div>
-        <div class="filterbar">
-          <select id="filterCategory"><option value="">Todas las categorías</option></select>
-          <input type="text" id="filterSearch" placeholder="Buscar por título...">
+      </div>
+
+      <!-- ---------- TAREAS: tareas de una categoría ---------- -->
+      <div id="tasksBankCategoryView" class="hidden">
+        <button type="button" class="btn ghost small" id="tasksBankCategoryBack" style="margin-bottom:10px;">← Categorías</button>
+        <div class="card">
+          <h2 style="font-size:1.05rem;" id="tasksBankCategoryTitle">Categoría</h2>
+          <div class="filterbar">
+            <input type="text" id="filterSearch" placeholder="Buscar por título...">
+          </div>
+          <div id="taskList"><div class="empty">Cargando tareas...</div></div>
         </div>
-        <div id="taskList"><div class="empty">Cargando tareas...</div></div>
       </div>
     </div>
 
@@ -1051,6 +1085,7 @@ function initAppUI(){
   rolePill.classList.toggle("gestor", isGestor);
   rolePill.classList.toggle("editor", role === ROLE_EDITOR);
   document.getElementById("editorPanel").classList.toggle("hidden", !canEditContent);
+  document.getElementById("tasksGoNew").classList.toggle("hidden", !canEditContent);
   document.getElementById("btnNewCategory").classList.toggle("hidden", !canEditContent);
   document.getElementById("playEditorPanel").classList.toggle("hidden", !canEditContent);
   document.getElementById("btnNewAbpCategory").classList.toggle("hidden", !canEditContent);
@@ -1093,9 +1128,65 @@ document.querySelectorAll(".tab").forEach(btn=>{
       document.getElementById("tab-"+t).classList.toggle("hidden", t!==btn.dataset.tab);
     });
     placeBoardWrapFor(btn.dataset.tab);
+    if(btn.dataset.tab === "tasks") showTasksView("home");
     window.scrollTo({top:0, behavior:"smooth"});
   };
 });
+
+/* ---------- Navegación interna de Tareas (submenú / nueva tarea / banco por categorías) ---------- */
+function showTasksView(view){
+  document.getElementById("tasksHome").classList.toggle("hidden", view!=="home");
+  document.getElementById("tasksNewTaskView").classList.toggle("hidden", view!=="new");
+  document.getElementById("tasksBankView").classList.toggle("hidden", view!=="bank");
+  document.getElementById("tasksBankCategoryView").classList.toggle("hidden", view!=="category");
+}
+document.getElementById("tasksGoNew").onclick = () => showTasksView("new");
+document.getElementById("tasksGoBank").onclick = () => { showTasksView("bank"); renderTaskCategoryList(); };
+document.getElementById("tasksNewBack").onclick = () => showTasksView("home");
+document.getElementById("tasksBankBack").onclick = () => showTasksView("home");
+document.getElementById("tasksBankCategoryBack").onclick = () => showTasksView("bank");
+
+let currentTaskCategoryId = null; // id de categoría real, o "__NONE__" para "sin categoría"
+window.openTaskCategory = (categoryId) => {
+  currentTaskCategoryId = categoryId;
+  const name = categoryId === "__NONE__" ? "Sin categoría" : (catName_(categoryId) || "Categoría");
+  document.getElementById("tasksBankCategoryTitle").textContent = name;
+  document.getElementById("filterSearch").value = "";
+  showTasksView("category");
+  renderTaskList();
+};
+function renderTaskCategoryList(){
+  const wrap = document.getElementById("taskCategoryList");
+  if(categories.length===0 && tasks.length===0){
+    wrap.innerHTML = '<div class="empty">🗂️ Todavía no hay categorías ni tareas.</div>';
+    return;
+  }
+  const counts = {};
+  let uncategorized = 0;
+  tasks.forEach(t=>{
+    const ids = taskCategoryIds(t);
+    if(ids.length===0){ uncategorized++; return; }
+    ids.forEach(id=>{ counts[id] = (counts[id]||0)+1; });
+  });
+  let html = categories.map(c=>{
+    const n = counts[c.id]||0;
+    return `
+    <button type="button" class="home-card" onclick="openTaskCategory('${c.id}')">
+      <span class="home-card-icon">🏷️</span>
+      <span class="home-card-label">${escapeHtml(c.name)}</span>
+      <span class="home-card-desc">${n} tarea${n===1?"":"s"}</span>
+    </button>`;
+  }).join("");
+  if(uncategorized>0){
+    html += `
+    <button type="button" class="home-card" onclick="openTaskCategory('__NONE__')">
+      <span class="home-card-icon">❔</span>
+      <span class="home-card-label">Sin categoría</span>
+      <span class="home-card-desc">${uncategorized} tarea${uncategorized===1?"":"s"}</span>
+    </button>`;
+  }
+  wrap.innerHTML = html ? `<div class="home-grid">${html}</div>` : '<div class="empty">🗂️ Todavía no hay categorías.</div>';
+}
 document.querySelectorAll(".home-card[data-goto]").forEach(card=>{
   card.onclick = () => {
     const target = document.querySelector(`.tab[data-tab="${card.dataset.goto}"]`);
@@ -1119,6 +1210,7 @@ function attachRealtimeListeners(){
   db.collection("tasks").orderBy("createdAt","desc").onSnapshot(snap=>{
     tasks = snap.docs.map(d=>({id:d.id, ...d.data()}));
     renderTaskList();
+    renderTaskCategoryList();
     renderSessionTaskBrowser();
     handleDeepLink();
   });
@@ -1236,8 +1328,8 @@ function renderCategorySelects(){
         ${escapeHtml(c.name)}
       </label>`).join("");
   }
-  document.getElementById("filterCategory").innerHTML = '<option value="">Todas las categorías</option>' + opts;
   document.getElementById("sessionAddCategory").innerHTML = '<option value="">Todas las categorías</option>' + opts;
+  renderTaskCategoryList();
 }
 
 
@@ -1984,7 +2076,7 @@ document.getElementById("taskForm").onsubmit = async (e) => {
   }
 };
 
-document.getElementById("cancelEdit").onclick = () => resetTaskForm();
+document.getElementById("cancelEdit").onclick = () => { resetTaskForm(); showTasksView("home"); };
 
 function resetTaskForm(){
   editingTaskId = null;
@@ -2035,6 +2127,7 @@ window.editTask = (id) => {
   redrawBoard(); renderFramesList();
   document.getElementById("cancelEdit").classList.remove("hidden");
   document.querySelector('.tab[data-tab="tasks"]').click();
+  showTasksView("new");
   document.getElementById("editorPanel").scrollIntoView({behavior:"smooth"});
 };
 
@@ -2044,15 +2137,18 @@ window.deleteTask = async (id) => {
 };
 
 /* ---------- Task list rendering + filters ---------- */
-document.getElementById("filterCategory").onchange = renderTaskList;
 document.getElementById("filterSearch").oninput = renderTaskList;
 
 function renderTaskList(){
   const wrap = document.getElementById("taskList");
-  const catFilter = document.getElementById("filterCategory").value;
   const search = document.getElementById("filterSearch").value.toLowerCase();
   let list = tasks.filter(t=>{
-    if(catFilter && !taskCategoryIds(t).includes(catFilter)) return false;
+    const ids = taskCategoryIds(t);
+    if(currentTaskCategoryId === "__NONE__"){
+      if(ids.length>0) return false;
+    } else if(currentTaskCategoryId){
+      if(!ids.includes(currentTaskCategoryId)) return false;
+    }
     if(search && !(t.title||"").toLowerCase().includes(search)) return false;
     return true;
   });
