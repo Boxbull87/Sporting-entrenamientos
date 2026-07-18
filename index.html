@@ -12,6 +12,8 @@
   3) Activa Authentication > Email/Password.
   4) Activa Firestore Database (modo producción) y pega las reglas
      que encontrarás al final de este fichero, en el comentario REGLAS_FIRESTORE.
+  5) Activa Storage (para los documentos del Modelo de juego) y pega las
+     reglas del comentario REGLAS_STORAGE.
 ============================================================= -->
 <script>
   const FIREBASE_CONFIG = {
@@ -27,6 +29,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 
@@ -237,7 +240,8 @@ canvas.court{
 
 .board-fullscreen{
   position:fixed;inset:0;background:rgba(5,5,5,.94);z-index:300;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:16px;
+  display:flex;flex-direction:column;align-items:center;gap:14px;padding:16px;
+  overflow-y:auto;
 }
 .board-fullscreen #closeFullscreenBoard{position:absolute;top:14px;right:14px;}
 .board-fullscreen canvas.court{width:min(94vw,115vh);max-width:min(94vw,115vh);max-height:82vh;}
@@ -334,6 +338,16 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
   </div>
 </div>
 
+<!-- ================= PUBLIC PLAY SESSION (sin login) ================= -->
+<div id="publicScreen" class="hidden">
+  <div class="topbar">
+    <div class="brand"><img class="crest crest-img" alt="Escudo"> Sporting FS Almería</div>
+  </div>
+  <div class="wrap" id="publicWrap">
+    <div class="empty">Cargando jugadas...</div>
+  </div>
+</div>
+
 <!-- ================= APP ================= -->
 <div id="app" class="hidden">
   <div class="topbar">
@@ -349,6 +363,8 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
     <button class="tab active" data-tab="home">🏠 Inicio</button>
     <button class="tab" data-tab="tasks">Tareas</button>
     <button class="tab" data-tab="sessions">Sesiones</button>
+    <button class="tab" data-tab="modelo">Modelo de juego</button>
+    <button class="tab" data-tab="abp">ABP</button>
     <button class="tab hidden" id="tabCoachesBtn" data-tab="coaches">Entrenadores</button>
   </div>
 
@@ -371,6 +387,16 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
           <span class="home-card-icon">🗓️</span>
           <span class="home-card-label">Sesiones</span>
           <span class="home-card-desc">Organiza tus entrenamientos</span>
+        </button>
+        <button type="button" class="home-card" data-goto="modelo">
+          <span class="home-card-icon">🧩</span>
+          <span class="home-card-label">Modelo de juego</span>
+          <span class="home-card-desc">Documentos del club</span>
+        </button>
+        <button type="button" class="home-card" data-goto="abp">
+          <span class="home-card-icon">🎯</span>
+          <span class="home-card-label">ABP</span>
+          <span class="home-card-desc">Jugadas a balón parado</span>
         </button>
         <button type="button" class="home-card hidden" id="homeCoachesBtn" data-goto="coaches">
           <span class="home-card-icon">👥</span>
@@ -443,7 +469,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
 
           <h3 style="margin-top:16px;font-size:.95rem;">🎯 Pizarra táctica</h3>
           <p class="muted" style="margin-top:-6px;">Coloca jugadores y balón, y pulsa "Guardar fotograma" cada vez que cambien de posición para crear una animación.</p>
-          <div class="board-wrap">
+          <div class="board-wrap" id="boardWrap">
             <div class="board-toolbar">
               <button type="button" class="btn small" id="addPlayerA"><span class="swatch" style="background:#2f80ed;"></span>+ Azul</button>
               <button type="button" class="btn small" id="addPlayerB"><span class="swatch" style="background:#eb5757;"></span>+ Rojo</button>
@@ -563,6 +589,119 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
       </div>
     </div>
 
+    <!-- ---------- MODELO DE JUEGO TAB ---------- -->
+    <div id="tab-modelo" class="hidden">
+      <div class="card" id="modeloUploadPanel">
+        <h2 style="font-size:1.05rem;">🧩 Subir documento</h2>
+        <p class="muted">Excel, PDF u otros documentos del modelo de juego del club.</p>
+        <div class="row">
+          <div>
+            <label>Título del documento</label>
+            <input type="text" id="modeloTitle" placeholder="Ej: Modelo de juego Alevín 2025">
+          </div>
+          <div>
+            <label>Archivo</label>
+            <input type="file" id="modeloFile" accept=".pdf,.xls,.xlsx,.doc,.docx">
+          </div>
+        </div>
+        <button class="btn accent" id="btnUploadModelo" style="margin-top:10px;">📤 Subir</button>
+        <div id="modeloUploadMsg"></div>
+        <div id="modeloUploadProgress" class="muted" style="margin-top:6px;"></div>
+      </div>
+      <div class="card">
+        <h2 style="font-size:1.05rem;">Documentos del club</h2>
+        <div id="modeloList"><div class="empty">Cargando documentos...</div></div>
+      </div>
+    </div>
+
+    <!-- ---------- ABP TAB ---------- -->
+    <div id="tab-abp" class="hidden">
+      <div class="card" id="playEditorPanel">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <h2 style="font-size:1.05rem;" id="playFormTitle">🎯 Nueva jugada</h2>
+          <button class="btn ghost small" id="btnNewAbpCategory">+ Categoría</button>
+        </div>
+        <form id="playForm">
+          <div class="row">
+            <div>
+              <label>Título</label>
+              <input type="text" id="playTitle" required>
+            </div>
+            <div>
+              <label>Categoría</label>
+              <select id="playCategory"></select>
+            </div>
+          </div>
+          <div class="row" style="margin-top:10px;">
+            <div>
+              <label>Enlace del vídeo (YouTube u otro)</label>
+              <input type="url" id="playVideoUrl" placeholder="https://youtube.com/...">
+            </div>
+          </div>
+          <label style="margin-top:10px;">Observaciones</label>
+          <textarea id="playObservations" placeholder="Claves de la jugada, roles, variantes..."></textarea>
+
+          <h3 style="margin-top:16px;font-size:.95rem;">🎯 Pizarra táctica</h3>
+          <div id="abpBoardAnchor"></div>
+
+          <div style="margin-top:10px;display:flex;gap:8px;">
+            <button type="submit" class="btn accent">Guardar jugada</button>
+            <button type="button" class="btn ghost hidden" id="cancelPlayEdit">Cancelar edición</button>
+          </div>
+          <div id="playFormMsg"></div>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2 style="font-size:1.05rem;">Banco de jugadas</h2>
+        <div class="filterbar">
+          <select id="filterAbpCategory"><option value="">Todas las categorías</option></select>
+          <input type="text" id="filterAbpSearch" placeholder="Buscar por título...">
+        </div>
+        <div id="playList"><div class="empty">Cargando jugadas...</div></div>
+      </div>
+
+      <div class="card" id="playSessionEditorPanel">
+        <h2 style="font-size:1.05rem;" id="playSessionEditorTitle">🎬 Crear sesión de ABP</h2>
+        <div class="row">
+          <div>
+            <label>Nombre de la sesión</label>
+            <input type="text" id="playSessionName" placeholder="Ej: Córners rivales - Jornada 12">
+          </div>
+          <div>
+            <label>Fecha</label>
+            <input type="date" id="playSessionDate">
+          </div>
+        </div>
+        <label style="margin-top:10px;">Notas</label>
+        <textarea id="playSessionNotes" placeholder="Observaciones generales..."></textarea>
+        <label style="margin-top:10px;display:flex;align-items:center;gap:8px;text-transform:none;font-family:inherit;font-weight:400;">
+          <input type="checkbox" id="playSessionPublic" style="width:auto;">
+          Permitir enlace público (visible por cualquiera, sin iniciar sesión)
+        </label>
+
+        <h3 style="margin-top:14px;font-size:.9rem;">Añadir jugadas</h3>
+        <div class="filterbar">
+          <select id="playSessionFilterCategory"><option value="">Todas las categorías</option></select>
+        </div>
+        <div id="playSessionBrowser"></div>
+
+        <h3 style="margin-top:14px;font-size:.9rem;">Jugadas seleccionadas</h3>
+        <div id="playSessionList"><p class="muted">Ninguna jugada añadida todavía.</p></div>
+
+        <div style="margin-top:8px;display:flex;gap:8px;">
+          <button class="btn accent" id="btnSavePlaySession">Guardar sesión</button>
+          <button type="button" class="btn ghost hidden" id="cancelPlaySessionEdit">Cancelar edición</button>
+        </div>
+        <div id="playSessionMsg"></div>
+      </div>
+
+      <div class="card">
+        <h2 style="font-size:1.05rem;">Sesiones de ABP guardadas</h2>
+        <div id="playSessionsSaved"><div class="empty">Cargando sesiones...</div></div>
+      </div>
+    </div>
+
     <!-- ---------- COACHES TAB (gestor only) ---------- -->
     <div id="tab-coaches" class="hidden">
       <div class="card">
@@ -589,6 +728,18 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
   </div>
 </div>
 
+<div id="abpCategoryModal" class="modal-bg hidden">
+  <div class="modal">
+    <h2 style="font-size:1.05rem;">Categorías de ABP</h2>
+    <div class="row">
+      <input type="text" id="newAbpCategoryName" placeholder="Ej: Córner a favor, Falta lateral...">
+      <button class="btn accent" id="btnAddAbpCategory" style="flex:0 0 auto;">Añadir</button>
+    </div>
+    <div id="abpCategoryModalList" style="margin-top:12px;"></div>
+    <button class="btn ghost" id="btnCloseAbpCategoryModal" style="margin-top:14px;width:100%;">Cerrar</button>
+  </div>
+</div>
+
 <!-- ---------- Task view modal (with animation playback) ---------- -->
 <div id="viewTaskModal" class="modal-bg hidden">
   <div class="modal">
@@ -597,6 +748,17 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
     <p id="viewTaskDesc" style="white-space:pre-wrap;font-size:.9rem;"></p>
     <div id="viewTaskBoardWrap"></div>
     <button class="btn ghost" id="btnCloseViewModal" style="margin-top:14px;width:100%;">Cerrar</button>
+  </div>
+</div>
+
+<div id="viewPlayModal" class="modal-bg hidden">
+  <div class="modal">
+    <h2 id="viewPlayTitle" style="font-size:1.1rem;"></h2>
+    <div id="viewPlayMeta" style="margin:6px 0 10px 0;"></div>
+    <div id="viewPlayVideoWrap" style="margin-bottom:8px;"></div>
+    <div id="viewPlayDesc" style="white-space:pre-wrap;font-size:.9rem;"></div>
+    <div id="viewPlayBoardWrap"></div>
+    <button class="btn ghost" id="btnCloseViewPlayModal" style="margin-top:14px;width:100%;">Cerrar</button>
   </div>
 </div>
 
@@ -656,6 +818,7 @@ firebase.initializeApp(FIREBASE_CONFIG);
 document.querySelectorAll(".crest-img").forEach(img => img.src = CREST_DATA_URI);
 const auth = firebase.auth();
 const db = firebase.firestore();
+const storage = firebase.storage();
 db.settings({ experimentalForceLongPolling: true, useFetchStreams: false });
 
 let currentUser = null;   // firebase auth user
@@ -664,6 +827,10 @@ let categories = [];
 let tasks = [];
 let coaches = [];
 let sessions = [];
+let abpCategories = [];
+let plays = [];
+let playSessions = [];
+let gameModelFiles = [];
 
 const ROLE_GESTOR = "gestor";
 const ROLE_EDITOR = "editor";
@@ -770,29 +937,35 @@ function friendlyAuthError(err){
   return map[err.code] || "Ha ocurrido un error. Inténtalo de nuevo.";
 }
 
-auth.onAuthStateChanged(async (user) => {
-  currentUser = user;
-  if(!user){
-    showScreen("auth");
-    return;
-  }
-  const doc = await db.collection("coaches").doc(user.uid).get();
-  if(!doc.exists){
-    // Safety fallback: create pending profile
-    await db.collection("coaches").doc(user.uid).set({
-      name: user.email, email: user.email, role: ROLE_COACH, active:false,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-  }
-  currentCoach = (await db.collection("coaches").doc(user.uid).get()).data();
+const PUBLIC_MATCH = location.hash.match(/public=([^&]+)/);
+if(PUBLIC_MATCH){
+  document.getElementById("authScreen").classList.add("hidden");
+  loadPublicPlaySession(decodeURIComponent(PUBLIC_MATCH[1]));
+} else {
+  auth.onAuthStateChanged(async (user) => {
+    currentUser = user;
+    if(!user){
+      showScreen("auth");
+      return;
+    }
+    const doc = await db.collection("coaches").doc(user.uid).get();
+    if(!doc.exists){
+      // Safety fallback: create pending profile
+      await db.collection("coaches").doc(user.uid).set({
+        name: user.email, email: user.email, role: ROLE_COACH, active:false,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+    currentCoach = (await db.collection("coaches").doc(user.uid).get()).data();
 
-  if(!currentCoach.active){
-    showScreen("pending");
-    return;
-  }
-  showScreen("app");
-  initAppUI();
-});
+    if(!currentCoach.active){
+      showScreen("pending");
+      return;
+    }
+    showScreen("app");
+    initAppUI();
+  });
+}
 
 function showScreen(name){
   document.getElementById("authScreen").classList.toggle("hidden", name!=="auth");
@@ -816,6 +989,9 @@ function initAppUI(){
   rolePill.classList.toggle("editor", role === ROLE_EDITOR);
   document.getElementById("editorPanel").classList.toggle("hidden", !canEditContent);
   document.getElementById("btnNewCategory").classList.toggle("hidden", !canEditContent);
+  document.getElementById("playEditorPanel").classList.toggle("hidden", !canEditContent);
+  document.getElementById("btnNewAbpCategory").classList.toggle("hidden", !canEditContent);
+  document.getElementById("modeloUploadPanel").classList.toggle("hidden", !canEditContent);
   document.getElementById("tabCoachesBtn").classList.toggle("hidden", !isGestor);
   document.getElementById("homeCoachesBtn").classList.toggle("hidden", !isGestor);
 
@@ -826,13 +1002,34 @@ function initAppUI(){
 }
 
 /* ---------- Tabs ---------- */
+let boardWrapHomeParent = null, boardWrapHomeNext = null;
+(function captureBoardWrapHome(){
+  const bw = document.getElementById("boardWrap");
+  boardWrapHomeParent = bw.parentNode;
+  boardWrapHomeNext = bw.nextSibling;
+})();
+function placeBoardWrapFor(tab){
+  if(tab!=="tasks" && tab!=="abp") return;
+  const bw = document.getElementById("boardWrap");
+  const abpAnchor = document.getElementById("abpBoardAnchor");
+  if(tab === "abp"){
+    if(bw.parentNode !== abpAnchor) abpAnchor.appendChild(bw);
+  } else if(bw.parentNode !== boardWrapHomeParent){
+    if(boardWrapHomeNext && boardWrapHomeNext.parentNode === boardWrapHomeParent){
+      boardWrapHomeParent.insertBefore(bw, boardWrapHomeNext);
+    } else {
+      boardWrapHomeParent.appendChild(bw);
+    }
+  }
+}
 document.querySelectorAll(".tab").forEach(btn=>{
   btn.onclick = () => {
     document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));
     btn.classList.add("active");
-    ["home","tasks","sessions","coaches"].forEach(t=>{
+    ["home","tasks","sessions","modelo","abp","coaches"].forEach(t=>{
       document.getElementById("tab-"+t).classList.toggle("hidden", t!==btn.dataset.tab);
     });
+    placeBoardWrapFor(btn.dataset.tab);
     window.scrollTo({top:0, behavior:"smooth"});
   };
 });
@@ -872,6 +1069,65 @@ function attachRealtimeListeners(){
     sessions = snap.docs.map(d=>({id:d.id, ...d.data()}));
     renderSavedSessions();
   });
+
+  db.collection("abpCategories").orderBy("name").onSnapshot(snap=>{
+    abpCategories = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    renderAbpCategorySelects();
+    renderAbpCategoryModalList();
+  });
+
+  db.collection("plays").orderBy("createdAt","desc").onSnapshot(snap=>{
+    plays = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    renderPlayList();
+    renderPlaySessionBrowser();
+  });
+
+  db.collection("playSessions").orderBy("createdAt","desc").onSnapshot(snap=>{
+    playSessions = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    renderSavedPlaySessions();
+  });
+
+  db.collection("gameModelFiles").orderBy("uploadedAt","desc").onSnapshot(snap=>{
+    gameModelFiles = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    renderModeloList();
+  });
+}
+
+/* ============================================================
+   CATEGORÍAS ABP
+============================================================= */
+document.getElementById("btnNewAbpCategory").onclick = () => document.getElementById("abpCategoryModal").classList.remove("hidden");
+document.getElementById("btnCloseAbpCategoryModal").onclick = () => document.getElementById("abpCategoryModal").classList.add("hidden");
+
+document.getElementById("btnAddAbpCategory").onclick = async () => {
+  const input = document.getElementById("newAbpCategoryName");
+  const name = input.value.trim();
+  if(!name) return;
+  await db.collection("abpCategories").add({name, createdBy: currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp()});
+  input.value = "";
+};
+
+function renderAbpCategoryModalList(){
+  const wrap = document.getElementById("abpCategoryModalList");
+  if(abpCategories.length===0){ wrap.innerHTML = '<p class="muted">Todavía no hay categorías.</p>'; return; }
+  wrap.innerHTML = abpCategories.map(c=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);">
+      <span>${escapeHtml(c.name)}</span>
+      <button class="btn danger small" onclick="deleteAbpCategory('${c.id}')">Eliminar</button>
+    </div>`).join("");
+}
+window.deleteAbpCategory = async (id) => {
+  if(!confirm("¿Eliminar esta categoría de ABP?")) return;
+  await db.collection("abpCategories").doc(id).delete();
+};
+
+function abpCatName_(id){ const c = abpCategories.find(x=>x.id===id); return c ? c.name : ""; }
+
+function renderAbpCategorySelects(){
+  const opts = abpCategories.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
+  document.getElementById("playCategory").innerHTML = opts || '<option value="">Sin categorías</option>';
+  document.getElementById("filterAbpCategory").innerHTML = '<option value="">Todas las categorías</option>' + opts;
+  document.getElementById("playSessionFilterCategory").innerHTML = '<option value="">Todas las categorías</option>' + opts;
 }
 
 /* ============================================================
@@ -2424,6 +2680,480 @@ document.getElementById("btnExportTasksExcel").onclick = () => {
 };
 
 /* ============================================================
+   VISOR DE PIZARRA REUTILIZABLE (solo lectura)
+============================================================= */
+function renderBoardViewer(container, frameList){
+  const frames_ = frameList || [];
+  if(frames_.length===0){ container.innerHTML = ""; return; }
+  const uid = "bv" + Math.random().toString(36).slice(2,9);
+  container.innerHTML = `
+    <h3 style="margin-top:14px;">Pizarra táctica</h3>
+    <canvas id="${uid}" class="court" width="980" height="700"></canvas>
+    <div style="display:flex;gap:8px;justify-content:center;margin-top:6px;flex-wrap:wrap;">
+      <button type="button" class="btn small accent" id="${uid}-play">▶ Reproducir</button>
+      <button type="button" class="btn small ghost" id="${uid}-stop">⏹ Detener</button>
+      <button type="button" class="btn small ghost" id="${uid}-expand">⛶ Ampliar</button>
+    </div>`;
+  const vc = document.getElementById(uid);
+  const vx = vc.getContext("2d");
+  function drawStatic(){
+    drawCourtOn(vx, vc);
+    if(frames_[0]){
+      drawShapesOn(vx, vc, frameShapes(frames_[0]));
+      drawPathsOn(vx, vc, framePaths(frames_[0]));
+      drawArrowsOn(vx, vc, frameArrows(frames_[0]));
+      drawTokensOn(vx, vc, frameTokens(frames_[0]));
+      drawTextsOn(vx, vc, frameTexts(frames_[0]));
+    }
+  }
+  drawStatic();
+  document.getElementById(uid+"-play").onclick = () => playFrames(frames_, vc, vx, ()=>{});
+  document.getElementById(uid+"-stop").onclick = () => {
+    animRunning=false; if(animReq) cancelAnimationFrame(animReq);
+    drawStatic();
+  };
+  document.getElementById(uid+"-expand").onclick = () => openBoardFullscreen(vc, "view", frames_);
+}
+
+function youtubeEmbedUrl(url){
+  if(!url) return null;
+  const m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([a-zA-Z0-9_-]{6,})/);
+  return m ? `https://www.youtube.com/embed/${m[1]}` : null;
+}
+function videoEmbedHtml(url){
+  if(!url) return "";
+  const embed = youtubeEmbedUrl(url);
+  if(embed){
+    return `<div style="position:relative;padding-top:56.25%;border-radius:8px;overflow:hidden;background:#000;">
+      <iframe src="${embed}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;" allowfullscreen loading="lazy"></iframe>
+    </div>`;
+  }
+  return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="btn ghost small">▶ Ver vídeo</a>`;
+}
+
+/* ============================================================
+   ABP · BANCO DE JUGADAS
+============================================================= */
+let editingPlayId = null;
+
+document.getElementById("playForm").onsubmit = async (e) => {
+  e.preventDefault();
+  const msgEl = document.getElementById("playFormMsg");
+  msgEl.innerHTML = "";
+  const payload = {
+    title: document.getElementById("playTitle").value.trim(),
+    categoryId: document.getElementById("playCategory").value || null,
+    videoUrl: document.getElementById("playVideoUrl").value.trim(),
+    observations: document.getElementById("playObservations").value.trim(),
+    animation: { frames: frames },
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+  if(!payload.title){ msgEl.innerHTML = '<p class="error-msg">Ponle un título a la jugada.</p>'; return; }
+  try{
+    if(editingPlayId){
+      await db.collection("plays").doc(editingPlayId).update(payload);
+    } else {
+      payload.createdBy = currentUser.uid;
+      payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection("plays").add(payload);
+    }
+    msgEl.innerHTML = '<p class="ok-msg">Jugada guardada correctamente.</p>';
+    resetPlayForm();
+  }catch(err){
+    msgEl.innerHTML = '<p class="error-msg">Error al guardar: '+err.message+'</p>';
+  }
+};
+document.getElementById("cancelPlayEdit").onclick = () => resetPlayForm();
+
+function resetPlayForm(){
+  editingPlayId = null;
+  document.getElementById("playForm").reset();
+  document.getElementById("cancelPlayEdit").classList.add("hidden");
+  document.getElementById("playFormTitle").textContent = "🎯 Nueva jugada";
+  tokens = []; frames = []; arrows = []; texts = []; shapes = []; paths = [];
+  tokenSeq = 0; arrowSeq = 0; textSeq = 0; shapeSeq = 0; pathSeq = 0;
+  historyStack = []; selected = null; dragObj = null;
+  lastGoalId = null;
+  setMode("select");
+  redrawBoard(); renderFramesList();
+}
+
+window.editPlay = (id) => {
+  const p = plays.find(x=>x.id===id);
+  if(!p) return;
+  editingPlayId = id;
+  document.getElementById("playTitle").value = p.title || "";
+  document.getElementById("playCategory").value = p.categoryId || "";
+  document.getElementById("playVideoUrl").value = p.videoUrl || "";
+  document.getElementById("playObservations").value = p.observations || "";
+  frames = (p.animation && p.animation.frames) ? JSON.parse(JSON.stringify(p.animation.frames)) : [];
+  tokens = frames.length ? JSON.parse(JSON.stringify(frameTokens(frames[frames.length-1]))) : [];
+  arrows = frames.length ? JSON.parse(JSON.stringify(frameArrows(frames[frames.length-1]))) : [];
+  texts = frames.length ? JSON.parse(JSON.stringify(frameTexts(frames[frames.length-1]))) : [];
+  shapes = frames.length ? JSON.parse(JSON.stringify(frameShapes(frames[frames.length-1]))) : [];
+  paths = frames.length ? JSON.parse(JSON.stringify(framePaths(frames[frames.length-1]))) : [];
+  tokenSeq = tokens.reduce((m,tk)=> Math.max(m, parseInt((tk.id||"t0").slice(1))||0), 0);
+  arrowSeq = arrows.reduce((m,a)=> Math.max(m, parseInt((a.id||"a0").slice(1))||0), 0);
+  textSeq = texts.reduce((m,o)=> Math.max(m, parseInt((o.id||"x0").slice(1))||0), 0);
+  shapeSeq = shapes.reduce((m,o)=> Math.max(m, parseInt((o.id||"c0").slice(1))||0), 0);
+  pathSeq = paths.reduce((m,o)=> Math.max(m, parseInt((o.id||"p0").slice(1))||0), 0);
+  historyStack = []; selected = null; dragObj = null;
+  lastGoalId = null;
+  setMode("select");
+  redrawBoard(); renderFramesList();
+  document.getElementById("cancelPlayEdit").classList.remove("hidden");
+  document.getElementById("playFormTitle").textContent = "✏️ Editando jugada: " + (p.title||"");
+  document.querySelector('.tab[data-tab="abp"]').click();
+  document.getElementById("playEditorPanel").scrollIntoView({behavior:"smooth"});
+};
+
+window.deletePlay = async (id) => {
+  if(!confirm("¿Eliminar esta jugada definitivamente?")) return;
+  await db.collection("plays").doc(id).delete();
+};
+
+window.viewPlay = (id) => {
+  closeBoardFullscreen();
+  const p = plays.find(x=>x.id===id);
+  if(!p) return;
+  document.getElementById("viewPlayTitle").textContent = p.title;
+  document.getElementById("viewPlayMeta").innerHTML = `
+    ${abpCatName_(p.categoryId) ? `<span class="badge">${escapeHtml(abpCatName_(p.categoryId))}</span>` : ""}
+  `;
+  document.getElementById("viewPlayVideoWrap").innerHTML = videoEmbedHtml(p.videoUrl);
+  document.getElementById("viewPlayDesc").innerHTML = p.observations ? escapeHtml(p.observations) : '<span class="muted">Sin observaciones.</span>';
+  renderBoardViewer(document.getElementById("viewPlayBoardWrap"), (p.animation && p.animation.frames) || []);
+  document.getElementById("viewPlayModal").classList.remove("hidden");
+};
+document.getElementById("btnCloseViewPlayModal").onclick = () => {
+  animRunning = false; if(animReq) cancelAnimationFrame(animReq);
+  closeBoardFullscreen();
+  document.getElementById("viewPlayModal").classList.add("hidden");
+};
+
+document.getElementById("filterAbpCategory").onchange = renderPlayList;
+document.getElementById("filterAbpSearch").oninput = renderPlayList;
+function renderPlayList(){
+  const wrap = document.getElementById("playList");
+  const catFilter = document.getElementById("filterAbpCategory").value;
+  const search = document.getElementById("filterAbpSearch").value.trim().toLowerCase();
+  const list = plays.filter(p=>{
+    if(catFilter && p.categoryId!==catFilter) return false;
+    if(search && !(p.title||"").toLowerCase().includes(search)) return false;
+    return true;
+  });
+  if(list.length===0){ wrap.innerHTML = '<div class="empty">🔍 No hay jugadas que coincidan.</div>'; return; }
+  wrap.innerHTML = list.map(p=>{
+    const frameCount = (p.animation && p.animation.frames) ? p.animation.frames.length : 0;
+    return `
+    <div class="task-item">
+      <div>
+        <h4>${escapeHtml(p.title)}</h4>
+        <div class="task-meta">
+          ${abpCatName_(p.categoryId) ? `<span class="badge">${escapeHtml(abpCatName_(p.categoryId))}</span>` : ""}
+          ${p.videoUrl ? `<span class="badge outline b-duration">▶ Vídeo</span>` : ""}
+          ${frameCount ? `<span class="badge outline">🎯 ${frameCount} fotog.</span>`:""}
+        </div>
+      </div>
+      <div class="task-actions">
+        <button class="btn small ghost" onclick="viewPlay('${p.id}')">Ver</button>
+        <button class="btn small ghost" onclick="editPlay('${p.id}')">Editar</button>
+        <button class="btn small danger" onclick="deletePlay('${p.id}')">Eliminar</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+/* ============================================================
+   ABP · SESIONES (constructor + guardado + enlace público)
+============================================================= */
+let playSessionItems = [];
+let editingPlaySessionId = null;
+
+document.getElementById("playSessionFilterCategory").onchange = renderPlaySessionBrowser;
+
+function renderPlaySessionBrowser(){
+  const wrap = document.getElementById("playSessionBrowser");
+  const catFilter = document.getElementById("playSessionFilterCategory").value;
+  const list = plays.filter(p=> !catFilter || p.categoryId===catFilter);
+  if(list.length===0){ wrap.innerHTML = '<div class="empty">🔍 No hay jugadas que coincidan.</div>'; return; }
+  const inSession = new Set(playSessionItems.map(x=>x.playId));
+  wrap.innerHTML = list.map(p=>{
+    const already = inSession.has(p.id);
+    return `
+    <div class="task-item">
+      <div>
+        <h4>${escapeHtml(p.title)}</h4>
+        <div class="task-meta">
+          ${abpCatName_(p.categoryId) ? `<span class="badge">${escapeHtml(abpCatName_(p.categoryId))}</span>` : ""}
+          ${p.videoUrl ? `<span class="badge outline b-duration">▶ Vídeo</span>` : ""}
+        </div>
+      </div>
+      <div class="task-actions">
+        <button class="btn small ghost" onclick="viewPlay('${p.id}')">Ver</button>
+        ${already
+          ? `<button class="btn small ghost" disabled>✔ En la sesión</button>`
+          : `<button class="btn small accent" onclick="addPlayToSession('${p.id}')">➕ Añadir</button>`}
+      </div>
+    </div>`;
+  }).join("");
+}
+window.addPlayToSession = (id) => {
+  const p = plays.find(x=>x.id===id);
+  if(!p) return;
+  playSessionItems.push({
+    playId: p.id,
+    title: p.title || "",
+    categoryName: abpCatName_(p.categoryId) || "",
+    observations: p.observations || "",
+    videoUrl: p.videoUrl || "",
+    animation: p.animation ? JSON.parse(JSON.stringify(p.animation)) : {frames:[]}
+  });
+  renderPlaySessionList();
+  renderPlaySessionBrowser();
+};
+function renderPlaySessionList(){
+  const wrap = document.getElementById("playSessionList");
+  if(playSessionItems.length===0){ wrap.innerHTML = '<p class="muted">Ninguna jugada añadida todavía.</p>'; return; }
+  wrap.innerHTML = playSessionItems.map((item,i)=>`
+    <div class="session-task">
+      <div class="order-btns">
+        <button type="button" onclick="movePlaySessionItem(${i},-1)">▲</button>
+        <button type="button" onclick="movePlaySessionItem(${i},1)">▼</button>
+      </div>
+      <div style="flex:1;">
+        <strong>${i+1}. ${escapeHtml(item.title)}</strong>
+        <div class="muted">${item.categoryName ? escapeHtml(item.categoryName) : ""}</div>
+      </div>
+      <button class="btn small danger" onclick="removePlaySessionItem(${i})">Quitar</button>
+    </div>`).join("");
+}
+window.movePlaySessionItem = (i, dir) => {
+  const j = i+dir;
+  if(j<0 || j>=playSessionItems.length) return;
+  [playSessionItems[i],playSessionItems[j]] = [playSessionItems[j],playSessionItems[i]];
+  renderPlaySessionList();
+};
+window.removePlaySessionItem = (i) => { playSessionItems.splice(i,1); renderPlaySessionList(); renderPlaySessionBrowser(); };
+
+document.getElementById("btnSavePlaySession").onclick = async () => {
+  const msgEl = document.getElementById("playSessionMsg");
+  const name = document.getElementById("playSessionName").value.trim();
+  if(!name){ msgEl.innerHTML = '<p class="error-msg">Ponle un nombre a la sesión.</p>'; return; }
+  if(playSessionItems.length===0){ msgEl.innerHTML = '<p class="error-msg">Añade al menos una jugada.</p>'; return; }
+  const payload = {
+    name,
+    date: document.getElementById("playSessionDate").value || null,
+    notes: document.getElementById("playSessionNotes").value.trim(),
+    public: document.getElementById("playSessionPublic").checked,
+    plays: JSON.parse(JSON.stringify(playSessionItems))
+  };
+  try{
+    if(editingPlaySessionId){
+      await db.collection("playSessions").doc(editingPlaySessionId).update(payload);
+      msgEl.innerHTML = '<p class="ok-msg">Sesión de ABP actualizada.</p>';
+    } else {
+      payload.createdBy = currentUser.uid;
+      payload.createdByName = currentCoach.name;
+      payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection("playSessions").add(payload);
+      msgEl.innerHTML = '<p class="ok-msg">Sesión de ABP guardada.</p>';
+    }
+    resetPlaySessionForm();
+  }catch(err){
+    msgEl.innerHTML = '<p class="error-msg">Error: '+err.message+'</p>';
+  }
+};
+function resetPlaySessionForm(){
+  editingPlaySessionId = null;
+  document.getElementById("playSessionName").value = "";
+  document.getElementById("playSessionDate").value = "";
+  document.getElementById("playSessionNotes").value = "";
+  document.getElementById("playSessionPublic").checked = false;
+  playSessionItems = [];
+  renderPlaySessionList();
+  renderPlaySessionBrowser();
+  document.getElementById("playSessionEditorTitle").textContent = "🎬 Crear sesión de ABP";
+  document.getElementById("cancelPlaySessionEdit").classList.add("hidden");
+}
+document.getElementById("cancelPlaySessionEdit").onclick = () => { resetPlaySessionForm(); document.getElementById("playSessionMsg").innerHTML=""; };
+
+window.editPlaySession = (id) => {
+  const s = playSessions.find(x=>x.id===id);
+  if(!s) return;
+  editingPlaySessionId = id;
+  document.getElementById("playSessionName").value = s.name || "";
+  document.getElementById("playSessionDate").value = s.date || "";
+  document.getElementById("playSessionNotes").value = s.notes || "";
+  document.getElementById("playSessionPublic").checked = !!s.public;
+  playSessionItems = JSON.parse(JSON.stringify(s.plays || []));
+  renderPlaySessionList();
+  renderPlaySessionBrowser();
+  document.getElementById("playSessionEditorTitle").textContent = "✏️ Editando sesión: " + (s.name||"");
+  document.getElementById("cancelPlaySessionEdit").classList.remove("hidden");
+  document.getElementById("playSessionMsg").innerHTML = "";
+  document.querySelector('.tab[data-tab="abp"]').click();
+  document.getElementById("playSessionEditorPanel").scrollIntoView({behavior:"smooth"});
+};
+
+window.deletePlaySession = async (id) => {
+  if(!confirm("¿Eliminar esta sesión de ABP definitivamente?")) return;
+  await db.collection("playSessions").doc(id).delete();
+};
+
+window.copyPublicLink = (id) => {
+  const url = location.origin + location.pathname + "#public=" + id;
+  navigator.clipboard.writeText(url).then(()=>{
+    alert("Enlace copiado al portapapeles.");
+  }).catch(()=>{
+    prompt("Copia este enlace:", url);
+  });
+};
+
+function renderSavedPlaySessions(){
+  const wrap = document.getElementById("playSessionsSaved");
+  if(playSessions.length===0){ wrap.innerHTML = '<div class="empty">🎬 Todavía no se han guardado sesiones de ABP.</div>'; return; }
+  wrap.innerHTML = playSessions.map(s=>{
+    const canManage = currentCoach && (currentCoach.role===ROLE_GESTOR || s.createdBy===currentUser.uid);
+    const publicUrl = location.origin + location.pathname + "#public=" + s.id;
+    const itemsHtml = (s.plays||[]).map(item=>`<li>${escapeHtml(item.title)}${item.categoryName?` <span class="muted">· ${escapeHtml(item.categoryName)}</span>`:""}</li>`).join("");
+    return `
+    <div class="card" style="margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <h3 style="font-size:.95rem;">${escapeHtml(s.name)}</h3>
+        <span class="muted">${s.date||""}</span>
+      </div>
+      <p class="muted" style="margin:2px 0 8px 0;">Por ${escapeHtml(s.createdByName||"")} · ${(s.plays||[]).length} jugada${(s.plays||[]).length===1?"":"s"}</p>
+      <ol style="margin:0 0 6px 18px;padding:0;font-size:.88rem;">${itemsHtml}</ol>
+      ${s.notes ? `<p class="muted" style="font-size:.85rem;">${escapeHtml(s.notes)}</p>` : ""}
+      ${s.public ? `
+      <div class="row" style="margin-top:6px;">
+        <input type="text" readonly value="${escapeHtml(publicUrl)}" onclick="this.select()" style="font-size:.78rem;">
+        <button type="button" class="btn small ghost" style="flex:0 0 auto;" onclick="copyPublicLink('${s.id}')">🔗 Copiar enlace</button>
+      </div>` : `<p class="muted" style="font-size:.78rem;">Enlace público desactivado para esta sesión.</p>`}
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+        ${canManage ? `<button class="btn ghost small" onclick="editPlaySession('${s.id}')">✏️ Editar sesión</button>` : ""}
+        ${canManage ? `<button class="btn danger small" onclick="deletePlaySession('${s.id}')">🗑 Borrar sesión</button>` : ""}
+      </div>
+    </div>`;
+  }).join("");
+}
+
+/* ============================================================
+   MODELO DE JUEGO (subida y descarga de documentos)
+============================================================= */
+document.getElementById("btnUploadModelo").onclick = async () => {
+  const msgEl = document.getElementById("modeloUploadMsg");
+  const progEl = document.getElementById("modeloUploadProgress");
+  msgEl.innerHTML = ""; progEl.textContent = "";
+  const fileInput = document.getElementById("modeloFile");
+  const file = fileInput.files[0];
+  const title = document.getElementById("modeloTitle").value.trim();
+  if(!file){ msgEl.innerHTML = '<p class="error-msg">Selecciona un archivo primero.</p>'; return; }
+  const safeName = file.name.replace(/[^\w.\-]+/g,"_");
+  const path = `gameModel/${Date.now()}_${safeName}`;
+  const ref = storage.ref().child(path);
+  const uploadTask = ref.put(file);
+  uploadTask.on("state_changed", (snap)=>{
+    const pct = Math.round((snap.bytesTransferred/snap.totalBytes)*100);
+    progEl.textContent = `Subiendo... ${pct}%`;
+  }, (err)=>{
+    msgEl.innerHTML = '<p class="error-msg">Error al subir: '+err.message+'</p>';
+    progEl.textContent = "";
+  }, async ()=>{
+    const downloadURL = await ref.getDownloadURL();
+    await db.collection("gameModelFiles").add({
+      title: title || file.name,
+      fileName: file.name,
+      contentType: file.type || "",
+      size: file.size || 0,
+      storagePath: path,
+      downloadURL,
+      uploadedBy: currentUser.uid,
+      uploadedByName: currentCoach.name,
+      uploadedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    msgEl.innerHTML = '<p class="ok-msg">Documento subido correctamente.</p>';
+    progEl.textContent = "";
+    document.getElementById("modeloTitle").value = "";
+    fileInput.value = "";
+  });
+};
+
+function humanFileSize(bytes){
+  if(!bytes) return "";
+  const units = ["B","KB","MB","GB"];
+  let i = 0, size = bytes;
+  while(size>=1024 && i<units.length-1){ size/=1024; i++; }
+  return size.toFixed(size<10 && i>0 ? 1 : 0) + " " + units[i];
+}
+function renderModeloList(){
+  const wrap = document.getElementById("modeloList");
+  if(gameModelFiles.length===0){ wrap.innerHTML = '<div class="empty">📄 Todavía no se han subido documentos.</div>'; return; }
+  const canManage = currentCoach && (currentCoach.role===ROLE_GESTOR || currentCoach.role===ROLE_EDITOR);
+  wrap.innerHTML = gameModelFiles.map(f=>`
+    <div class="task-item">
+      <div>
+        <h4>📄 ${escapeHtml(f.title || f.fileName)}</h4>
+        <div class="task-meta">
+          <span class="badge outline">${escapeHtml(f.fileName||"")}</span>
+          ${f.size ? `<span class="badge outline b-duration">${humanFileSize(f.size)}</span>`:""}
+          <span class="muted" style="align-self:center;">Subido por ${escapeHtml(f.uploadedByName||"")}</span>
+        </div>
+      </div>
+      <div class="task-actions">
+        <a class="btn small accent" href="${f.downloadURL}" target="_blank" rel="noopener">⬇ Descargar</a>
+        ${canManage ? `<button class="btn small danger" onclick="deleteModeloFile('${f.id}','${escapeHtml(f.storagePath||"")}')">Eliminar</button>` : ""}
+      </div>
+    </div>`).join("");
+}
+window.deleteModeloFile = async (id, storagePath) => {
+  if(!confirm("¿Eliminar este documento definitivamente?")) return;
+  try{
+    if(storagePath) await storage.ref().child(storagePath).delete();
+  }catch(e){ /* si el archivo ya no existe en Storage, seguimos borrando el registro */ }
+  await db.collection("gameModelFiles").doc(id).delete();
+};
+
+/* ============================================================
+   ENLACE PÚBLICO DE UNA SESIÓN DE ABP (sin necesidad de login)
+============================================================= */
+async function loadPublicPlaySession(id){
+  document.getElementById("publicScreen").classList.remove("hidden");
+  const wrap = document.getElementById("publicWrap");
+  try{
+    const snap = await db.collection("playSessions").doc(id).get();
+    if(!snap.exists || !snap.data().public){
+      wrap.innerHTML = '<div class="empty">Este enlace no existe o ya no está disponible públicamente.</div>';
+      return;
+    }
+    const s = snap.data();
+    wrap.innerHTML = `
+      <div class="card">
+        <h2 style="font-size:1.1rem;">${escapeHtml(s.name||"Jugadas a balón parado")}</h2>
+        ${s.date ? `<p class="muted">${escapeHtml(s.date)}</p>` : ""}
+        ${s.notes ? `<p style="white-space:pre-wrap;">${escapeHtml(s.notes)}</p>` : ""}
+      </div>`;
+    (s.plays||[]).forEach((item, i)=>{
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `
+        <h3 style="font-size:.95rem;">${i+1}. ${escapeHtml(item.title)}</h3>
+        ${item.categoryName ? `<span class="badge">${escapeHtml(item.categoryName)}</span>` : ""}
+        <div class="public-video" style="margin-top:8px;"></div>
+        ${item.observations ? `<p style="white-space:pre-wrap;margin-top:8px;">${escapeHtml(item.observations)}</p>` : ""}
+        <div class="public-board" style="margin-top:8px;"></div>
+      `;
+      wrap.appendChild(card);
+      card.querySelector(".public-video").innerHTML = videoEmbedHtml(item.videoUrl);
+      renderBoardViewer(card.querySelector(".public-board"), (item.animation && item.animation.frames) || []);
+    });
+  }catch(err){
+    wrap.innerHTML = '<div class="empty">No se ha podido cargar esta sesión: '+escapeHtml(err.message)+'</div>';
+  }
+}
+
+/* ============================================================
    UTIL
 ============================================================= */
 function escapeHtml(str){
@@ -2461,6 +3191,43 @@ service cloud.firestore {
       allow read: if isActive();
       allow create: if isActive();
       allow update, delete: if isActive() && (resource.data.createdBy == request.auth.uid || isGestor());
+    }
+    match /abpCategories/{catId} {
+      allow read: if isActive();
+      allow write: if isEditor();
+    }
+    match /plays/{playId} {
+      allow read: if isActive();
+      allow write: if isEditor();
+    }
+    match /playSessions/{sessionId} {
+      allow read: if isActive() || resource.data.public == true;
+      allow create: if isActive();
+      allow update, delete: if isActive() && (resource.data.createdBy == request.auth.uid || isGestor());
+    }
+    match /gameModelFiles/{fileId} {
+      allow read: if isActive();
+      allow create: if isEditor();
+      allow update, delete: if isEditor();
+    }
+  }
+}
+-->
+
+<!--
+REGLAS_STORAGE (pégalas en Storage > Reglas, para los documentos del Modelo de juego):
+
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isSignedIn() { return request.auth != null; }
+    function myCoach() { return firestore.get(/databases/(default)/documents/coaches/$(request.auth.uid)); }
+    function isActive() { return isSignedIn() && myCoach().data.active == true; }
+    function isEditor() { return isActive() && (myCoach().data.role == 'gestor' || myCoach().data.role == 'editor'); }
+
+    match /gameModel/{fileName} {
+      allow read: if isActive();
+      allow write, delete: if isEditor();
     }
   }
 }
