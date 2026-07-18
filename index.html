@@ -375,6 +375,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
     <button class="tab" data-tab="modelo">Modelo de juego</button>
     <button class="tab" data-tab="abp">ABP</button>
     <button class="tab hidden" id="tabCoachesBtn" data-tab="coaches">Entrenadores</button>
+    <button class="tab hidden" id="tabPapeleraBtn" data-tab="papelera">🗑️ Papelera</button>
   </div>
 
   <div class="wrap">
@@ -411,6 +412,11 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
           <span class="home-card-icon">👥</span>
           <span class="home-card-label">Entrenadores</span>
           <span class="home-card-desc">Gestiona el equipo técnico</span>
+        </button>
+        <button type="button" class="home-card hidden" id="homePapeleraBtn" data-goto="papelera">
+          <span class="home-card-icon">🗑️</span>
+          <span class="home-card-label">Papelera</span>
+          <span class="home-card-desc">Restaura lo que se ha borrado</span>
         </button>
       </div>
     </div>
@@ -751,6 +757,43 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
         <p class="muted">Aprueba altas nuevas, cambia el rol o da de baja a un entrenador.</p>
         <div id="coachList"><div class="empty">Cargando entrenadores...</div></div>
       </div>
+
+      <div class="card">
+        <h2 style="font-size:1.05rem;">💾 Copia de seguridad</h2>
+        <p class="muted">Descarga una copia completa de toda la base de datos (tareas, sesiones, categorías, entrenadores, jugadas de ABP, documentos...). Guárdala una vez al mes o antes de cambios grandes.</p>
+        <button class="btn accent" id="btnExportBackup">📤 Descargar copia de seguridad completa</button>
+        <div id="backupExportMsg"></div>
+
+        <h3 style="margin-top:18px;font-size:.95rem;">Restaurar desde una copia</h3>
+        <p class="muted">Sube un archivo de copia de seguridad para restaurar esos datos. <strong>Sobrescribirá</strong> los elementos que tengan el mismo identificador que los de ahora mismo.</p>
+        <input type="file" id="backupRestoreFile" accept="application/json">
+        <button class="btn danger" id="btnRestoreBackup" style="margin-top:8px;">📥 Restaurar desde archivo</button>
+        <div id="backupRestoreMsg"></div>
+      </div>
+    </div>
+
+    <!-- ---------- PAPELERA (solo gestor) ---------- -->
+    <div id="tab-papelera" class="hidden">
+      <div class="card">
+        <h2 style="font-size:1.05rem;">🗑️ Papelera</h2>
+        <p class="muted">Lo que se borra no desaparece al instante: se guarda aquí durante 30 días por si hace falta recuperarlo, y después se elimina de forma definitiva y automática.</p>
+      </div>
+      <div class="card">
+        <h3 style="font-size:.95rem;">📋 Tareas borradas</h3>
+        <div id="trashTasksList"><p class="muted">Cargando...</p></div>
+      </div>
+      <div class="card">
+        <h3 style="font-size:.95rem;">🗓️ Sesiones borradas</h3>
+        <div id="trashSessionsList"><p class="muted">Cargando...</p></div>
+      </div>
+      <div class="card">
+        <h3 style="font-size:.95rem;">🎯 Jugadas de ABP borradas</h3>
+        <div id="trashPlaysList"><p class="muted">Cargando...</p></div>
+      </div>
+      <div class="card">
+        <h3 style="font-size:.95rem;">🎬 Sesiones de ABP borradas</h3>
+        <div id="trashPlaySessionsList"><p class="muted">Cargando...</p></div>
+      </div>
     </div>
 
   </div>
@@ -928,6 +971,11 @@ let abpCategories = [];
 let plays = [];
 let playSessions = [];
 let gameModelFiles = [];
+let trashTasks = [];
+let trashSessions = [];
+let trashPlays = [];
+let trashPlaySessions = [];
+const TRASH_RETENTION_DAYS = 30;
 
 const ROLE_GESTOR = "gestor";
 const ROLE_EDITOR = "editor";
@@ -1092,6 +1140,8 @@ function initAppUI(){
   document.getElementById("modeloUploadPanel").classList.toggle("hidden", !canEditContent);
   document.getElementById("tabCoachesBtn").classList.toggle("hidden", !isGestor);
   document.getElementById("homeCoachesBtn").classList.toggle("hidden", !isGestor);
+  document.getElementById("tabPapeleraBtn").classList.toggle("hidden", !isGestor);
+  document.getElementById("homePapeleraBtn").classList.toggle("hidden", !isGestor);
 
   if(!listenersAttached){
     attachRealtimeListeners();
@@ -1124,7 +1174,7 @@ document.querySelectorAll(".tab").forEach(btn=>{
   btn.onclick = () => {
     document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));
     btn.classList.add("active");
-    ["home","tasks","sessions","modelo","abp","coaches"].forEach(t=>{
+    ["home","tasks","sessions","modelo","abp","coaches","papelera"].forEach(t=>{
       document.getElementById("tab-"+t).classList.toggle("hidden", t!==btn.dataset.tab);
     });
     placeBoardWrapFor(btn.dataset.tab);
@@ -1208,10 +1258,13 @@ function attachRealtimeListeners(){
   });
 
   db.collection("tasks").orderBy("createdAt","desc").onSnapshot(snap=>{
-    tasks = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    const all = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    tasks = all.filter(t=>!t.deleted);
+    trashTasks = all.filter(t=>t.deleted);
     renderTaskList();
     renderTaskCategoryList();
     renderSessionTaskBrowser();
+    renderTrash();
     handleDeepLink();
   });
 
@@ -1221,8 +1274,11 @@ function attachRealtimeListeners(){
   });
 
   db.collection("sessions").orderBy("createdAt","desc").onSnapshot(snap=>{
-    sessions = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    const all = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    sessions = all.filter(s=>!s.deleted);
+    trashSessions = all.filter(s=>s.deleted);
     renderSavedSessions();
+    renderTrash();
   });
 
   db.collection("abpCategories").orderBy("name").onSnapshot(snap=>{
@@ -1232,14 +1288,20 @@ function attachRealtimeListeners(){
   });
 
   db.collection("plays").orderBy("createdAt","desc").onSnapshot(snap=>{
-    plays = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    const all = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    plays = all.filter(p=>!p.deleted);
+    trashPlays = all.filter(p=>p.deleted);
     renderPlayList();
     renderPlaySessionBrowser();
+    renderTrash();
   });
 
   db.collection("playSessions").orderBy("createdAt","desc").onSnapshot(snap=>{
-    playSessions = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    const all = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    playSessions = all.filter(s=>!s.deleted);
+    trashPlaySessions = all.filter(s=>s.deleted);
     renderSavedPlaySessions();
+    renderTrash();
   });
 
   db.collection("gameModelFiles").orderBy("uploadedAt","desc").onSnapshot(snap=>{
@@ -2132,8 +2194,12 @@ window.editTask = (id) => {
 };
 
 window.deleteTask = async (id) => {
-  if(!confirm("¿Eliminar esta tarea definitivamente?")) return;
-  await db.collection("tasks").doc(id).delete();
+  if(!confirm("¿Mover esta tarea a la papelera? Podrás restaurarla más tarde desde la Papelera.")) return;
+  await db.collection("tasks").doc(id).update({
+    deleted: true,
+    deletedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    deletedBy: currentCoach.name || ""
+  });
 };
 
 /* ---------- Task list rendering + filters ---------- */
@@ -2538,9 +2604,13 @@ function renderSavedSessions(){
   }).join("");
 }
 window.deleteSession = async (id) => {
-  if(!confirm("¿Borrar esta sesión definitivamente? Las tareas que contiene no se verán afectadas.")) return;
+  if(!confirm("¿Mover esta sesión a la papelera? Las tareas que contiene no se verán afectadas y podrás restaurarla más tarde.")) return;
   try{
-    await db.collection("sessions").doc(id).delete();
+    await db.collection("sessions").doc(id).update({
+      deleted: true,
+      deletedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      deletedBy: currentCoach.name || ""
+    });
   }catch(err){
     alert("No se ha podido borrar la sesión: " + err.message);
   }
@@ -2994,8 +3064,12 @@ window.editPlay = (id) => {
 };
 
 window.deletePlay = async (id) => {
-  if(!confirm("¿Eliminar esta jugada definitivamente?")) return;
-  await db.collection("plays").doc(id).delete();
+  if(!confirm("¿Mover esta jugada a la papelera? Podrás restaurarla más tarde desde la Papelera.")) return;
+  await db.collection("plays").doc(id).update({
+    deleted: true,
+    deletedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    deletedBy: currentCoach.name || ""
+  });
 };
 
 window.viewPlay = (id) => {
@@ -3183,8 +3257,12 @@ window.editPlaySession = (id) => {
 };
 
 window.deletePlaySession = async (id) => {
-  if(!confirm("¿Eliminar esta sesión de ABP definitivamente?")) return;
-  await db.collection("playSessions").doc(id).delete();
+  if(!confirm("¿Mover esta sesión de ABP a la papelera? Podrás restaurarla más tarde.")) return;
+  await db.collection("playSessions").doc(id).update({
+    deleted: true,
+    deletedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    deletedBy: currentCoach.name || ""
+  });
 };
 
 window.copyPublicLink = (id) => {
@@ -3311,6 +3389,188 @@ async function loadPublicPlaySession(id){
     wrap.innerHTML = '<div class="empty">No se ha podido cargar esta sesión: '+escapeHtml(err.message)+'</div>';
   }
 }
+
+/* ============================================================
+   PAPELERA (borrado suave con restauración y purga automática)
+============================================================= */
+function tsToDate(ts){
+  if(!ts) return null;
+  if(typeof ts.toDate === "function") return ts.toDate();
+  if(ts.seconds) return new Date(ts.seconds*1000);
+  return null;
+}
+function formatTS(ts){
+  const d = tsToDate(ts);
+  if(!d) return "";
+  return d.toLocaleDateString('es-ES', {day:'2-digit', month:'2-digit', year:'numeric'});
+}
+function daysSince(ts){
+  const d = tsToDate(ts);
+  if(!d) return 0;
+  return (Date.now() - d.getTime()) / (1000*60*60*24);
+}
+async function purgeExpired(list, collectionName){
+  const expired = list.filter(item => daysSince(item.deletedAt) > TRASH_RETENTION_DAYS);
+  for(const item of expired){
+    try{ await db.collection(collectionName).doc(item.id).delete(); }catch(e){ /* ya no existe, seguimos */ }
+  }
+}
+function renderTrashSection(elId, list, cfg){
+  const wrap = document.getElementById(elId);
+  if(!wrap) return;
+  if(list.length===0){ wrap.innerHTML = '<p class="muted">Papelera vacía.</p>'; return; }
+  wrap.innerHTML = list.map(item=>{
+    const daysLeft = Math.max(0, Math.ceil(TRASH_RETENTION_DAYS - daysSince(item.deletedAt)));
+    return `
+    <div class="task-item">
+      <div>
+        <h4>${escapeHtml(cfg.label(item))}</h4>
+        <div class="task-meta">
+          <span class="muted">Borrado por ${escapeHtml(item.deletedBy||"")} el ${formatTS(item.deletedAt)}</span>
+          <span class="badge outline">Se elimina en ${daysLeft} día${daysLeft===1?"":"s"}</span>
+        </div>
+      </div>
+      <div class="task-actions">
+        <button class="btn small accent" onclick="${cfg.onRestore}('${item.id}')">♻️ Restaurar</button>
+        <button class="btn small danger" onclick="${cfg.onPurge}('${item.id}')">🗑 Eliminar ya</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+function renderTrash(){
+  if(!currentCoach || currentCoach.role !== ROLE_GESTOR) return;
+  purgeExpired(trashTasks, "tasks");
+  purgeExpired(trashSessions, "sessions");
+  purgeExpired(trashPlays, "plays");
+  purgeExpired(trashPlaySessions, "playSessions");
+
+  renderTrashSection("trashTasksList", trashTasks, {
+    label: t=>t.title || "(sin título)", onRestore: "restoreTask", onPurge: "purgeTask"
+  });
+  renderTrashSection("trashSessionsList", trashSessions, {
+    label: s=>s.name || "(sin nombre)", onRestore: "restoreSession", onPurge: "purgeSession"
+  });
+  renderTrashSection("trashPlaysList", trashPlays, {
+    label: p=>p.title || "(sin título)", onRestore: "restorePlay", onPurge: "purgePlay"
+  });
+  renderTrashSection("trashPlaySessionsList", trashPlaySessions, {
+    label: s=>s.name || "(sin nombre)", onRestore: "restorePlaySession", onPurge: "purgePlaySession"
+  });
+}
+window.restoreTask = async (id) => {
+  await db.collection("tasks").doc(id).update({ deleted: false, deletedAt: firebase.firestore.FieldValue.delete(), deletedBy: firebase.firestore.FieldValue.delete() });
+};
+window.purgeTask = async (id) => {
+  if(!confirm("¿Eliminar esta tarea DEFINITIVAMENTE? No podrás recuperarla.")) return;
+  await db.collection("tasks").doc(id).delete();
+};
+window.restoreSession = async (id) => {
+  await db.collection("sessions").doc(id).update({ deleted: false, deletedAt: firebase.firestore.FieldValue.delete(), deletedBy: firebase.firestore.FieldValue.delete() });
+};
+window.purgeSession = async (id) => {
+  if(!confirm("¿Eliminar esta sesión DEFINITIVAMENTE? No podrás recuperarla.")) return;
+  await db.collection("sessions").doc(id).delete();
+};
+window.restorePlay = async (id) => {
+  await db.collection("plays").doc(id).update({ deleted: false, deletedAt: firebase.firestore.FieldValue.delete(), deletedBy: firebase.firestore.FieldValue.delete() });
+};
+window.purgePlay = async (id) => {
+  if(!confirm("¿Eliminar esta jugada DEFINITIVAMENTE? No podrás recuperarla.")) return;
+  await db.collection("plays").doc(id).delete();
+};
+window.restorePlaySession = async (id) => {
+  await db.collection("playSessions").doc(id).update({ deleted: false, deletedAt: firebase.firestore.FieldValue.delete(), deletedBy: firebase.firestore.FieldValue.delete() });
+};
+window.purgePlaySession = async (id) => {
+  if(!confirm("¿Eliminar esta sesión de ABP DEFINITIVAMENTE? No podrás recuperarla.")) return;
+  await db.collection("playSessions").doc(id).delete();
+};
+
+/* ============================================================
+   COPIA DE SEGURIDAD COMPLETA (exportar / restaurar)
+============================================================= */
+const BACKUP_COLLECTIONS = ["tasks","sessions","categories","coaches","abpCategories","plays","playSessions","gameModelFiles"];
+
+document.getElementById("btnExportBackup").onclick = async () => {
+  const msgEl = document.getElementById("backupExportMsg");
+  msgEl.innerHTML = '<p class="muted">Generando copia de seguridad...</p>';
+  try{
+    const backup = { exportedAt: new Date().toISOString(), version: 1, collections: {} };
+    for(const col of BACKUP_COLLECTIONS){
+      const snap = await db.collection(col).get();
+      backup.collections[col] = snap.docs.map(d => ({ id: d.id, data: d.data() }));
+    }
+    const json = JSON.stringify(backup, (key, value) => {
+      if(value && typeof value === "object" && typeof value.seconds === "number" && typeof value.nanoseconds === "number"){
+        return { __ts__: true, seconds: value.seconds, nanoseconds: value.nanoseconds };
+      }
+      return value;
+    }, 2);
+    const blob = new Blob([json], {type: "application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const dateStr = new Date().toISOString().slice(0,10);
+    a.href = url;
+    a.download = `backup_sporting_${dateStr}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    msgEl.innerHTML = '<p class="ok-msg">Copia de seguridad descargada correctamente.</p>';
+  }catch(err){
+    msgEl.innerHTML = '<p class="error-msg">Error al generar la copia: '+err.message+'</p>';
+  }
+};
+
+function reviveTimestamps(obj){
+  if(Array.isArray(obj)) return obj.map(reviveTimestamps);
+  if(obj && typeof obj === "object"){
+    if(obj.__ts__){
+      return new firebase.firestore.Timestamp(obj.seconds, obj.nanoseconds);
+    }
+    const out = {};
+    for(const k in obj) out[k] = reviveTimestamps(obj[k]);
+    return out;
+  }
+  return obj;
+}
+
+document.getElementById("btnRestoreBackup").onclick = async () => {
+  const msgEl = document.getElementById("backupRestoreMsg");
+  msgEl.innerHTML = "";
+  const fileInput = document.getElementById("backupRestoreFile");
+  const file = fileInput.files[0];
+  if(!file){ msgEl.innerHTML = '<p class="error-msg">Selecciona primero un archivo de copia de seguridad.</p>'; return; }
+  try{
+    const text = await file.text();
+    const backup = JSON.parse(text);
+    if(!backup || !backup.collections){ msgEl.innerHTML = '<p class="error-msg">El archivo no parece una copia de seguridad válida.</p>'; return; }
+    const summary = BACKUP_COLLECTIONS
+      .filter(col => backup.collections[col])
+      .map(col => `${(backup.collections[col]||[]).length} en "${col}"`)
+      .join(", ");
+    const confirmMsg = `Vas a restaurar: ${summary}.\n\nEsto SOBRESCRIBIRÁ los datos actuales que tengan el mismo identificador. ¿Continuar?`;
+    if(!confirm(confirmMsg)) return;
+
+    msgEl.innerHTML = '<p class="muted">Restaurando... no cierres esta pantalla.</p>';
+    for(const col of BACKUP_COLLECTIONS){
+      const docs = backup.collections[col];
+      if(!docs || docs.length===0) continue;
+      for(let i=0; i<docs.length; i+=400){
+        const chunk = docs.slice(i, i+400);
+        const batch = db.batch();
+        chunk.forEach(({id, data}) => {
+          batch.set(db.collection(col).doc(id), reviveTimestamps(data));
+        });
+        await batch.commit();
+      }
+    }
+    msgEl.innerHTML = '<p class="ok-msg">Restauración completada correctamente.</p>';
+    fileInput.value = "";
+  }catch(err){
+    msgEl.innerHTML = '<p class="error-msg">Error al restaurar: '+err.message+'</p>';
+  }
+};
 
 /* ============================================================
    UTIL
