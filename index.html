@@ -812,6 +812,58 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
 ============================================================= */
 firebase.initializeApp(FIREBASE_CONFIG);
 document.querySelectorAll(".crest-img").forEach(img => img.src = CREST_DATA_URI);
+
+/* ============================================================
+   ICONO DEL ESCUDO PARA FAVICON / ACCESO DIRECTO (PC y móvil)
+============================================================= */
+(function setupAppIcons(){
+  // Favicon en la pestaña del navegador (PC y Android)
+  const favicon = document.createElement("link");
+  favicon.rel = "icon";
+  favicon.type = "image/png";
+  favicon.href = CREST_DATA_URI;
+  document.head.appendChild(favicon);
+
+  // Icono al añadir a pantalla de inicio en iOS/Safari
+  const appleIcon = document.createElement("link");
+  appleIcon.rel = "apple-touch-icon";
+  appleIcon.href = CREST_DATA_URI;
+  document.head.appendChild(appleIcon);
+
+  const appleTitle = document.createElement("meta");
+  appleTitle.name = "apple-mobile-web-app-title";
+  appleTitle.content = "Sporting FS";
+  document.head.appendChild(appleTitle);
+
+  const appleCapable = document.createElement("meta");
+  appleCapable.name = "apple-mobile-web-app-capable";
+  appleCapable.content = "yes";
+  document.head.appendChild(appleCapable);
+
+  const themeColor = document.createElement("meta");
+  themeColor.name = "theme-color";
+  themeColor.content = "#d81e2c";
+  document.head.appendChild(themeColor);
+
+  // Manifest para "Instalar app" / "Añadir a pantalla de inicio" en Android/Chrome
+  const manifest = {
+    name: "Sporting FS Almería - Entrenamientos",
+    short_name: "Sporting FS",
+    start_url: location.pathname,
+    display: "standalone",
+    background_color: "#0a0a0a",
+    theme_color: "#d81e2c",
+    icons: [
+      { src: CREST_DATA_URI, sizes: "192x192", type: "image/png" },
+      { src: CREST_DATA_URI, sizes: "512x512", type: "image/png" }
+    ]
+  };
+  const manifestUrl = URL.createObjectURL(new Blob([JSON.stringify(manifest)], {type:"application/json"}));
+  const manifestLink = document.createElement("link");
+  manifestLink.rel = "manifest";
+  manifestLink.href = manifestUrl;
+  document.head.appendChild(manifestLink);
+})();
 const auth = firebase.auth();
 const db = firebase.firestore();
 db.settings({ experimentalForceLongPolling: true, useFetchStreams: false });
