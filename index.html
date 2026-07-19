@@ -668,7 +668,27 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
 
     <!-- ---------- ABP TAB ---------- -->
     <div id="tab-abp" class="hidden">
-      <div class="card" id="playEditorPanel">
+
+      <!-- ---------- ABP: submenú ---------- -->
+      <div id="abpHome">
+        <div class="home-grid">
+          <button type="button" class="home-card" id="abpGoNew">
+            <span class="home-card-icon">➕</span>
+            <span class="home-card-label">Crear ABP</span>
+            <span class="home-card-desc">Nueva jugada a balón parado</span>
+          </button>
+          <button type="button" class="home-card" id="abpGoBank">
+            <span class="home-card-icon">📂</span>
+            <span class="home-card-label">Banco de ABP</span>
+            <span class="home-card-desc">Consulta por categorías y crea sesiones</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ---------- ABP: Nueva/editar jugada ---------- -->
+      <div id="abpNewPlayView" class="hidden">
+        <button type="button" class="btn ghost small" id="abpNewBack" style="margin-bottom:10px;">← Volver</button>
+        <div class="card" id="playEditorPanel">
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <h2 style="font-size:1.05rem;" id="playFormTitle">🎯 Nueva jugada</h2>
           <button class="btn ghost small" id="btnNewAbpCategory">+ Categoría</button>
@@ -702,56 +722,71 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
           </div>
           <div id="playFormMsg"></div>
         </form>
-      </div>
-
-      <div class="card">
-        <h2 style="font-size:1.05rem;">Banco de jugadas</h2>
-        <div class="filterbar">
-          <select id="filterAbpCategory"><option value="">Todas las categorías</option></select>
-          <input type="text" id="filterAbpSearch" placeholder="Buscar por título...">
         </div>
-        <div id="playList"><div class="empty">Cargando jugadas...</div></div>
       </div>
 
-      <div class="card" id="playSessionEditorPanel">
-        <h2 style="font-size:1.05rem;" id="playSessionEditorTitle">🎬 Crear sesión de ABP</h2>
-        <div class="row">
-          <div>
-            <label>Nombre de la sesión</label>
-            <input type="text" id="playSessionName" placeholder="Ej: Córners rivales - Jornada 12">
+      <!-- ---------- ABP: Banco de ABP (categorías + sesiones) ---------- -->
+      <div id="abpBankView" class="hidden">
+        <button type="button" class="btn ghost small" id="abpBankBack" style="margin-bottom:10px;">← Volver</button>
+        <div class="card">
+          <h2 style="font-size:1.05rem;">📂 Banco de ABP</h2>
+          <p class="muted">Elige una categoría para ver sus jugadas.</p>
+          <div id="abpCategoryList"><div class="empty">Cargando categorías...</div></div>
+        </div>
+
+        <div class="card" id="playSessionEditorPanel">
+          <h2 style="font-size:1.05rem;" id="playSessionEditorTitle">🎬 Crear sesión de ABP</h2>
+          <div class="row">
+            <div>
+              <label>Nombre de la sesión</label>
+              <input type="text" id="playSessionName" placeholder="Ej: Córners rivales - Jornada 12">
+            </div>
+            <div>
+              <label>Fecha</label>
+              <input type="date" id="playSessionDate">
+            </div>
           </div>
-          <div>
-            <label>Fecha</label>
-            <input type="date" id="playSessionDate">
+          <label style="margin-top:10px;">Notas</label>
+          <textarea id="playSessionNotes" placeholder="Observaciones generales..."></textarea>
+          <label style="margin-top:10px;display:flex;align-items:center;gap:8px;text-transform:none;font-family:inherit;font-weight:400;">
+            <input type="checkbox" id="playSessionPublic" style="width:auto;">
+            Permitir enlace público (visible por cualquiera, sin iniciar sesión)
+          </label>
+
+          <h3 style="margin-top:14px;font-size:.9rem;">Añadir jugadas</h3>
+          <div class="filterbar">
+            <select id="playSessionFilterCategory"><option value="">Todas las categorías</option></select>
           </div>
-        </div>
-        <label style="margin-top:10px;">Notas</label>
-        <textarea id="playSessionNotes" placeholder="Observaciones generales..."></textarea>
-        <label style="margin-top:10px;display:flex;align-items:center;gap:8px;text-transform:none;font-family:inherit;font-weight:400;">
-          <input type="checkbox" id="playSessionPublic" style="width:auto;">
-          Permitir enlace público (visible por cualquiera, sin iniciar sesión)
-        </label>
+          <div id="playSessionBrowser"></div>
 
-        <h3 style="margin-top:14px;font-size:.9rem;">Añadir jugadas</h3>
-        <div class="filterbar">
-          <select id="playSessionFilterCategory"><option value="">Todas las categorías</option></select>
-        </div>
-        <div id="playSessionBrowser"></div>
+          <h3 style="margin-top:14px;font-size:.9rem;">Jugadas seleccionadas</h3>
+          <div id="playSessionList"><p class="muted">Ninguna jugada añadida todavía.</p></div>
 
-        <h3 style="margin-top:14px;font-size:.9rem;">Jugadas seleccionadas</h3>
-        <div id="playSessionList"><p class="muted">Ninguna jugada añadida todavía.</p></div>
-
-        <div style="margin-top:8px;display:flex;gap:8px;">
-          <button class="btn accent" id="btnSavePlaySession">Guardar sesión</button>
-          <button type="button" class="btn ghost hidden" id="cancelPlaySessionEdit">Cancelar edición</button>
+          <div style="margin-top:8px;display:flex;gap:8px;">
+            <button class="btn accent" id="btnSavePlaySession">Guardar sesión</button>
+            <button type="button" class="btn ghost hidden" id="cancelPlaySessionEdit">Cancelar edición</button>
+          </div>
+          <div id="playSessionMsg"></div>
         </div>
-        <div id="playSessionMsg"></div>
+
+        <div class="card">
+          <h2 style="font-size:1.05rem;">Sesiones de ABP guardadas</h2>
+          <div id="playSessionsSaved"><div class="empty">Cargando sesiones...</div></div>
+        </div>
       </div>
 
-      <div class="card">
-        <h2 style="font-size:1.05rem;">Sesiones de ABP guardadas</h2>
-        <div id="playSessionsSaved"><div class="empty">Cargando sesiones...</div></div>
+      <!-- ---------- ABP: jugadas de una categoría ---------- -->
+      <div id="abpCategoryView" class="hidden">
+        <button type="button" class="btn ghost small" id="abpCategoryBack" style="margin-bottom:10px;">← Categorías</button>
+        <div class="card">
+          <h2 style="font-size:1.05rem;" id="abpCategoryTitle">Categoría</h2>
+          <div class="filterbar">
+            <input type="text" id="filterAbpSearch" placeholder="Buscar por título...">
+          </div>
+          <div id="playList"><div class="empty">Cargando jugadas...</div></div>
+        </div>
       </div>
+
     </div>
 
     <!-- ---------- COACHES TAB (gestor only) ---------- -->
@@ -1187,6 +1222,7 @@ document.querySelectorAll(".tab").forEach(btn=>{
     });
     placeBoardWrapFor(btn.dataset.tab);
     if(btn.dataset.tab === "tasks") showTasksView("home");
+    if(btn.dataset.tab === "abp") showAbpView("home");
     window.scrollTo({top:0, behavior:"smooth"});
   };
 });
@@ -1246,6 +1282,65 @@ function renderTaskCategoryList(){
       <span class="home-card-icon">❔</span>
       <span class="home-card-label">Sin categoría</span>
       <span class="home-card-desc">${uncategorized} tarea${uncategorized===1?"":"s"}</span>
+    </button>`;
+  }
+  wrap.innerHTML = html ? `<div class="home-grid">${html}</div>` : '<div class="empty">🗂️ Todavía no hay categorías.</div>';
+}
+
+/* ---------- Navegación interna de ABP (submenú / nueva jugada / banco por categorías) ---------- */
+function showAbpView(view){
+  document.getElementById("abpHome").classList.toggle("hidden", view!=="home");
+  document.getElementById("abpNewPlayView").classList.toggle("hidden", view!=="new");
+  document.getElementById("abpBankView").classList.toggle("hidden", view!=="bank");
+  document.getElementById("abpCategoryView").classList.toggle("hidden", view!=="category");
+}
+let abpFormReturnView = "home"; // adónde volver al terminar de crear/editar una jugada
+document.getElementById("abpGoNew").onclick = () => { abpFormReturnView = "home"; showAbpView("new"); };
+document.getElementById("abpGoBank").onclick = () => { showAbpView("bank"); renderAbpCategoryList(); };
+document.getElementById("abpNewBack").onclick = () => {
+  resetPlayForm();
+  showAbpView(abpFormReturnView);
+  if(abpFormReturnView === "category") renderPlayList();
+};
+document.getElementById("abpBankBack").onclick = () => showAbpView("home");
+document.getElementById("abpCategoryBack").onclick = () => showAbpView("bank");
+
+let currentAbpCategoryId = null; // id de categoría real, o "__NONE__" para "sin categoría"
+window.openAbpCategory = (categoryId) => {
+  currentAbpCategoryId = categoryId;
+  const name = categoryId === "__NONE__" ? "Sin categoría" : (abpCatName_(categoryId) || "Categoría");
+  document.getElementById("abpCategoryTitle").textContent = name;
+  document.getElementById("filterAbpSearch").value = "";
+  showAbpView("category");
+  renderPlayList();
+};
+function renderAbpCategoryList(){
+  const wrap = document.getElementById("abpCategoryList");
+  if(abpCategories.length===0 && plays.length===0){
+    wrap.innerHTML = '<div class="empty">🗂️ Todavía no hay categorías ni jugadas.</div>';
+    return;
+  }
+  const counts = {};
+  let uncategorized = 0;
+  plays.forEach(p=>{
+    if(!p.categoryId){ uncategorized++; return; }
+    counts[p.categoryId] = (counts[p.categoryId]||0)+1;
+  });
+  let html = abpCategories.map(c=>{
+    const n = counts[c.id]||0;
+    return `
+    <button type="button" class="home-card" onclick="openAbpCategory('${c.id}')">
+      <span class="home-card-icon">🎯</span>
+      <span class="home-card-label">${escapeHtml(c.name)}</span>
+      <span class="home-card-desc">${n} jugada${n===1?"":"s"}</span>
+    </button>`;
+  }).join("");
+  if(uncategorized>0){
+    html += `
+    <button type="button" class="home-card" onclick="openAbpCategory('__NONE__')">
+      <span class="home-card-icon">❔</span>
+      <span class="home-card-label">Sin categoría</span>
+      <span class="home-card-desc">${uncategorized} jugada${uncategorized===1?"":"s"}</span>
     </button>`;
   }
   wrap.innerHTML = html ? `<div class="home-grid">${html}</div>` : '<div class="empty">🗂️ Todavía no hay categorías.</div>';
@@ -1356,7 +1451,6 @@ function abpCatName_(id){ const c = abpCategories.find(x=>x.id===id); return c ?
 function renderAbpCategorySelects(){
   const opts = abpCategories.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
   document.getElementById("playCategory").innerHTML = opts || '<option value="">Sin categorías</option>';
-  document.getElementById("filterAbpCategory").innerHTML = '<option value="">Todas las categorías</option>' + opts;
   document.getElementById("playSessionFilterCategory").innerHTML = '<option value="">Todas las categorías</option>' + opts;
 }
 
@@ -1514,13 +1608,18 @@ function drawOrientedPlayer(cx, x, y, r, color, rotationDeg, isGK, label){
   const skin = "#e8b48a";
   const bodyRx = r*0.98, bodyRy = r*1.12;
 
-  // Brazos (color piel), salen por detrás del cuerpo hacia los dos lados de arriba
-  cx.lineJoin = "round";
+  // Brazos (color piel) con forma de croissant/media luna, abiertos hacia fuera desde los hombros
+  cx.lineCap = "round";
   [-1,1].forEach(side=>{
+    const armCx = side*r*0.92, armCy = -r*0.4, armR = r*0.62;
+    const startA = side<0 ? Math.PI/2 : -Math.PI/2;
+    const endA = side<0 ? Math.PI*1.5 : Math.PI/2;
     cx.beginPath();
-    cx.ellipse(side*r*0.72, -r*0.68, r*0.4, r*0.58, side*0.32, 0, Math.PI*2);
-    cx.fillStyle = skin; cx.fill();
-    cx.lineWidth = Math.max(2, r*0.14); cx.strokeStyle = "#111"; cx.stroke();
+    cx.arc(armCx, armCy, armR, startA, endA, false);
+    cx.lineWidth = r*0.92; cx.strokeStyle = "#111"; cx.stroke();
+    cx.beginPath();
+    cx.arc(armCx, armCy, armR, startA, endA, false);
+    cx.lineWidth = r*0.66; cx.strokeStyle = skin; cx.stroke();
   });
 
   // Cuerpo principal (óvalo), con contorno negro grueso tipo "sticker"
@@ -1663,7 +1762,7 @@ function drawSelectionHighlight(cx,cvs){
   if(selected.kind==="token"){
     const t = tokens.find(o=>o.id===selected.id); if(!t){ selected=null; cx.restore(); return; }
     const x=t.x*cvs.width, y=t.y*cvs.height;
-    const r=(tokenRadius(t.type)*(t.scale||1)) + (t.oriented ? 16 : 8);
+    const r=(tokenRadius(t.type)*(t.scale||1)) + (t.oriented ? 26 : 8);
     cx.beginPath(); cx.arc(x,y,r,0,Math.PI*2); cx.stroke();
   } else if(selected.kind==="text"){
     const o = texts.find(x=>x.id===selected.id); if(!o){ selected=null; cx.restore(); return; }
@@ -1869,7 +1968,7 @@ function selectAt(p){
   for(let i=tokens.length-1;i>=0;i--){
     const t = tokens[i];
     const tx=t.x*canvas.width, ty=t.y*canvas.height;
-    const r = (tokenRadius(t.type)*(t.scale||1)) + (t.oriented ? 18 : 10);
+    const r = (tokenRadius(t.type)*(t.scale||1)) + (t.oriented ? 28 : 10);
     if(Math.hypot(px-tx,py-ty) <= r){
       selected = {kind:"token", id:t.id};
       if(t.type==="goal") lastGoalId = t.id;
@@ -3147,7 +3246,11 @@ document.getElementById("playForm").onsubmit = async (e) => {
     msgEl.innerHTML = '<p class="error-msg">Error al guardar: '+err.message+'</p>';
   }
 };
-document.getElementById("cancelPlayEdit").onclick = () => resetPlayForm();
+document.getElementById("cancelPlayEdit").onclick = () => {
+  resetPlayForm();
+  showAbpView(abpFormReturnView);
+  if(abpFormReturnView === "category") renderPlayList();
+};
 
 function resetPlayForm(){
   editingPlayId = null;
@@ -3188,6 +3291,8 @@ window.editPlay = (id) => {
   document.getElementById("cancelPlayEdit").classList.remove("hidden");
   document.getElementById("playFormTitle").textContent = "✏️ Editando jugada: " + (p.title||"");
   document.querySelector('.tab[data-tab="abp"]').click();
+  abpFormReturnView = "category";
+  showAbpView("new");
   document.getElementById("playEditorPanel").scrollIntoView({behavior:"smooth"});
 };
 
@@ -3219,14 +3324,13 @@ document.getElementById("btnCloseViewPlayModal").onclick = () => {
   document.getElementById("viewPlayModal").classList.add("hidden");
 };
 
-document.getElementById("filterAbpCategory").onchange = renderPlayList;
 document.getElementById("filterAbpSearch").oninput = renderPlayList;
 function renderPlayList(){
   const wrap = document.getElementById("playList");
-  const catFilter = document.getElementById("filterAbpCategory").value;
   const search = document.getElementById("filterAbpSearch").value.trim().toLowerCase();
   const list = plays.filter(p=>{
-    if(catFilter && p.categoryId!==catFilter) return false;
+    if(currentAbpCategoryId === "__NONE__"){ if(p.categoryId) return false; }
+    else if(currentAbpCategoryId){ if(p.categoryId !== currentAbpCategoryId) return false; }
     if(search && !(p.title||"").toLowerCase().includes(search)) return false;
     return true;
   });
@@ -3381,6 +3485,8 @@ window.editPlaySession = (id) => {
   document.getElementById("cancelPlaySessionEdit").classList.remove("hidden");
   document.getElementById("playSessionMsg").innerHTML = "";
   document.querySelector('.tab[data-tab="abp"]').click();
+  showAbpView("bank");
+  renderAbpCategoryList();
   document.getElementById("playSessionEditorPanel").scrollIntoView({behavior:"smooth"});
 };
 
