@@ -584,7 +584,27 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
 
     <!-- ---------- SESSIONS TAB ---------- -->
     <div id="tab-sessions" class="hidden">
-      <div class="card" id="sessionEditorPanel">
+
+      <!-- ---------- SESIONES: submenú ---------- -->
+      <div id="sessionsHome">
+        <div class="home-grid">
+          <button type="button" class="home-card" id="sessionsGoNew">
+            <span class="home-card-icon">➕</span>
+            <span class="home-card-label">Crear sesión</span>
+            <span class="home-card-desc">Monta una sesión de entrenamiento</span>
+          </button>
+          <button type="button" class="home-card" id="sessionsGoSaved">
+            <span class="home-card-icon">🗓️</span>
+            <span class="home-card-label">Sesiones creadas</span>
+            <span class="home-card-desc">Agrupadas por entrenador</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ---------- SESIONES: Crear/editar sesión ---------- -->
+      <div id="sessionsNewView" class="hidden">
+        <button type="button" class="btn ghost small" id="sessionsNewBack" style="margin-bottom:10px;">← Volver</button>
+        <div class="card" id="sessionEditorPanel">
         <h2 style="font-size:1.05rem;" id="sessionEditorTitle">🗓️ Crear sesión de entrenamiento</h2>
         <div class="row">
           <div>
@@ -631,11 +651,16 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
           <button type="button" class="btn ghost hidden" id="cancelSessionEdit">Cancelar edición</button>
         </div>
         <div id="sessionMsg"></div>
+        </div>
       </div>
 
-      <div class="card">
-        <h2 style="font-size:1.05rem;">Sesiones guardadas</h2>
-        <div id="sessionsSaved"><div class="empty">Cargando sesiones...</div></div>
+      <!-- ---------- SESIONES: Sesiones creadas (agrupadas por entrenador) ---------- -->
+      <div id="sessionsSavedView" class="hidden">
+        <button type="button" class="btn ghost small" id="sessionsSavedBack" style="margin-bottom:10px;">← Volver</button>
+        <div class="card">
+          <h2 style="font-size:1.05rem;">Sesiones guardadas</h2>
+          <div id="sessionsSaved"><div class="empty">Cargando sesiones...</div></div>
+        </div>
       </div>
     </div>
 
@@ -1226,6 +1251,7 @@ document.querySelectorAll(".tab").forEach(btn=>{
     placeBoardWrapFor(btn.dataset.tab);
     if(btn.dataset.tab === "tasks") showTasksView("home");
     if(btn.dataset.tab === "abp") showAbpView("home");
+    if(btn.dataset.tab === "sessions") showSessionsView("home");
     window.scrollTo({top:0, behavior:"smooth"});
   };
 });
@@ -1351,6 +1377,18 @@ function renderAbpCategoryList(){
   }
   wrap.innerHTML = html ? `<div class="home-grid">${html}</div>` : '<div class="empty">🗂️ Todavía no hay categorías.</div>';
 }
+
+/* ---------- Navegación interna de Sesiones (submenú / crear / guardadas) ---------- */
+function showSessionsView(view){
+  document.getElementById("sessionsHome").classList.toggle("hidden", view!=="home");
+  document.getElementById("sessionsNewView").classList.toggle("hidden", view!=="new");
+  document.getElementById("sessionsSavedView").classList.toggle("hidden", view!=="saved");
+}
+document.getElementById("sessionsGoNew").onclick = () => showSessionsView("new");
+document.getElementById("sessionsGoSaved").onclick = () => showSessionsView("saved");
+document.getElementById("sessionsNewBack").onclick = () => showSessionsView("home");
+document.getElementById("sessionsSavedBack").onclick = () => showSessionsView("home");
+
 document.querySelectorAll(".home-card[data-goto]").forEach(card=>{
   card.onclick = () => {
     const target = document.querySelector(`.tab[data-tab="${card.dataset.goto}"]`);
@@ -2696,6 +2734,7 @@ window.editSession = (id) => {
   document.getElementById("cancelSessionEdit").classList.remove("hidden");
   document.getElementById("sessionMsg").innerHTML = "";
   document.querySelector('.tab[data-tab="sessions"]').click();
+  showSessionsView("new");
   document.getElementById("sessionEditorPanel").scrollIntoView({behavior:"smooth"});
 };
 
