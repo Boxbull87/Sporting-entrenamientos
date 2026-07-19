@@ -1506,28 +1506,52 @@ function tokenColor(type){
 }
 function darkLabel(type){ return type==="D" || type==="GD"; }
 
-function drawOrientedPlayer(cx, x, y, r, color, rotationDeg, isGK){
+function drawOrientedPlayer(cx, x, y, r, color, rotationDeg, isGK, label){
   cx.save();
   cx.translate(x, y);
   cx.rotate((rotationDeg||0) * Math.PI/180);
-  // Cuerpo (torso), un poco más ancho que alto, ligeramente desplazado hacia "atrás"
+
+  const skin = "#e8b48a";
+  const bodyRx = r*0.98, bodyRy = r*1.12;
+
+  // Brazos (color piel), salen por detrás del cuerpo hacia los dos lados de arriba
+  cx.lineJoin = "round";
+  [-1,1].forEach(side=>{
+    cx.beginPath();
+    cx.ellipse(side*r*0.72, -r*0.68, r*0.4, r*0.58, side*0.32, 0, Math.PI*2);
+    cx.fillStyle = skin; cx.fill();
+    cx.lineWidth = Math.max(2, r*0.14); cx.strokeStyle = "#111"; cx.stroke();
+  });
+
+  // Cuerpo principal (óvalo), con contorno negro grueso tipo "sticker"
   cx.beginPath();
-  cx.ellipse(0, r*0.15, r*0.75, r*0.9, 0, 0, Math.PI*2);
+  cx.ellipse(0, 0, bodyRx, bodyRy, 0, 0, Math.PI*2);
   cx.fillStyle = color;
   cx.fill();
-  cx.lineWidth = isGK ? 3 : 1.5;
-  cx.strokeStyle = isGK ? "#ffffff" : "rgba(0,0,0,0.35)";
+  cx.lineWidth = Math.max(2.5, r*0.16);
+  cx.strokeStyle = "#111";
   cx.stroke();
-  // Dos "brazos" (bultos redondeados) que marcan los hombros / el frente del jugador
-  cx.fillStyle = color;
-  cx.beginPath(); cx.ellipse(-r*0.62, -r*0.5, r*0.42, r*0.32, -0.5, 0, Math.PI*2); cx.fill();
-  cx.beginPath(); cx.ellipse( r*0.62, -r*0.5, r*0.42, r*0.32,  0.5, 0, Math.PI*2); cx.fill();
-  cx.lineWidth = 1; cx.strokeStyle = "rgba(0,0,0,0.35)";
-  cx.beginPath(); cx.ellipse(-r*0.62, -r*0.5, r*0.42, r*0.32, -0.5, 0, Math.PI*2); cx.stroke();
-  cx.beginPath(); cx.ellipse( r*0.62, -r*0.5, r*0.42, r*0.32,  0.5, 0, Math.PI*2); cx.stroke();
-  // Punto blanco en la "cara" para que se vea claramente hacia dónde mira
-  cx.beginPath(); cx.arc(0, -r*1.0, r*0.17, 0, Math.PI*2);
-  cx.fillStyle = "#ffffff"; cx.fill();
+
+  // Anillo interior blanco para diferenciar al portero
+  if(isGK){
+    cx.lineWidth = Math.max(1.5, r*0.08);
+    cx.strokeStyle = "#ffffff";
+    cx.beginPath();
+    cx.ellipse(0, 0, bodyRx-r*0.18, bodyRy-r*0.18, 0, 0, Math.PI*2);
+    cx.stroke();
+  }
+
+  // Número grande, blanco con borde negro, que gira con la ficha (como en la realidad)
+  if(label){
+    cx.font = "bold "+Math.round(r*1.3)+"px 'Oswald', Arial, sans-serif";
+    cx.textAlign = "center"; cx.textBaseline = "middle";
+    cx.lineWidth = Math.max(2, r*0.16);
+    cx.strokeStyle = "#111";
+    cx.strokeText(label, 0, r*0.06);
+    cx.fillStyle = "#ffffff";
+    cx.fillText(label, 0, r*0.06);
+  }
+
   cx.restore();
 }
 function drawTokensOn(cx,cvs,list){
@@ -1569,7 +1593,7 @@ function drawTokensOn(cx,cvs,list){
     const r = tokenRadius(t.type)*scl;
     const isGK = (t.type==="GA"||t.type==="GB"||t.type==="GC"||t.type==="GD");
     if(t.oriented){
-      drawOrientedPlayer(cx, x, y, r, tokenColor(t.type), t.rotation||0, isGK);
+      drawOrientedPlayer(cx, x, y, r, tokenColor(t.type), t.rotation||0, isGK, isGK ? "P" : String(t.num||""));
       return;
     }
     cx.beginPath(); cx.arc(x,y, r, 0, Math.PI*2);
@@ -1638,7 +1662,8 @@ function drawSelectionHighlight(cx,cvs){
   cx.setLineDash([6,4]); cx.strokeStyle = "#00e5ff"; cx.lineWidth = 2.5;
   if(selected.kind==="token"){
     const t = tokens.find(o=>o.id===selected.id); if(!t){ selected=null; cx.restore(); return; }
-    const x=t.x*cvs.width, y=t.y*cvs.height, r=(tokenRadius(t.type)*(t.scale||1))+8;
+    const x=t.x*cvs.width, y=t.y*cvs.height;
+    const r=(tokenRadius(t.type)*(t.scale||1)) + (t.oriented ? 16 : 8);
     cx.beginPath(); cx.arc(x,y,r,0,Math.PI*2); cx.stroke();
   } else if(selected.kind==="text"){
     const o = texts.find(x=>x.id===selected.id); if(!o){ selected=null; cx.restore(); return; }
@@ -1844,7 +1869,7 @@ function selectAt(p){
   for(let i=tokens.length-1;i>=0;i--){
     const t = tokens[i];
     const tx=t.x*canvas.width, ty=t.y*canvas.height;
-    const r = (tokenRadius(t.type)*(t.scale||1))+10;
+    const r = (tokenRadius(t.type)*(t.scale||1)) + (t.oriented ? 18 : 10);
     if(Math.hypot(px-tx,py-ty) <= r){
       selected = {kind:"token", id:t.id};
       if(t.type==="goal") lastGoalId = t.id;
