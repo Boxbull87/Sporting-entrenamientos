@@ -527,15 +527,12 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
               <button type="button" class="btn small ghost" id="toggleTextMode">🔤 Texto</button>
               <button type="button" class="btn small ghost" id="toggleCircleMode">⭕ Rodear</button>
               <button type="button" class="btn small ghost" id="togglePencilMode">✏️ Línea libre</button>
-              <button type="button" class="btn small ghost" id="toggleOriented">🙆 Con orientación</button>
               <button type="button" class="btn small ghost" id="undoLast">↩ Deshacer</button>
               <span class="muted" id="modeHint" style="display:none;"></span>
             </div>
             <div class="board-toolbar">
               <button type="button" class="btn small ghost" id="growSelected">🔍+ Agrandar</button>
               <button type="button" class="btn small ghost" id="shrinkSelected">🔍- Reducir</button>
-              <button type="button" class="btn small ghost" id="rotateLeftSelected">↺ Girar</button>
-              <button type="button" class="btn small ghost" id="rotateRightSelected">↻ Girar</button>
               <button type="button" class="btn small danger" id="deleteSelected">🗑 Borrar selección</button>
               <button type="button" class="btn small danger" id="clearBoard">Vaciar pizarra</button>
             </div>
@@ -680,7 +677,12 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
           <button type="button" class="home-card" id="abpGoBank">
             <span class="home-card-icon">📂</span>
             <span class="home-card-label">Banco de ABP</span>
-            <span class="home-card-desc">Consulta por categorías y crea sesiones</span>
+            <span class="home-card-desc">Consulta las jugadas por categorías</span>
+          </button>
+          <button type="button" class="home-card" id="abpGoSessions">
+            <span class="home-card-icon">🎬</span>
+            <span class="home-card-label">Crear sesión de ABP</span>
+            <span class="home-card-desc">Combina jugadas y comparte el enlace</span>
           </button>
         </div>
       </div>
@@ -725,7 +727,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
         </div>
       </div>
 
-      <!-- ---------- ABP: Banco de ABP (categorías + sesiones) ---------- -->
+      <!-- ---------- ABP: Banco de ABP (solo categorías) ---------- -->
       <div id="abpBankView" class="hidden">
         <button type="button" class="btn ghost small" id="abpBankBack" style="margin-bottom:10px;">← Volver</button>
         <div class="card">
@@ -733,7 +735,11 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
           <p class="muted">Elige una categoría para ver sus jugadas.</p>
           <div id="abpCategoryList"><div class="empty">Cargando categorías...</div></div>
         </div>
+      </div>
 
+      <!-- ---------- ABP: Crear sesión de ABP ---------- -->
+      <div id="abpSessionsView" class="hidden">
+        <button type="button" class="btn ghost small" id="abpSessionsBack" style="margin-bottom:10px;">← Volver</button>
         <div class="card" id="playSessionEditorPanel">
           <h2 style="font-size:1.05rem;" id="playSessionEditorTitle">🎬 Crear sesión de ABP</h2>
           <div class="row">
@@ -912,15 +918,12 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
       <button type="button" class="btn small ghost" id="fsToggleTextMode">🔤 Texto</button>
       <button type="button" class="btn small ghost" id="fsToggleCircleMode">⭕ Rodear</button>
       <button type="button" class="btn small ghost" id="fsTogglePencilMode">✏️ Línea libre</button>
-      <button type="button" class="btn small ghost" id="fsToggleOriented">🙆 Con orientación</button>
       <button type="button" class="btn small ghost" id="fsUndoLast">↩ Deshacer</button>
       <span class="muted" id="fsModeHint" style="display:none;"></span>
     </div>
     <div class="board-toolbar">
       <button type="button" class="btn small ghost" id="fsGrowSelected">🔍+ Agrandar</button>
       <button type="button" class="btn small ghost" id="fsShrinkSelected">🔍- Reducir</button>
-      <button type="button" class="btn small ghost" id="fsRotateLeftSelected">↺ Girar</button>
-      <button type="button" class="btn small ghost" id="fsRotateRightSelected">↻ Girar</button>
       <button type="button" class="btn small danger" id="fsDeleteSelected">🗑 Borrar selección</button>
       <button type="button" class="btn small danger" id="fsClearBoard">Vaciar pizarra</button>
     </div>
@@ -1292,17 +1295,20 @@ function showAbpView(view){
   document.getElementById("abpHome").classList.toggle("hidden", view!=="home");
   document.getElementById("abpNewPlayView").classList.toggle("hidden", view!=="new");
   document.getElementById("abpBankView").classList.toggle("hidden", view!=="bank");
+  document.getElementById("abpSessionsView").classList.toggle("hidden", view!=="sessions");
   document.getElementById("abpCategoryView").classList.toggle("hidden", view!=="category");
 }
 let abpFormReturnView = "home"; // adónde volver al terminar de crear/editar una jugada
 document.getElementById("abpGoNew").onclick = () => { abpFormReturnView = "home"; showAbpView("new"); };
 document.getElementById("abpGoBank").onclick = () => { showAbpView("bank"); renderAbpCategoryList(); };
+document.getElementById("abpGoSessions").onclick = () => showAbpView("sessions");
 document.getElementById("abpNewBack").onclick = () => {
   resetPlayForm();
   showAbpView(abpFormReturnView);
   if(abpFormReturnView === "category") renderPlayList();
 };
 document.getElementById("abpBankBack").onclick = () => showAbpView("home");
+document.getElementById("abpSessionsBack").onclick = () => showAbpView("home");
 document.getElementById("abpCategoryBack").onclick = () => showAbpView("bank");
 
 let currentAbpCategoryId = null; // id de categoría real, o "__NONE__" para "sin categoría"
@@ -1518,7 +1524,6 @@ let dragObj = null;     // {kind, id} currently being dragged
 let dragLastPos = null;
 let selected = null;    // {kind, id} currently selected element
 let mode = "select";    // 'select' | 'arrow' | 'dotted' | 'text' | 'circle' | 'pencil'
-let orientedMode = false; // si está activo, los jugadores nuevos se crean con orientación corporal (brazos)
 let arrowStart = null;
 let shapeDraft = null;  // {x1,y1,x2,y2} while drawing a circle
 let pencilDraft = null; // array of points while drawing freehand
@@ -1600,59 +1605,6 @@ function tokenColor(type){
 }
 function darkLabel(type){ return type==="D" || type==="GD"; }
 
-function drawOrientedPlayer(cx, x, y, r, color, rotationDeg, isGK, label){
-  cx.save();
-  cx.translate(x, y);
-  cx.rotate((rotationDeg||0) * Math.PI/180);
-
-  const skin = "#e8b48a";
-  const bodyRx = r*0.98, bodyRy = r*1.12;
-
-  // Brazos (color piel) con forma de croissant/media luna, abiertos hacia fuera desde los hombros
-  cx.lineCap = "round";
-  [-1,1].forEach(side=>{
-    const armCx = side*r*0.92, armCy = -r*0.4, armR = r*0.62;
-    const startA = side<0 ? Math.PI/2 : -Math.PI/2;
-    const endA = side<0 ? Math.PI*1.5 : Math.PI/2;
-    cx.beginPath();
-    cx.arc(armCx, armCy, armR, startA, endA, false);
-    cx.lineWidth = r*0.92; cx.strokeStyle = "#111"; cx.stroke();
-    cx.beginPath();
-    cx.arc(armCx, armCy, armR, startA, endA, false);
-    cx.lineWidth = r*0.66; cx.strokeStyle = skin; cx.stroke();
-  });
-
-  // Cuerpo principal (óvalo), con contorno negro grueso tipo "sticker"
-  cx.beginPath();
-  cx.ellipse(0, 0, bodyRx, bodyRy, 0, 0, Math.PI*2);
-  cx.fillStyle = color;
-  cx.fill();
-  cx.lineWidth = Math.max(2.5, r*0.16);
-  cx.strokeStyle = "#111";
-  cx.stroke();
-
-  // Anillo interior blanco para diferenciar al portero
-  if(isGK){
-    cx.lineWidth = Math.max(1.5, r*0.08);
-    cx.strokeStyle = "#ffffff";
-    cx.beginPath();
-    cx.ellipse(0, 0, bodyRx-r*0.18, bodyRy-r*0.18, 0, 0, Math.PI*2);
-    cx.stroke();
-  }
-
-  // Número grande, blanco con borde negro, que gira con la ficha (como en la realidad)
-  if(label){
-    cx.font = "bold "+Math.round(r*1.3)+"px 'Oswald', Arial, sans-serif";
-    cx.textAlign = "center"; cx.textBaseline = "middle";
-    cx.lineWidth = Math.max(2, r*0.16);
-    cx.strokeStyle = "#111";
-    cx.strokeText(label, 0, r*0.06);
-    cx.fillStyle = "#ffffff";
-    cx.fillText(label, 0, r*0.06);
-  }
-
-  cx.restore();
-}
 function drawTokensOn(cx,cvs,list){
   (list||[]).forEach(t=>{
     const x=t.x*cvs.width, y=t.y*cvs.height;
@@ -1691,10 +1643,6 @@ function drawTokensOn(cx,cvs,list){
     }
     const r = tokenRadius(t.type)*scl;
     const isGK = (t.type==="GA"||t.type==="GB"||t.type==="GC"||t.type==="GD");
-    if(t.oriented){
-      drawOrientedPlayer(cx, x, y, r, tokenColor(t.type), t.rotation||0, isGK, isGK ? "P" : String(t.num||""));
-      return;
-    }
     cx.beginPath(); cx.arc(x,y, r, 0, Math.PI*2);
     cx.fillStyle = tokenColor(t.type);
     cx.fill(); cx.lineWidth=2; cx.strokeStyle="#fff"; cx.stroke();
@@ -1762,7 +1710,7 @@ function drawSelectionHighlight(cx,cvs){
   if(selected.kind==="token"){
     const t = tokens.find(o=>o.id===selected.id); if(!t){ selected=null; cx.restore(); return; }
     const x=t.x*cvs.width, y=t.y*cvs.height;
-    const r=(tokenRadius(t.type)*(t.scale||1)) + (t.oriented ? 26 : 8);
+    const r=(tokenRadius(t.type)*(t.scale||1))+8;
     cx.beginPath(); cx.arc(x,y,r,0,Math.PI*2); cx.stroke();
   } else if(selected.kind==="text"){
     const o = texts.find(x=>x.id===selected.id); if(!o){ selected=null; cx.restore(); return; }
@@ -1821,8 +1769,6 @@ function addToken(type){
     num: isPlayerLike ? sameTeam+1 : "",
     dir: type==="goal" ? "down" : undefined,
     scale: 1,
-    oriented: isPlayerLike ? orientedMode : false,
-    rotation: 0,
     x: startX === undefined ? 0.5 : startX,
     y: startY
   });
@@ -1968,7 +1914,7 @@ function selectAt(p){
   for(let i=tokens.length-1;i>=0;i--){
     const t = tokens[i];
     const tx=t.x*canvas.width, ty=t.y*canvas.height;
-    const r = (tokenRadius(t.type)*(t.scale||1)) + (t.oriented ? 28 : 10);
+    const r = (tokenRadius(t.type)*(t.scale||1))+10;
     if(Math.hypot(px-tx,py-ty) <= r){
       selected = {kind:"token", id:t.id};
       if(t.type==="goal") lastGoalId = t.id;
@@ -2064,25 +2010,6 @@ function resizeSelected(factor){
 }
 wire2("growSelected","fsGrowSelected", ()=>resizeSelected(1.15));
 wire2("shrinkSelected","fsShrinkSelected", ()=>resizeSelected(0.87));
-
-function toggleOrientedMode(){
-  orientedMode = !orientedMode;
-  [document.getElementById("toggleOriented"), document.getElementById("fsToggleOriented")].forEach(el=>{
-    if(el) el.classList.toggle("accent", orientedMode);
-  });
-}
-wire2("toggleOriented","fsToggleOriented", toggleOrientedMode);
-
-function rotateSelected(deltaDeg){
-  if(!selected){ alert("Primero toca un jugador con orientación corporal para seleccionarlo."); return; }
-  if(selected.kind !== "token"){ alert("Solo se pueden rotar los jugadores con orientación corporal."); return; }
-  const t = tokens.find(o=>o.id===selected.id);
-  if(!t || !t.oriented){ alert("Este jugador no tiene orientación corporal. Actívala con el botón \"🙆 Con orientación\" antes de añadirlo a la pizarra."); return; }
-  t.rotation = ((t.rotation||0) + deltaDeg + 360) % 360;
-  redrawBoard();
-}
-wire2("rotateLeftSelected","fsRotateLeftSelected", ()=>rotateSelected(-15));
-wire2("rotateRightSelected","fsRotateRightSelected", ()=>rotateSelected(15));
 
 function deleteSelected(){
   if(!selected){ alert("Primero toca un elemento de la pizarra para seleccionarlo."); return; }
@@ -3485,8 +3412,7 @@ window.editPlaySession = (id) => {
   document.getElementById("cancelPlaySessionEdit").classList.remove("hidden");
   document.getElementById("playSessionMsg").innerHTML = "";
   document.querySelector('.tab[data-tab="abp"]').click();
-  showAbpView("bank");
-  renderAbpCategoryList();
+  showAbpView("sessions");
   document.getElementById("playSessionEditorPanel").scrollIntoView({behavior:"smooth"});
 };
 
