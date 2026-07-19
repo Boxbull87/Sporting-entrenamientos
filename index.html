@@ -523,15 +523,19 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
             </div>
             <div class="board-toolbar">
               <button type="button" class="btn small ghost" id="toggleArrowMode">➜ Flecha</button>
+              <button type="button" class="btn small ghost" id="toggleDottedMode">┄ Línea de puntos</button>
               <button type="button" class="btn small ghost" id="toggleTextMode">🔤 Texto</button>
               <button type="button" class="btn small ghost" id="toggleCircleMode">⭕ Rodear</button>
               <button type="button" class="btn small ghost" id="togglePencilMode">✏️ Línea libre</button>
+              <button type="button" class="btn small ghost" id="toggleOriented">🙆 Con orientación</button>
               <button type="button" class="btn small ghost" id="undoLast">↩ Deshacer</button>
               <span class="muted" id="modeHint" style="display:none;"></span>
             </div>
             <div class="board-toolbar">
               <button type="button" class="btn small ghost" id="growSelected">🔍+ Agrandar</button>
               <button type="button" class="btn small ghost" id="shrinkSelected">🔍- Reducir</button>
+              <button type="button" class="btn small ghost" id="rotateLeftSelected">↺ Girar</button>
+              <button type="button" class="btn small ghost" id="rotateRightSelected">↻ Girar</button>
               <button type="button" class="btn small danger" id="deleteSelected">🗑 Borrar selección</button>
               <button type="button" class="btn small danger" id="clearBoard">Vaciar pizarra</button>
             </div>
@@ -869,15 +873,19 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
     </div>
     <div class="board-toolbar">
       <button type="button" class="btn small ghost" id="fsToggleArrowMode">➜ Flecha</button>
+      <button type="button" class="btn small ghost" id="fsToggleDottedMode">┄ Línea de puntos</button>
       <button type="button" class="btn small ghost" id="fsToggleTextMode">🔤 Texto</button>
       <button type="button" class="btn small ghost" id="fsToggleCircleMode">⭕ Rodear</button>
       <button type="button" class="btn small ghost" id="fsTogglePencilMode">✏️ Línea libre</button>
+      <button type="button" class="btn small ghost" id="fsToggleOriented">🙆 Con orientación</button>
       <button type="button" class="btn small ghost" id="fsUndoLast">↩ Deshacer</button>
       <span class="muted" id="fsModeHint" style="display:none;"></span>
     </div>
     <div class="board-toolbar">
       <button type="button" class="btn small ghost" id="fsGrowSelected">🔍+ Agrandar</button>
       <button type="button" class="btn small ghost" id="fsShrinkSelected">🔍- Reducir</button>
+      <button type="button" class="btn small ghost" id="fsRotateLeftSelected">↺ Girar</button>
+      <button type="button" class="btn small ghost" id="fsRotateRightSelected">↻ Girar</button>
       <button type="button" class="btn small danger" id="fsDeleteSelected">🗑 Borrar selección</button>
       <button type="button" class="btn small danger" id="fsClearBoard">Vaciar pizarra</button>
     </div>
@@ -1190,9 +1198,14 @@ function showTasksView(view){
   document.getElementById("tasksBankView").classList.toggle("hidden", view!=="bank");
   document.getElementById("tasksBankCategoryView").classList.toggle("hidden", view!=="category");
 }
-document.getElementById("tasksGoNew").onclick = () => showTasksView("new");
+let taskFormReturnView = "home"; // adónde volver al terminar de crear/editar una tarea
+document.getElementById("tasksGoNew").onclick = () => { taskFormReturnView = "home"; showTasksView("new"); };
 document.getElementById("tasksGoBank").onclick = () => { showTasksView("bank"); renderTaskCategoryList(); };
-document.getElementById("tasksNewBack").onclick = () => showTasksView("home");
+document.getElementById("tasksNewBack").onclick = () => {
+  resetTaskForm();
+  showTasksView(taskFormReturnView);
+  if(taskFormReturnView === "category") renderTaskList();
+};
 document.getElementById("tasksBankBack").onclick = () => showTasksView("home");
 document.getElementById("tasksBankCategoryBack").onclick = () => showTasksView("bank");
 
@@ -1410,7 +1423,8 @@ let tokenSeq = 0, arrowSeq = 0, textSeq = 0, shapeSeq = 0, pathSeq = 0;
 let dragObj = null;     // {kind, id} currently being dragged
 let dragLastPos = null;
 let selected = null;    // {kind, id} currently selected element
-let mode = "select";    // 'select' | 'arrow' | 'text' | 'circle' | 'pencil'
+let mode = "select";    // 'select' | 'arrow' | 'dotted' | 'text' | 'circle' | 'pencil'
+let orientedMode = false; // si está activo, los jugadores nuevos se crean con orientación corporal (brazos)
 let arrowStart = null;
 let shapeDraft = null;  // {x1,y1,x2,y2} while drawing a circle
 let pencilDraft = null; // array of points while drawing freehand
@@ -1492,6 +1506,30 @@ function tokenColor(type){
 }
 function darkLabel(type){ return type==="D" || type==="GD"; }
 
+function drawOrientedPlayer(cx, x, y, r, color, rotationDeg, isGK){
+  cx.save();
+  cx.translate(x, y);
+  cx.rotate((rotationDeg||0) * Math.PI/180);
+  // Cuerpo (torso), un poco más ancho que alto, ligeramente desplazado hacia "atrás"
+  cx.beginPath();
+  cx.ellipse(0, r*0.15, r*0.75, r*0.9, 0, 0, Math.PI*2);
+  cx.fillStyle = color;
+  cx.fill();
+  cx.lineWidth = isGK ? 3 : 1.5;
+  cx.strokeStyle = isGK ? "#ffffff" : "rgba(0,0,0,0.35)";
+  cx.stroke();
+  // Dos "brazos" (bultos redondeados) que marcan los hombros / el frente del jugador
+  cx.fillStyle = color;
+  cx.beginPath(); cx.ellipse(-r*0.62, -r*0.5, r*0.42, r*0.32, -0.5, 0, Math.PI*2); cx.fill();
+  cx.beginPath(); cx.ellipse( r*0.62, -r*0.5, r*0.42, r*0.32,  0.5, 0, Math.PI*2); cx.fill();
+  cx.lineWidth = 1; cx.strokeStyle = "rgba(0,0,0,0.35)";
+  cx.beginPath(); cx.ellipse(-r*0.62, -r*0.5, r*0.42, r*0.32, -0.5, 0, Math.PI*2); cx.stroke();
+  cx.beginPath(); cx.ellipse( r*0.62, -r*0.5, r*0.42, r*0.32,  0.5, 0, Math.PI*2); cx.stroke();
+  // Punto blanco en la "cara" para que se vea claramente hacia dónde mira
+  cx.beginPath(); cx.arc(0, -r*1.0, r*0.17, 0, Math.PI*2);
+  cx.fillStyle = "#ffffff"; cx.fill();
+  cx.restore();
+}
 function drawTokensOn(cx,cvs,list){
   (list||[]).forEach(t=>{
     const x=t.x*cvs.width, y=t.y*cvs.height;
@@ -1529,12 +1567,16 @@ function drawTokensOn(cx,cvs,list){
       return;
     }
     const r = tokenRadius(t.type)*scl;
+    const isGK = (t.type==="GA"||t.type==="GB"||t.type==="GC"||t.type==="GD");
+    if(t.oriented){
+      drawOrientedPlayer(cx, x, y, r, tokenColor(t.type), t.rotation||0, isGK);
+      return;
+    }
     cx.beginPath(); cx.arc(x,y, r, 0, Math.PI*2);
     cx.fillStyle = tokenColor(t.type);
     cx.fill(); cx.lineWidth=2; cx.strokeStyle="#fff"; cx.stroke();
     cx.font = "bold "+Math.round(15*scl)+"px sans-serif"; cx.textAlign="center"; cx.textBaseline="middle";
     cx.fillStyle = darkLabel(t.type) ? "#3a2f00" : "#fff";
-    const isGK = (t.type==="GA"||t.type==="GB"||t.type==="GC"||t.type==="GD");
     cx.fillText(isGK ? "P" : t.num, x, y);
   });
 }
@@ -1542,16 +1584,25 @@ function drawArrowsOn(cx,cvs,list){
   (list||[]).forEach(a=>{
     const x1=a.x1*cvs.width, y1=a.y1*cvs.height, x2=a.x2*cvs.width, y2=a.y2*cvs.height;
     const w = a.width || 2.5;
-    cx.strokeStyle = "#fff176"; cx.lineWidth = w; cx.setLineDash([]);
+    cx.strokeStyle = "#fff176"; cx.lineWidth = w;
+    if(a.dashed){
+      cx.setLineDash([Math.max(4, w*2.2), Math.max(4, w*1.8)]);
+      cx.lineCap = "round";
+    } else {
+      cx.setLineDash([]);
+    }
     cx.beginPath(); cx.moveTo(x1,y1); cx.lineTo(x2,y2); cx.stroke();
-    const angle = Math.atan2(y2-y1, x2-x1), headLen = 11 + (w-2.5)*2.2;
-    cx.beginPath();
-    cx.moveTo(x2,y2);
-    cx.lineTo(x2-headLen*Math.cos(angle-Math.PI/6), y2-headLen*Math.sin(angle-Math.PI/6));
-    cx.lineTo(x2-headLen*Math.cos(angle+Math.PI/6), y2-headLen*Math.sin(angle+Math.PI/6));
-    cx.closePath();
-    cx.fillStyle = "#fff176";
-    cx.fill();
+    cx.setLineDash([]);
+    if(!a.dashed){
+      const angle = Math.atan2(y2-y1, x2-x1), headLen = 11 + (w-2.5)*2.2;
+      cx.beginPath();
+      cx.moveTo(x2,y2);
+      cx.lineTo(x2-headLen*Math.cos(angle-Math.PI/6), y2-headLen*Math.sin(angle-Math.PI/6));
+      cx.lineTo(x2-headLen*Math.cos(angle+Math.PI/6), y2-headLen*Math.sin(angle+Math.PI/6));
+      cx.closePath();
+      cx.fillStyle = "#fff176";
+      cx.fill();
+    }
   });
 }
 function drawTextsOn(cx,cvs,list){
@@ -1646,6 +1697,8 @@ function addToken(type){
     num: isPlayerLike ? sameTeam+1 : "",
     dir: type==="goal" ? "down" : undefined,
     scale: 1,
+    oriented: isPlayerLike ? orientedMode : false,
+    rotation: 0,
     x: startX === undefined ? 0.5 : startX,
     y: startY
   });
@@ -1696,7 +1749,7 @@ function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
 function setMode(newMode){
   mode = (mode===newMode) ? "select" : newMode;
   arrowStart = null; shapeDraft = null; pencilDraft = null; dragObj = null;
-  const map = {arrow:"toggleArrowMode", text:"toggleTextMode", circle:"toggleCircleMode", pencil:"togglePencilMode"};
+  const map = {arrow:"toggleArrowMode", dotted:"toggleDottedMode", text:"toggleTextMode", circle:"toggleCircleMode", pencil:"togglePencilMode"};
   Object.keys(map).forEach(k=>{
     [document.getElementById(map[k]), document.getElementById("fs"+cap(map[k]))].forEach(el=>{
       if(el) el.classList.toggle("accent", mode===k);
@@ -1704,6 +1757,7 @@ function setMode(newMode){
   });
   const hints = {
     arrow:"Toca el punto de inicio y luego el punto final de la flecha.",
+    dotted:"Toca el punto de inicio y luego el punto final de la línea de puntos.",
     text:"Toca la pizarra donde quieras escribir el texto.",
     circle:"Arrastra sobre la pizarra para rodear una zona.",
     pencil:"Mantén pulsado y arrastra para dibujar a mano alzada.",
@@ -1717,6 +1771,7 @@ function setMode(newMode){
   redrawBoard();
 }
 wire2("toggleArrowMode","fsToggleArrowMode", ()=>setMode("arrow"));
+wire2("toggleDottedMode","fsToggleDottedMode", ()=>setMode("dotted"));
 wire2("toggleTextMode","fsToggleTextMode", ()=>setMode("text"));
 wire2("toggleCircleMode","fsToggleCircleMode", ()=>setMode("circle"));
 wire2("togglePencilMode","fsTogglePencilMode", ()=>setMode("pencil"));
@@ -1726,7 +1781,7 @@ function handleArrowClick(p){
   else{
     arrowSeq++;
     const id = "a"+arrowSeq;
-    arrows.push({id, x1:arrowStart.x, y1:arrowStart.y, x2:p.x, y2:p.y, width:2.5});
+    arrows.push({id, x1:arrowStart.x, y1:arrowStart.y, x2:p.x, y2:p.y, width:2.5, dashed: mode==="dotted"});
     pushHistory("arrow", id);
     arrowStart = null;
     redrawBoard();
@@ -1878,16 +1933,32 @@ function resizeSelected(factor){
   } else if(selected.kind==="arrow"){
     const a = arrows.find(o=>o.id===selected.id);
     if(a){
-      const mx=(a.x1+a.x2)/2, my=(a.y1+a.y2)/2;
-      a.x1 = mx+(a.x1-mx)*factor; a.y1 = my+(a.y1-my)*factor;
-      a.x2 = mx+(a.x2-mx)*factor; a.y2 = my+(a.y2-my)*factor;
-      a.width = Math.max(1, Math.min(6, (a.width||2.5)*factor));
+      a.width = Math.max(1, Math.min(10, (a.width||2.5)*factor));
     }
   }
   redrawBoard();
 }
 wire2("growSelected","fsGrowSelected", ()=>resizeSelected(1.15));
 wire2("shrinkSelected","fsShrinkSelected", ()=>resizeSelected(0.87));
+
+function toggleOrientedMode(){
+  orientedMode = !orientedMode;
+  [document.getElementById("toggleOriented"), document.getElementById("fsToggleOriented")].forEach(el=>{
+    if(el) el.classList.toggle("accent", orientedMode);
+  });
+}
+wire2("toggleOriented","fsToggleOriented", toggleOrientedMode);
+
+function rotateSelected(deltaDeg){
+  if(!selected){ alert("Primero toca un jugador con orientación corporal para seleccionarlo."); return; }
+  if(selected.kind !== "token"){ alert("Solo se pueden rotar los jugadores con orientación corporal."); return; }
+  const t = tokens.find(o=>o.id===selected.id);
+  if(!t || !t.oriented){ alert("Este jugador no tiene orientación corporal. Actívala con el botón \"🙆 Con orientación\" antes de añadirlo a la pizarra."); return; }
+  t.rotation = ((t.rotation||0) + deltaDeg + 360) % 360;
+  redrawBoard();
+}
+wire2("rotateLeftSelected","fsRotateLeftSelected", ()=>rotateSelected(-15));
+wire2("rotateRightSelected","fsRotateRightSelected", ()=>rotateSelected(15));
 
 function deleteSelected(){
   if(!selected){ alert("Primero toca un elemento de la pizarra para seleccionarlo."); return; }
@@ -1903,7 +1974,7 @@ wire2("deleteSelected","fsDeleteSelected", deleteSelected);
 
 /* ---- Entrada de puntero unificada (ratón + táctil) ---- */
 function boardPointerDown(p){
-  if(mode==="arrow"){ handleArrowClick(p); return; }
+  if(mode==="arrow" || mode==="dotted"){ handleArrowClick(p); return; }
   if(mode==="text"){ handleTextClick(p); return; }
   if(mode==="circle"){ shapeDraft = {x1:p.x, y1:p.y, x2:p.x, y2:p.y}; return; }
   if(mode==="pencil"){ pencilDraft = [p]; return; }
@@ -1938,15 +2009,41 @@ document.getElementById("saveFrame").onclick = () => saveCurrentFrame();
 function updateFrameCount(){
   document.getElementById("frameCount").textContent = frames.length + " fotogramas";
 }
+let activeFrameIndex = null; // qué fotograma está cargado ahora mismo en la pizarra
 function renderFramesList(){
   updateFrameCount();
   const wrap = document.getElementById("framesList");
   wrap.innerHTML = frames.map((f,i)=>`
-    <div class="frame-chip" title="Fotograma ${i+1}">
-      ${i+1}<span class="rm" onclick="removeFrame(${i})">×</span>
+    <div class="frame-chip ${activeFrameIndex===i ? "active" : ""}" title="Toca para cargar el fotograma ${i+1} en la pizarra" onclick="loadFrame(${i})">
+      ${i+1}<span class="rm" onclick="event.stopPropagation(); removeFrame(${i})">×</span>
     </div>`).join("");
 }
-window.removeFrame = (i) => { frames.splice(i,1); renderFramesList(); };
+window.loadFrame = (i) => {
+  const f = frames[i];
+  if(!f) return;
+  tokens = JSON.parse(JSON.stringify(frameTokens(f)));
+  arrows = JSON.parse(JSON.stringify(frameArrows(f)));
+  texts = JSON.parse(JSON.stringify(frameTexts(f)));
+  shapes = JSON.parse(JSON.stringify(frameShapes(f)));
+  paths = JSON.parse(JSON.stringify(framePaths(f)));
+  tokenSeq = tokens.reduce((m,tk)=> Math.max(m, parseInt((tk.id||"t0").slice(1))||0), 0);
+  arrowSeq = arrows.reduce((m,a)=> Math.max(m, parseInt((a.id||"a0").slice(1))||0), 0);
+  textSeq = texts.reduce((m,o)=> Math.max(m, parseInt((o.id||"x0").slice(1))||0), 0);
+  shapeSeq = shapes.reduce((m,o)=> Math.max(m, parseInt((o.id||"c0").slice(1))||0), 0);
+  pathSeq = paths.reduce((m,o)=> Math.max(m, parseInt((o.id||"p0").slice(1))||0), 0);
+  historyStack = []; selected = null; dragObj = null;
+  lastGoalId = null;
+  activeFrameIndex = i;
+  setMode("select");
+  redrawBoard();
+  renderFramesList();
+};
+window.removeFrame = (i) => {
+  frames.splice(i,1);
+  if(activeFrameIndex === i) activeFrameIndex = null;
+  else if(activeFrameIndex !== null && activeFrameIndex > i) activeFrameIndex--;
+  renderFramesList();
+};
 
 function stopAnimFn(){
   animRunning=false; if(animReq) cancelAnimationFrame(animReq); redrawBoard();
@@ -1967,6 +2064,7 @@ function saveCurrentFrame(){
     shapes: JSON.parse(JSON.stringify(shapes)),
     paths: JSON.parse(JSON.stringify(paths))
   });
+  activeFrameIndex = frames.length - 1;
   renderFramesList();
   const fsCount = document.getElementById("fsFrameCount");
   if(fsCount) fsCount.textContent = frames.length + " fotogramas";
@@ -2138,7 +2236,11 @@ document.getElementById("taskForm").onsubmit = async (e) => {
   }
 };
 
-document.getElementById("cancelEdit").onclick = () => { resetTaskForm(); showTasksView("home"); };
+document.getElementById("cancelEdit").onclick = () => {
+  resetTaskForm();
+  showTasksView(taskFormReturnView);
+  if(taskFormReturnView === "category") renderTaskList();
+};
 
 function resetTaskForm(){
   editingTaskId = null;
@@ -2149,7 +2251,7 @@ function resetTaskForm(){
   tokens = []; frames = []; arrows = []; texts = []; shapes = []; paths = [];
   tokenSeq = 0; arrowSeq = 0; textSeq = 0; shapeSeq = 0; pathSeq = 0;
   historyStack = []; selected = null; dragObj = null;
-  lastGoalId = null;
+  lastGoalId = null; activeFrameIndex = null;
   setMode("select");
   redrawBoard(); renderFramesList();
 }
@@ -2184,11 +2286,12 @@ window.editTask = (id) => {
   shapeSeq = shapes.reduce((m,o)=> Math.max(m, parseInt((o.id||"c0").slice(1))||0), 0);
   pathSeq = paths.reduce((m,o)=> Math.max(m, parseInt((o.id||"p0").slice(1))||0), 0);
   historyStack = []; selected = null; dragObj = null;
-  lastGoalId = null;
+  lastGoalId = null; activeFrameIndex = frames.length ? frames.length-1 : null;
   setMode("select");
   redrawBoard(); renderFramesList();
   document.getElementById("cancelEdit").classList.remove("hidden");
   document.querySelector('.tab[data-tab="tasks"]').click();
+  taskFormReturnView = "category";
   showTasksView("new");
   document.getElementById("editorPanel").scrollIntoView({behavior:"smooth"});
 };
@@ -3029,7 +3132,7 @@ function resetPlayForm(){
   tokens = []; frames = []; arrows = []; texts = []; shapes = []; paths = [];
   tokenSeq = 0; arrowSeq = 0; textSeq = 0; shapeSeq = 0; pathSeq = 0;
   historyStack = []; selected = null; dragObj = null;
-  lastGoalId = null;
+  lastGoalId = null; activeFrameIndex = null;
   setMode("select");
   redrawBoard(); renderFramesList();
 }
@@ -3054,7 +3157,7 @@ window.editPlay = (id) => {
   shapeSeq = shapes.reduce((m,o)=> Math.max(m, parseInt((o.id||"c0").slice(1))||0), 0);
   pathSeq = paths.reduce((m,o)=> Math.max(m, parseInt((o.id||"p0").slice(1))||0), 0);
   historyStack = []; selected = null; dragObj = null;
-  lastGoalId = null;
+  lastGoalId = null; activeFrameIndex = frames.length ? frames.length-1 : null;
   setMode("select");
   redrawBoard(); renderFramesList();
   document.getElementById("cancelPlayEdit").classList.remove("hidden");
