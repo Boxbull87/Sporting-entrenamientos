@@ -197,6 +197,30 @@ textarea{resize:vertical;min-height:70px;}
 
 /* filters */
 .filterbar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+.notif-badge{
+  position:absolute;top:-4px;right:-6px;background:var(--danger);color:#fff;
+  font-size:.62rem;font-weight:700;border-radius:10px;min-width:16px;height:16px;
+  line-height:16px;text-align:center;padding:0 3px;font-family:'Roboto Mono',monospace;
+}
+.notif-panel{
+  position:absolute;top:calc(100% + 8px);right:0;width:300px;max-width:85vw;max-height:70vh;
+  overflow-y:auto;background:#fff;border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:0 8px 24px rgba(0,0,0,.18);padding:12px;z-index:400;text-align:left;
+}
+.notif-item{
+  display:flex;align-items:flex-start;gap:8px;padding:7px 4px;border-bottom:1px solid var(--border);
+  cursor:pointer;font-size:.82rem;
+}
+.notif-item:last-child{border-bottom:none;}
+.notif-item:hover{background:#faf8f5;}
+.notif-dot{
+  display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--danger);
+  flex-shrink:0;margin-top:5px;
+}
+.card-dot{
+  display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--danger);
+  margin-left:6px;vertical-align:middle;
+}
 .checkbox-list{
   border:1px solid var(--border);border-radius:8px;padding:8px 10px;
   max-height:130px;overflow-y:auto;background:#fff;
@@ -362,6 +386,22 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
   <div class="topbar">
     <div class="brand" id="brandHomeBtn" style="cursor:pointer;" title="Ir al menú principal"><img class="crest crest-img" alt="Escudo"> Sporting FS Almería</div>
     <div class="userbox">
+      <div style="position:relative;">
+        <button class="linkbtn" id="btnNotifBell" title="Notificaciones" style="font-size:1.1rem;position:relative;">
+          🔔<span id="notifBadge" class="notif-badge hidden">0</span>
+        </button>
+        <div id="notifPanel" class="notif-panel hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <strong style="font-size:.9rem;">Notificaciones</strong>
+            <button type="button" class="btn ghost small" id="btnMarkAllSeen">✓ Marcar todo como visto</button>
+          </div>
+          <div id="notifList"></div>
+          <details style="margin-top:10px;">
+            <summary style="cursor:pointer;font-size:.82rem;color:var(--muted);">⚙️ ¿De qué quiero que me avisen?</summary>
+            <div id="notifPrefs" class="checkbox-list" style="margin-top:8px;"></div>
+          </details>
+        </div>
+      </div>
       <span id="userName"></span>
       <span id="userRolePill" class="pill">Entrenador</span>
       <button class="linkbtn" id="btnLogout">Salir</button>
@@ -390,22 +430,22 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
       <div class="home-grid">
         <button type="button" class="home-card" data-goto="tasks">
           <span class="home-card-icon">📋</span>
-          <span class="home-card-label">Tareas</span>
+          <span class="home-card-label">Tareas <span id="homeDotTasks" class="card-dot hidden"></span></span>
           <span class="home-card-desc">Crea y consulta ejercicios</span>
         </button>
         <button type="button" class="home-card" data-goto="sessions">
           <span class="home-card-icon">🗓️</span>
-          <span class="home-card-label">Sesiones</span>
+          <span class="home-card-label">Sesiones <span id="homeDotSessions" class="card-dot hidden"></span></span>
           <span class="home-card-desc">Organiza tus entrenamientos</span>
         </button>
         <button type="button" class="home-card" data-goto="modelo">
           <span class="home-card-icon">🧩</span>
-          <span class="home-card-label">Modelo de juego</span>
+          <span class="home-card-label">Modelo de juego <span id="homeDotModelo" class="card-dot hidden"></span></span>
           <span class="home-card-desc">Documentos del club</span>
         </button>
         <button type="button" class="home-card" data-goto="abp">
           <span class="home-card-icon">🎯</span>
-          <span class="home-card-label">ABP</span>
+          <span class="home-card-label">ABP <span id="homeDotAbp" class="card-dot hidden"></span></span>
           <span class="home-card-desc">Jugadas a balón parado</span>
         </button>
         <button type="button" class="home-card hidden" id="homeCoachesBtn" data-goto="coaches">
@@ -1252,6 +1292,7 @@ document.querySelectorAll(".tab").forEach(btn=>{
     if(btn.dataset.tab === "tasks") showTasksView("home");
     if(btn.dataset.tab === "abp") showAbpView("home");
     if(btn.dataset.tab === "sessions") showSessionsView("home");
+    if(btn.dataset.tab === "modelo") markSectionSeen("gameModelFiles");
     window.scrollTo({top:0, behavior:"smooth"});
   };
 });
@@ -1298,10 +1339,11 @@ function renderTaskCategoryList(){
   });
   let html = categories.map(c=>{
     const n = counts[c.id]||0;
+    const hasUnread = tasks.some(t=> taskCategoryIds(t).includes(c.id) && isItemUnread("tasks", t));
     return `
     <button type="button" class="home-card" onclick="openTaskCategory('${c.id}')">
       <span class="home-card-icon">🏷️</span>
-      <span class="home-card-label">${escapeHtml(c.name)}</span>
+      <span class="home-card-label">${escapeHtml(c.name)}${hasUnread ? '<span class="card-dot"></span>' : ""}</span>
       <span class="home-card-desc">${n} tarea${n===1?"":"s"}</span>
     </button>`;
   }).join("");
@@ -1360,10 +1402,11 @@ function renderAbpCategoryList(){
   });
   let html = abpCategories.map(c=>{
     const n = counts[c.id]||0;
+    const hasUnread = plays.some(p=> p.categoryId===c.id && isItemUnread("plays", p));
     return `
     <button type="button" class="home-card" onclick="openAbpCategory('${c.id}')">
       <span class="home-card-icon">🎯</span>
-      <span class="home-card-label">${escapeHtml(c.name)}</span>
+      <span class="home-card-label">${escapeHtml(c.name)}${hasUnread ? '<span class="card-dot"></span>' : ""}</span>
       <span class="home-card-desc">${n} jugada${n===1?"":"s"}</span>
     </button>`;
   }).join("");
@@ -1417,6 +1460,7 @@ function attachRealtimeListeners(){
     renderTaskCategoryList();
     renderSessionTaskBrowser();
     renderTrash();
+    renderNotifications();
     handleDeepLink();
   });
 
@@ -1431,6 +1475,7 @@ function attachRealtimeListeners(){
     trashSessions = all.filter(s=>s.deleted);
     renderSavedSessions();
     renderTrash();
+    renderNotifications();
   });
 
   db.collection("abpCategories").orderBy("name").onSnapshot(snap=>{
@@ -1446,6 +1491,7 @@ function attachRealtimeListeners(){
     renderPlayList();
     renderPlaySessionBrowser();
     renderTrash();
+    renderNotifications();
   });
 
   db.collection("playSessions").orderBy("createdAt","desc").onSnapshot(snap=>{
@@ -1454,17 +1500,183 @@ function attachRealtimeListeners(){
     trashPlaySessions = all.filter(s=>s.deleted);
     renderSavedPlaySessions();
     renderTrash();
+    renderNotifications();
   });
 
   db.collection("gameModelFiles").orderBy("uploadedAt","desc").onSnapshot(snap=>{
     gameModelFiles = snap.docs.map(d=>({id:d.id, ...d.data()}));
     renderModeloList();
+    renderNotifications();
   });
 }
 
 /* ============================================================
-   CATEGORÍAS ABP
+   NOTIFICACIONES (aviso dentro de la app, por secciones)
 ============================================================= */
+const NOTIFY_SECTIONS = [
+  {key:"tasks", label:"Tareas nuevas", icon:"📋"},
+  {key:"sessions", label:"Sesiones nuevas", icon:"🗓️"},
+  {key:"plays", label:"Jugadas de ABP nuevas", icon:"🎯"},
+  {key:"playSessions", label:"Sesiones de ABP nuevas", icon:"🎬"},
+  {key:"gameModelFiles", label:"Documentos nuevos en Modelo de juego", icon:"🧩"}
+];
+function notifyDataFor(section){
+  if(section==="tasks") return tasks;
+  if(section==="sessions") return sessions;
+  if(section==="plays") return plays;
+  if(section==="playSessions") return playSessions;
+  if(section==="gameModelFiles") return gameModelFiles;
+  return [];
+}
+function tsToMillis(ts){
+  if(!ts) return 0;
+  if(typeof ts.toMillis === "function") return ts.toMillis();
+  if(ts.seconds) return ts.seconds*1000;
+  return 0;
+}
+function isItemUnread(section, item){
+  if(!currentUser || !currentCoach || !item) return false;
+  if(item.createdBy === currentUser.uid) return false; // nunca te avisa de lo tuyo
+  const prefs = currentCoach.notifySections || [];
+  if(!prefs.includes(section)) return false;
+  const cutoffMs = tsToMillis((currentCoach.lastSeenAt||{})[section]);
+  const createdMs = tsToMillis(item.createdAt || item.uploadedAt);
+  if(cutoffMs && createdMs && createdMs <= cutoffMs) return false;
+  const seenArr = (currentCoach.seenIds||{})[section] || [];
+  if(seenArr.includes(item.id)) return false;
+  return true;
+}
+function sectionHasUnread(section){
+  return notifyDataFor(section).some(item=>isItemUnread(section, item));
+}
+function itemLabel(section, item){
+  return item.title || item.name || "(sin título)";
+}
+async function markItemSeen(section, id){
+  if(!currentUser || !currentCoach) return;
+  currentCoach.seenIds = currentCoach.seenIds || {};
+  currentCoach.seenIds[section] = [...(currentCoach.seenIds[section]||[]), id];
+  renderNotifications();
+  try{
+    await db.collection("coaches").doc(currentUser.uid).update({
+      [`seenIds.${section}`]: firebase.firestore.FieldValue.arrayUnion(id)
+    });
+  }catch(e){ /* se reintentará al recargar */ }
+}
+async function markSectionSeen(section){
+  if(!currentUser || !currentCoach) return;
+  currentCoach.lastSeenAt = currentCoach.lastSeenAt || {};
+  currentCoach.lastSeenAt[section] = { seconds: Math.floor(Date.now()/1000) };
+  currentCoach.seenIds = currentCoach.seenIds || {};
+  currentCoach.seenIds[section] = [];
+  renderNotifications();
+  try{
+    await db.collection("coaches").doc(currentUser.uid).update({
+      [`lastSeenAt.${section}`]: firebase.firestore.FieldValue.serverTimestamp(),
+      [`seenIds.${section}`]: []
+    });
+  }catch(e){ /* se reintentará al recargar */ }
+}
+window.markAllNotificationsSeen = async () => {
+  if(!currentUser || !currentCoach) return;
+  currentCoach.lastSeenAt = currentCoach.lastSeenAt || {};
+  currentCoach.seenIds = currentCoach.seenIds || {};
+  const updates = {};
+  NOTIFY_SECTIONS.forEach(s=>{
+    currentCoach.lastSeenAt[s.key] = { seconds: Math.floor(Date.now()/1000) };
+    currentCoach.seenIds[s.key] = [];
+    updates[`lastSeenAt.${s.key}`] = firebase.firestore.FieldValue.serverTimestamp();
+    updates[`seenIds.${s.key}`] = [];
+  });
+  renderNotifications();
+  try{ await db.collection("coaches").doc(currentUser.uid).update(updates); }catch(e){}
+};
+window.notifItemClick = (section, id) => {
+  markItemSeen(section, id);
+  document.getElementById("notifPanel").classList.add("hidden");
+  if(section==="tasks") { window.viewTask(id); return; }
+  if(section==="plays") { window.viewPlay(id); return; }
+  if(section==="sessions"){ document.querySelector('.tab[data-tab="sessions"]').click(); showSessionsView("saved"); return; }
+  if(section==="playSessions"){ document.querySelector('.tab[data-tab="abp"]').click(); showAbpView("sessions"); return; }
+  if(section==="gameModelFiles"){ document.querySelector('.tab[data-tab="modelo"]').click(); return; }
+};
+async function toggleNotifySection(section, on){
+  if(!currentUser || !currentCoach) return;
+  currentCoach.notifySections = currentCoach.notifySections || [];
+  if(on && !currentCoach.notifySections.includes(section)) currentCoach.notifySections.push(section);
+  if(!on) currentCoach.notifySections = currentCoach.notifySections.filter(s=>s!==section);
+  renderNotifications();
+  try{
+    await db.collection("coaches").doc(currentUser.uid).update({ notifySections: currentCoach.notifySections });
+  }catch(e){}
+}
+function renderNotifications(){
+  if(!currentCoach) return;
+  const prefs = currentCoach.notifySections || [];
+
+  // Panel de preferencias (checkboxes por sección)
+  const prefsWrap = document.getElementById("notifPrefs");
+  if(prefsWrap){
+    prefsWrap.innerHTML = NOTIFY_SECTIONS.map(s=>`
+      <label>
+        <input type="checkbox" value="${s.key}" ${prefs.includes(s.key)?"checked":""} onchange="toggleNotifySection('${s.key}', this.checked)">
+        ${s.icon} ${escapeHtml(s.label)}
+      </label>`).join("");
+  }
+
+  // Lista de pendientes + contador
+  let total = 0;
+  const groupsHtml = NOTIFY_SECTIONS.map(s=>{
+    const unread = notifyDataFor(s.key).filter(item=>isItemUnread(s.key, item));
+    if(unread.length===0) return "";
+    total += unread.length;
+    const itemsHtml = unread.slice(0,8).map(item=>`
+      <div class="notif-item" onclick="notifItemClick('${s.key}','${item.id}')">
+        <span class="notif-dot"></span>
+        <span>${escapeHtml(itemLabel(s.key,item))} <span class="muted">· ${s.icon} ${escapeHtml(s.label.replace(' nuevas','').replace(' nuevos',''))}</span></span>
+      </div>`).join("");
+    return itemsHtml;
+  }).join("");
+  const notifList = document.getElementById("notifList");
+  if(notifList){
+    notifList.innerHTML = total>0
+      ? groupsHtml
+      : '<p class="muted" style="font-size:.82rem;">No tienes notificaciones pendientes.</p>';
+  }
+  const badge = document.getElementById("notifBadge");
+  if(badge){
+    badge.textContent = total>9 ? "9+" : String(total);
+    badge.classList.toggle("hidden", total===0);
+  }
+
+  // Puntos rojos en las tarjetas del menú principal
+  const dotMap = {tasks:"homeDotTasks", sessions:"homeDotSessions", plays:"homeDotAbp", playSessions:"homeDotAbp", gameModelFiles:"homeDotModelo"};
+  const abpHas = sectionHasUnread("plays") || sectionHasUnread("playSessions");
+  Object.entries(dotMap).forEach(([section, elId])=>{
+    const el = document.getElementById(elId);
+    if(!el) return;
+    if(elId==="homeDotAbp"){ el.classList.toggle("hidden", !abpHas); return; }
+    el.classList.toggle("hidden", !sectionHasUnread(section));
+  });
+
+  // Re-pintar listados para que se vean los puntos por elemento
+  if(document.getElementById("taskList")) renderTaskList();
+  if(document.getElementById("abpCategoryList")) renderAbpCategoryList();
+  if(document.getElementById("playList")) renderPlayList();
+  if(document.getElementById("sessionsSaved")) renderSavedSessions();
+  if(document.getElementById("playSessionsSaved")) renderSavedPlaySessions();
+}
+document.getElementById("btnNotifBell").onclick = (e) => {
+  e.stopPropagation();
+  document.getElementById("notifPanel").classList.toggle("hidden");
+};
+document.addEventListener("click", (e) => {
+  const panel = document.getElementById("notifPanel");
+  if(!panel || panel.classList.contains("hidden")) return;
+  if(!panel.contains(e.target) && e.target.id !== "btnNotifBell") panel.classList.add("hidden");
+});
+document.getElementById("btnMarkAllSeen").onclick = () => window.markAllNotificationsSeen();
+
 document.getElementById("btnNewAbpCategory").onclick = () => document.getElementById("abpCategoryModal").classList.remove("hidden");
 document.getElementById("btnCloseAbpCategoryModal").onclick = () => document.getElementById("abpCategoryModal").classList.add("hidden");
 
@@ -2418,7 +2630,7 @@ function renderTaskList(){
     return `
     <div class="task-item">
       <div>
-        <h4>${escapeHtml(t.title)}</h4>
+        <h4>${escapeHtml(t.title)}${isItemUnread("tasks",t) ? '<span class="card-dot"></span>' : ""}</h4>
         <div class="task-meta">
           ${catNames.map(n=>`<span class="badge">${escapeHtml(n)}</span>`).join("")}
           ${phaseLabel(t) ? `<span class="badge b-phase">${escapeHtml(phaseLabel(t))}</span>` : ""}
@@ -2756,10 +2968,11 @@ function sessionCardHtml(s){
     taskListHtml = `<ol style="margin:0 0 6px 18px;padding:0;font-size:.88rem;">${(s.taskIds||[]).map(taskLi).join("")}</ol>`;
   }
   const canManage = currentCoach && (currentCoach.role===ROLE_GESTOR || s.createdBy===currentUser.uid);
+  const unread = isItemUnread("sessions", s);
   return `
   <div class="card" style="margin-bottom:10px;">
     <div style="display:flex;justify-content:space-between;align-items:center;">
-      <h3 style="font-size:.95rem;">${escapeHtml(s.name)}</h3>
+      <h3 style="font-size:.95rem;${unread?"cursor:pointer;":""}" ${unread ? `onclick="markItemSeen('sessions','${s.id}')" title="Toca para marcar como vista"` : ""}>${escapeHtml(s.name)}${unread ? '<span class="card-dot"></span>' : ""}</h3>
       <span class="muted">${s.date||""}</span>
     </div>
     ${taskListHtml}
@@ -3306,7 +3519,7 @@ function renderPlayList(){
     return `
     <div class="task-item">
       <div>
-        <h4>${escapeHtml(p.title)}</h4>
+        <h4>${escapeHtml(p.title)}${isItemUnread("plays",p) ? '<span class="card-dot"></span>' : ""}</h4>
         <div class="task-meta">
           ${abpCatName_(p.categoryId) ? `<span class="badge">${escapeHtml(abpCatName_(p.categoryId))}</span>` : ""}
           ${p.videoUrl ? `<span class="badge outline b-duration">▶ Vídeo</span>` : ""}
@@ -3480,10 +3693,11 @@ function renderSavedPlaySessions(){
     const canManage = currentCoach && (currentCoach.role===ROLE_GESTOR || s.createdBy===currentUser.uid);
     const publicUrl = location.origin + location.pathname + "#public=" + s.id;
     const itemsHtml = (s.plays||[]).map(item=>`<li>${escapeHtml(item.title)}${item.categoryName?` <span class="muted">· ${escapeHtml(item.categoryName)}</span>`:""}</li>`).join("");
+    const unread = isItemUnread("playSessions", s);
     return `
     <div class="card" style="margin-bottom:10px;">
       <div style="display:flex;justify-content:space-between;align-items:center;">
-        <h3 style="font-size:.95rem;">${escapeHtml(s.name)}</h3>
+        <h3 style="font-size:.95rem;${unread?"cursor:pointer;":""}" ${unread ? `onclick="markItemSeen('playSessions','${s.id}')" title="Toca para marcar como vista"` : ""}>${escapeHtml(s.name)}${unread ? '<span class="card-dot"></span>' : ""}</h3>
         <span class="muted">${s.date||""}</span>
       </div>
       <p class="muted" style="margin:2px 0 8px 0;">Por ${escapeHtml(s.createdByName||"")} · ${(s.plays||[]).length} jugada${(s.plays||[]).length===1?"":"s"}</p>
