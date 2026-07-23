@@ -554,6 +554,12 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
           </div>
           <div class="row" style="margin-top:10px;">
             <div>
+              <label>Enlace del vídeo (YouTube u otro, por si alguien graba la tarea)</label>
+              <input type="url" id="taskVideoUrl" placeholder="https://youtube.com/...">
+            </div>
+          </div>
+          <div class="row" style="margin-top:10px;">
+            <div>
               <label>Categoría de edad – Desde</label>
               <select id="taskLevelFrom"></select>
             </div>
@@ -979,6 +985,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
   <div class="modal">
     <h2 id="viewTaskTitle" style="font-size:1.1rem;"></h2>
     <div id="viewTaskMeta" style="margin:6px 0 10px 0;"></div>
+    <div id="viewTaskVideoWrap" style="margin-bottom:8px;"></div>
     <p id="viewTaskDesc" style="white-space:pre-wrap;font-size:.9rem;"></p>
     <div id="viewTaskBoardWrap"></div>
     <button class="btn ghost" id="btnCloseViewModal" style="margin-top:14px;width:100%;">Cerrar</button>
@@ -2570,6 +2577,7 @@ document.getElementById("taskForm").onsubmit = async (e) => {
     duration: Number(document.getElementById("taskDuration").value) || 0,
     objectives: document.getElementById("taskObjectives").value.trim(),
     material: document.getElementById("taskMaterial").value.trim(),
+    videoUrl: document.getElementById("taskVideoUrl").value.trim(),
     description: document.getElementById("taskDesc").value.trim(),
     levelFrom, levelTo, playersMin, playersMax,
     animation: { frames: frames },
@@ -2625,6 +2633,7 @@ window.editTask = (id) => {
   document.getElementById("taskDuration").value = t.duration || 15;
   document.getElementById("taskObjectives").value = t.objectives || "";
   document.getElementById("taskMaterial").value = t.material || "";
+  document.getElementById("taskVideoUrl").value = t.videoUrl || "";
   document.getElementById("taskDesc").value = t.description || "";
   document.getElementById("taskLevelFrom").value = t.levelFrom || AGE_LEVELS[0];
   document.getElementById("taskLevelTo").value = t.levelTo || AGE_LEVELS[AGE_LEVELS.length-1];
@@ -2734,6 +2743,7 @@ function renderTaskList(){
           ${t.objectives ? `<span class="badge outline">📋 Objetivos</span>`:""}
           ${levelRangeLabel(t) ? `<span class="badge outline b-level">🎂 ${escapeHtml(levelRangeLabel(t))}</span>`:""}
           ${playersRangeLabel(t) ? `<span class="badge outline b-players">👥 ${escapeHtml(playersRangeLabel(t))} jug.</span>`:""}
+          ${t.videoUrl ? `<span class="badge outline b-duration">▶ Vídeo</span>`:""}
           ${frameCount ? `<span class="badge outline">🎯 ${frameCount} fotog.</span>`:""}
         </div>
       </div>
@@ -2771,6 +2781,7 @@ window.viewTask = (id) => {
     ${playersRangeLabel(t) ? `<span class="badge outline b-players">👥 ${escapeHtml(playersRangeLabel(t))} jug.</span> `:""}
     ${t.material ? `<span class="badge outline">🧰 ${escapeHtml(t.material)}</span>`:""}
   `;
+  document.getElementById("viewTaskVideoWrap").innerHTML = videoEmbedHtml(t.videoUrl);
   document.getElementById("viewTaskDesc").innerHTML = `
     ${t.objectives ? `<strong style="font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);">Objetivos</strong>
     <div style="margin-top:4px;white-space:pre-wrap;">${escapeHtml(t.objectives)}</div>` : ""}
@@ -2916,6 +2927,7 @@ function renderSessionTaskBrowser(){
           ${t.objectives ? `<span class="badge outline">📋 Objetivos</span>`:""}
           ${levelRangeLabel(t) ? `<span class="badge outline b-level">🎂 ${escapeHtml(levelRangeLabel(t))}</span>`:""}
           ${playersRangeLabel(t) ? `<span class="badge outline b-players">👥 ${escapeHtml(playersRangeLabel(t))} jug.</span>`:""}
+          ${t.videoUrl ? `<span class="badge outline b-duration">▶ Vídeo</span>`:""}
           ${frameCount ? `<span class="badge outline">🎯 ${frameCount} fotog.</span>`:""}
         </div>
       </div>
@@ -3087,6 +3099,19 @@ function sessionCardHtml(s){
   </div>`;
 }
 
+const MONTH_NAMES_ES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+function sessionMonthKey(s){
+  let d = null;
+  if(s.date){ d = new Date(s.date + "T00:00:00"); }
+  else if(s.createdAt && typeof s.createdAt.seconds === "number"){ d = new Date(s.createdAt.seconds*1000); }
+  if(!d || isNaN(d.getTime())) return "0000-00";
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0");
+}
+function sessionMonthLabel(key){
+  if(key==="0000-00") return "Sin fecha";
+  const [y,m] = key.split("-");
+  return `${MONTH_NAMES_ES[Number(m)-1]} ${y}`;
+}
 function renderSavedSessions(){
   const wrap = document.getElementById("sessionsSaved");
   if(sessions.length===0){ wrap.innerHTML = '<div class="empty">🗓️ Todavía no se han guardado sesiones.</div>'; return; }
@@ -3099,13 +3124,30 @@ function renderSavedSessions(){
   const coachNames = Object.keys(groups).sort((a,b)=>a.localeCompare(b,'es'));
   wrap.innerHTML = coachNames.map((name, idx)=>{
     const list = groups[name];
-    const cardsHtml = list.map(sessionCardHtml).join("");
+    const monthGroups = {};
+    list.forEach(s=>{
+      const mk = sessionMonthKey(s);
+      if(!monthGroups[mk]) monthGroups[mk] = [];
+      monthGroups[mk].push(s);
+    });
+    const monthKeys = Object.keys(monthGroups).sort((a,b)=> b.localeCompare(a));
+    const monthsHtml = monthKeys.map((mk, mIdx)=>{
+      const mlist = monthGroups[mk];
+      const cardsHtml = mlist.map(sessionCardHtml).join("");
+      return `
+      <details class="month-group" style="margin:8px 0 0 4px;" ${mIdx===0 ? "open" : ""}>
+        <summary style="cursor:pointer;font-weight:600;font-size:.85rem;padding:8px 10px;background:#faf8f5;border:1px solid var(--border);border-radius:8px;">
+          🗓️ ${sessionMonthLabel(mk)} <span class="muted" style="font-weight:400;">(${mlist.length} sesión${mlist.length===1?"":"es"})</span>
+        </summary>
+        <div style="margin-top:8px;">${cardsHtml}</div>
+      </details>`;
+    }).join("");
     return `
     <details class="coach-group" style="margin-bottom:10px;" ${idx===0 ? "open" : ""}>
       <summary style="cursor:pointer;font-weight:700;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);">
         ${escapeHtml(name)} <span class="muted" style="font-weight:400;">(${list.length} sesión${list.length===1?"":"es"})</span>
       </summary>
-      <div style="margin-top:8px;">${cardsHtml}</div>
+      <div style="margin-top:8px;">${monthsHtml}</div>
     </details>`;
   }).join("");
 }
