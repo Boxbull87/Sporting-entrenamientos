@@ -221,6 +221,17 @@ textarea{resize:vertical;min-height:70px;}
   display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--danger);
   margin-left:6px;vertical-align:middle;
 }
+.star-btn{
+  background:none;border:none;cursor:pointer;font-size:1.25rem;line-height:1;
+  padding:2px 6px;color:#c9b48a;transition:transform .1s ease, color .15s ease;
+}
+.star-btn:active{transform:scale(.85);}
+.star-btn.active{color:#f0ad00;}
+.fav-filter{
+  display:flex;align-items:center;gap:6px;font-weight:400;text-transform:none;
+  font-family:'Inter',sans-serif;font-size:.85rem;color:var(--ink);cursor:pointer;
+}
+.fav-filter input{width:auto;}
 .checkbox-list{
   border:1px solid var(--border);border-radius:8px;padding:8px 10px;
   max-height:130px;overflow-y:auto;background:#fff;
@@ -625,6 +636,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
           <h2 style="font-size:1.05rem;" id="tasksBankCategoryTitle">Categoría</h2>
           <div class="filterbar">
             <input type="text" id="filterSearch" placeholder="Buscar por título...">
+            <label class="fav-filter"><input type="checkbox" id="filterFavOnly"> ⭐ Solo favoritas</label>
           </div>
           <div id="taskList"><div class="empty">Cargando tareas...</div></div>
         </div>
@@ -681,6 +693,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
           </select>
           <select id="sessionFilterLevel"></select>
           <input type="number" id="sessionFilterPlayers" placeholder="Jugadores disponibles" min="1">
+          <label class="fav-filter"><input type="checkbox" id="sessionFilterFavOnly"> ⭐ Solo favoritas</label>
         </div>
         <div class="filterbar" style="margin-top:6px;">
           <label class="muted" style="align-self:center;">Añadir al bloque:</label>
@@ -836,6 +849,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
           <h3 style="margin-top:14px;font-size:.9rem;">Añadir jugadas</h3>
           <div class="filterbar">
             <select id="playSessionFilterCategory"><option value="">Todas las categorías</option></select>
+            <label class="fav-filter"><input type="checkbox" id="playSessionFilterFavOnly"> ⭐ Solo favoritas</label>
           </div>
           <div id="playSessionBrowser"></div>
 
@@ -862,6 +876,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
           <h2 style="font-size:1.05rem;" id="abpCategoryTitle">Categoría</h2>
           <div class="filterbar">
             <input type="text" id="filterAbpSearch" placeholder="Buscar por título...">
+            <label class="fav-filter"><input type="checkbox" id="filterAbpFavOnly"> ⭐ Solo favoritas</label>
           </div>
           <div id="playList"><div class="empty">Cargando jugadas...</div></div>
         </div>
@@ -2615,12 +2630,48 @@ window.deleteTask = async (id) => {
   });
 };
 
+/* ============================================================
+   FAVORITOS (por entrenador: cada uno ve y gestiona los suyos)
+============================================================= */
+function isTaskFavorite(id){
+  return !!(currentCoach && Array.isArray(currentCoach.favoriteTaskIds) && currentCoach.favoriteTaskIds.includes(id));
+}
+function isPlayFavorite(id){
+  return !!(currentCoach && Array.isArray(currentCoach.favoritePlayIds) && currentCoach.favoritePlayIds.includes(id));
+}
+window.toggleFavoriteTask = async (id) => {
+  if(!currentUser || !currentCoach) return;
+  currentCoach.favoriteTaskIds = currentCoach.favoriteTaskIds || [];
+  const i = currentCoach.favoriteTaskIds.indexOf(id);
+  if(i>=0) currentCoach.favoriteTaskIds.splice(i,1);
+  else currentCoach.favoriteTaskIds.push(id);
+  renderTaskList();
+  renderSessionTaskBrowser();
+  try{
+    await db.collection("coaches").doc(currentUser.uid).update({ favoriteTaskIds: currentCoach.favoriteTaskIds });
+  }catch(e){}
+};
+window.toggleFavoritePlay = async (id) => {
+  if(!currentUser || !currentCoach) return;
+  currentCoach.favoritePlayIds = currentCoach.favoritePlayIds || [];
+  const i = currentCoach.favoritePlayIds.indexOf(id);
+  if(i>=0) currentCoach.favoritePlayIds.splice(i,1);
+  else currentCoach.favoritePlayIds.push(id);
+  renderPlayList();
+  renderPlaySessionBrowser();
+  try{
+    await db.collection("coaches").doc(currentUser.uid).update({ favoritePlayIds: currentCoach.favoritePlayIds });
+  }catch(e){}
+};
+
 /* ---------- Task list rendering + filters ---------- */
 document.getElementById("filterSearch").oninput = renderTaskList;
+document.getElementById("filterFavOnly").onchange = renderTaskList;
 
 function renderTaskList(){
   const wrap = document.getElementById("taskList");
   const search = document.getElementById("filterSearch").value.toLowerCase();
+  const favOnly = document.getElementById("filterFavOnly").checked;
   let list = tasks.filter(t=>{
     const ids = taskCategoryIds(t);
     if(currentTaskCategoryId === "__NONE__"){
@@ -2629,6 +2680,7 @@ function renderTaskList(){
       if(!ids.includes(currentTaskCategoryId)) return false;
     }
     if(search && !(t.title||"").toLowerCase().includes(search)) return false;
+    if(favOnly && !isTaskFavorite(t.id)) return false;
     return true;
   });
   if(list.length===0){ wrap.innerHTML = '<div class="empty">🔍 No hay tareas que coincidan.</div>'; return; }
@@ -2651,6 +2703,7 @@ function renderTaskList(){
         </div>
       </div>
       <div class="task-actions">
+        <button type="button" class="star-btn ${isTaskFavorite(t.id)?"active":""}" onclick="toggleFavoriteTask('${t.id}')" title="${isTaskFavorite(t.id)?"Quitar de favoritas":"Añadir a favoritas"}">${isTaskFavorite(t.id)?"★":"☆"}</button>
         <button class="btn small ghost" onclick="viewTask('${t.id}')">Ver</button>
         ${canEditContent ? `<button class="btn small ghost" onclick="editTask('${t.id}')">Editar</button>
         <button class="btn small danger" onclick="deleteTask('${t.id}')">Eliminar</button>` : ""}
@@ -2787,12 +2840,14 @@ document.getElementById("sessionFilterPhase").onchange = () => {
 };
 document.getElementById("sessionFilterLevel").onchange = renderSessionTaskBrowser;
 document.getElementById("sessionFilterPlayers").oninput = renderSessionTaskBrowser;
+document.getElementById("sessionFilterFavOnly").onchange = renderSessionTaskBrowser;
 function renderSessionTaskBrowser(){
   const wrap = document.getElementById("sessionTaskBrowser");
   const catFilter = document.getElementById("sessionAddCategory").value;
   const phaseFilter = document.getElementById("sessionFilterPhase").value;
   const levelFilter = document.getElementById("sessionFilterLevel").value;
   const playersFilter = document.getElementById("sessionFilterPlayers").value ? Number(document.getElementById("sessionFilterPlayers").value) : null;
+  const favOnly = document.getElementById("sessionFilterFavOnly").checked;
   const list = tasks.filter(t=>{
     if(catFilter && !taskCategoryIds(t).includes(catFilter)) return false;
     if(phaseFilter && t.phase!==phaseFilter) return false;
@@ -2806,6 +2861,7 @@ function renderSessionTaskBrowser(){
       if(t.playersMin!=null && playersFilter < t.playersMin) return false;
       if(t.playersMax!=null && playersFilter > t.playersMax) return false;
     }
+    if(favOnly && !isTaskFavorite(t.id)) return false;
     return true;
   });
   if(list.length===0){ wrap.innerHTML = '<div class="empty">🔍 No hay tareas que coincidan con los filtros.</div>'; return; }
@@ -2817,7 +2873,7 @@ function renderSessionTaskBrowser(){
     return `
     <div class="task-item">
       <div>
-        <h4>${escapeHtml(t.title)}</h4>
+        <h4>${isTaskFavorite(t.id)?"★ ":""}${escapeHtml(t.title)}</h4>
         <div class="task-meta">
           ${catNames.map(n=>`<span class="badge">${escapeHtml(n)}</span>`).join("")}
           ${phaseLabel(t) ? `<span class="badge b-phase">${escapeHtml(phaseLabel(t))}</span>` : ""}
@@ -3513,13 +3569,16 @@ document.getElementById("btnCloseViewPlayModal").onclick = () => {
 };
 
 document.getElementById("filterAbpSearch").oninput = renderPlayList;
+document.getElementById("filterAbpFavOnly").onchange = renderPlayList;
 function renderPlayList(){
   const wrap = document.getElementById("playList");
   const search = document.getElementById("filterAbpSearch").value.trim().toLowerCase();
+  const favOnly = document.getElementById("filterAbpFavOnly").checked;
   const list = plays.filter(p=>{
     if(currentAbpCategoryId === "__NONE__"){ if(p.categoryId) return false; }
     else if(currentAbpCategoryId){ if(p.categoryId !== currentAbpCategoryId) return false; }
     if(search && !(p.title||"").toLowerCase().includes(search)) return false;
+    if(favOnly && !isPlayFavorite(p.id)) return false;
     return true;
   });
   if(list.length===0){ wrap.innerHTML = '<div class="empty">🔍 No hay jugadas que coincidan.</div>'; return; }
@@ -3536,6 +3595,7 @@ function renderPlayList(){
         </div>
       </div>
       <div class="task-actions">
+        <button type="button" class="star-btn ${isPlayFavorite(p.id)?"active":""}" onclick="toggleFavoritePlay('${p.id}')" title="${isPlayFavorite(p.id)?"Quitar de favoritas":"Añadir a favoritas"}">${isPlayFavorite(p.id)?"★":"☆"}</button>
         <button class="btn small ghost" onclick="viewPlay('${p.id}')">Ver</button>
         <button class="btn small ghost" onclick="editPlay('${p.id}')">Editar</button>
         <button class="btn small danger" onclick="deletePlay('${p.id}')">Eliminar</button>
@@ -3551,11 +3611,13 @@ let playSessionItems = [];
 let editingPlaySessionId = null;
 
 document.getElementById("playSessionFilterCategory").onchange = renderPlaySessionBrowser;
+document.getElementById("playSessionFilterFavOnly").onchange = renderPlaySessionBrowser;
 
 function renderPlaySessionBrowser(){
   const wrap = document.getElementById("playSessionBrowser");
   const catFilter = document.getElementById("playSessionFilterCategory").value;
-  const list = plays.filter(p=> !catFilter || p.categoryId===catFilter);
+  const favOnly = document.getElementById("playSessionFilterFavOnly").checked;
+  const list = plays.filter(p=> (!catFilter || p.categoryId===catFilter) && (!favOnly || isPlayFavorite(p.id)) );
   if(list.length===0){ wrap.innerHTML = '<div class="empty">🔍 No hay jugadas que coincidan.</div>'; return; }
   const inSession = new Set(playSessionItems.map(x=>x.playId));
   wrap.innerHTML = list.map(p=>{
@@ -3563,7 +3625,7 @@ function renderPlaySessionBrowser(){
     return `
     <div class="task-item">
       <div>
-        <h4>${escapeHtml(p.title)}</h4>
+        <h4>${isPlayFavorite(p.id)?"★ ":""}${escapeHtml(p.title)}</h4>
         <div class="task-meta">
           ${abpCatName_(p.categoryId) ? `<span class="badge">${escapeHtml(abpCatName_(p.categoryId))}</span>` : ""}
           ${p.videoUrl ? `<span class="badge outline b-duration">▶ Vídeo</span>` : ""}
