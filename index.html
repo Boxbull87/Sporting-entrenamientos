@@ -991,7 +991,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
       <input type="text" id="newCategoryName" placeholder="Ej: Finalización, Portero, Físico...">
       <button class="btn accent" id="btnAddCategory" style="flex:0 0 auto;">Añadir</button>
     </div>
-    <p class="muted" style="margin-top:6px;">Mantén pulsada una subcategoría para moverla a otra categoría.</p>
+    <p class="muted" style="margin-top:6px;">Toca el nombre de una subcategoría para moverla a otra categoría.</p>
     <div id="categoryModalList" style="margin-top:12px;"></div>
     <button class="btn ghost" id="btnCloseCategoryModal" style="margin-top:14px;width:100%;">Cerrar</button>
   </div>
@@ -1882,22 +1882,13 @@ function renderCategoryModalList(){
     <div style="margin-top:14px;">
       <div class="muted" style="font-weight:600;margin-bottom:4px;">${g.icon} ${escapeHtml(g.name)}</div>
       ${subs.map(c=>`
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);">
-          <span style="user-select:none;-webkit-user-select:none;touch-action:none;cursor:pointer;" oncontextmenu="return false;" onpointerdown="startLongPress(event,'${c.id}')" onpointerup="cancelLongPress()" onpointerleave="cancelLongPress()" onpointercancel="cancelLongPress()">${escapeHtml(c.name)}</span>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">
+          <span style="cursor:pointer;" onclick="openMoveCategoryMenu('${c.id}')">${escapeHtml(c.name)} <span class="muted" style="font-size:.78em;">↕ mover</span></span>
           <button class="btn danger small" onclick="deleteCategory('${c.id}')">Eliminar</button>
         </div>`).join("")}
     </div>`;
   }).join("");
 }
-let longPressTimer = null;
-window.startLongPress = (e, catId) => {
-  e.preventDefault();
-  cancelLongPress();
-  longPressTimer = setTimeout(()=>{ longPressTimer = null; openMoveCategoryMenu(catId); }, 500);
-};
-window.cancelLongPress = () => {
-  if(longPressTimer){ clearTimeout(longPressTimer); longPressTimer = null; }
-};
 function openMoveCategoryMenu(catId){
   const c = categories.find(x=>x.id===catId);
   if(!c) return;
