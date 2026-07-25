@@ -805,6 +805,11 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
             <span class="home-card-label">Crear sesión de ABP</span>
             <span class="home-card-desc">Combina jugadas y comparte el enlace</span>
           </button>
+          <button type="button" class="home-card" id="abpGoSessionsSaved">
+            <span class="home-card-icon">🗓️</span>
+            <span class="home-card-label">Sesiones de ABP creadas</span>
+            <span class="home-card-desc">Organizadas en carpetas</span>
+          </button>
         </div>
       </div>
 
@@ -882,6 +887,13 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
               <label>Fecha</label>
               <input type="date" id="playSessionDate">
             </div>
+            <div>
+              <label>Carpeta</label>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <span id="playSessionFolderLabel" class="muted" style="flex:1;min-width:120px;">🏦 Raíz (sin carpeta)</span>
+                <button type="button" class="btn ghost small" id="btnPickPlaySessionFolder">📁 Elegir carpeta</button>
+              </div>
+            </div>
           </div>
           <label style="margin-top:10px;">Notas</label>
           <textarea id="playSessionNotes" placeholder="Observaciones generales..."></textarea>
@@ -908,9 +920,22 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
           <div id="playSessionMsg"></div>
         </div>
 
+      </div>
+
+      <!-- ---------- ABP: Sesiones de ABP creadas (estilo Drive) ---------- -->
+      <div id="abpSessionsSavedView" class="hidden">
+        <button type="button" class="btn ghost small" id="abpSessionsSavedBack" style="margin-bottom:10px;">← Volver</button>
         <div class="card">
-          <h2 style="font-size:1.05rem;">Sesiones de ABP guardadas</h2>
-          <div id="playSessionsSaved"><div class="empty">Cargando sesiones...</div></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <h2 style="font-size:1.05rem;">🎬 Sesiones de ABP creadas</h2>
+            <button class="btn ghost small" id="btnNewPlaySessionFolder">📁+ Carpeta</button>
+          </div>
+          <div id="playSessionsBreadcrumb" class="breadcrumb"></div>
+          <div id="playSessionsFolderList" style="margin-top:10px;"></div>
+          <div class="filterbar" style="margin-top:10px;">
+            <input type="text" id="filterPlaySessionSearch" placeholder="Buscar por nombre...">
+          </div>
+          <div id="playSessionsSaved" style="margin-top:10px;"><div class="empty">Cargando sesiones...</div></div>
         </div>
       </div>
 
@@ -1139,8 +1164,16 @@ const TASK_FOLDER_SEED = [
   {id:"porteros", name:"Entrenamiento de porteros"}
 ];
 /* ---------- Helpers genéricos de árbol de carpetas (Banco de tareas / Banco de ABP) ---------- */
-function folderList_(section){ return section==="tasks" ? categories : abpCategories; }
-function folderColl_(section){ return section==="tasks" ? "categories" : "abpCategories"; }
+function folderList_(section){
+  if(section==="tasks") return categories;
+  if(section==="abp") return abpCategories;
+  return playSessionFolders;
+}
+function folderColl_(section){
+  if(section==="tasks") return "categories";
+  if(section==="abp") return "abpCategories";
+  return "playSessionFolders";
+}
 function folderChildren_(section, parentId){
   return folderList_(section).filter(f=>(f.parentId||null)===(parentId||null));
 }
@@ -1169,6 +1202,7 @@ let tasks = [];
 let coaches = [];
 let sessions = [];
 let abpCategories = [];   // carpetas del Banco de ABP
+let playSessionFolders = [];   // carpetas de Sesiones de ABP creadas
 let plays = [];
 let playSessions = [];
 let gameModelFiles = [];
@@ -1485,18 +1519,92 @@ function showAbpView(view){
   document.getElementById("abpNewPlayView").classList.toggle("hidden", view!=="new");
   document.getElementById("abpBankView").classList.toggle("hidden", view!=="bank");
   document.getElementById("abpSessionsView").classList.toggle("hidden", view!=="sessions");
+  document.getElementById("abpSessionsSavedView").classList.toggle("hidden", view!=="sessionsSaved");
 }
 let abpFormReturnView = "home"; // adónde volver al terminar de crear/editar una jugada
+let abpSessionFormReturnView = "home"; // adónde volver al terminar de crear/editar una sesión de ABP
 document.getElementById("abpGoNew").onclick = () => { abpFormReturnView = "home"; showAbpView("new"); };
 document.getElementById("abpGoBank").onclick = () => { showAbpView("bank"); renderAbpBank(); };
-document.getElementById("abpGoSessions").onclick = () => showAbpView("sessions");
+document.getElementById("abpGoSessions").onclick = () => { abpSessionFormReturnView = "home"; showAbpView("sessions"); };
+document.getElementById("abpGoSessionsSaved").onclick = () => { showAbpView("sessionsSaved"); renderAbpSessionsBank(); };
 document.getElementById("abpNewBack").onclick = () => {
   resetPlayForm();
   showAbpView(abpFormReturnView);
   if(abpFormReturnView === "bank") renderPlayList();
 };
 document.getElementById("abpBankBack").onclick = () => showAbpView("home");
-document.getElementById("abpSessionsBack").onclick = () => showAbpView("home");
+document.getElementById("abpSessionsBack").onclick = () => {
+  showAbpView(abpSessionFormReturnView);
+  if(abpSessionFormReturnView === "sessionsSaved") renderAbpSessionsBank();
+};
+document.getElementById("abpSessionsSavedBack").onclick = () => showAbpView("home");
+
+/* ---------- Sesiones de ABP creadas: navegador de carpetas estilo Drive ---------- */
+let playSessionBrowserPath = []; // pila de ids de carpeta ("__NONE__" es vista especial)
+function playSessionCurrentFolder(){ return playSessionBrowserPath.length ? playSessionBrowserPath[playSessionBrowserPath.length-1] : null; }
+function playSessionFolderName_(id){ const f = playSessionFolders.find(x=>x.id===id); return f ? f.name : ""; }
+function renderPlaySessionsBreadcrumb(){
+  const el = document.getElementById("playSessionsBreadcrumb");
+  const crumbs = [{idx:0, label:"🏦 Raíz"}];
+  playSessionBrowserPath.forEach((id,i)=>{
+    const label = id==="__NONE__" ? "❔ Sin carpeta" : (playSessionFolderName_(id) || "Carpeta");
+    crumbs.push({idx:i+1, label});
+  });
+  el.innerHTML = crumbs.map((c,i)=>`<span class="crumb${i===crumbs.length-1?" current":""}" onclick="playSessionBrowserPath=playSessionBrowserPath.slice(0,${c.idx}); renderAbpSessionsBank();">${escapeHtml(c.label)}</span>`).join(' <span class="crumb-sep">›</span> ');
+}
+function renderPlaySessionsFolderList(){
+  const wrap = document.getElementById("playSessionsFolderList");
+  const curId = playSessionCurrentFolder();
+  document.getElementById("btnNewPlaySessionFolder").classList.toggle("hidden", curId==="__NONE__");
+  let html = "";
+  if(curId===null){
+    const noneCount = playSessions.filter(s=>!s.folderId).length;
+    if(noneCount>0){
+      html += `<div class="home-grid">
+      <button type="button" class="home-card" onclick="playSessionBrowserPath=['__NONE__']; renderAbpSessionsBank();">
+        <span class="home-card-icon">❔</span>
+        <span class="home-card-label">Sin carpeta</span>
+        <span class="home-card-desc">${noneCount} sesión${noneCount===1?"":"es"}</span>
+      </button>
+      </div>`;
+    }
+  }
+  if(curId!=="__NONE__"){
+    const folders = folderChildren_("playSessions", curId).sort((a,b)=>a.name.localeCompare(b.name,"es"));
+    if(folders.length){
+      html += `<div class="home-grid" style="margin-top:10px;">` + folders.map(f=>{
+        const count = playSessions.filter(s=>(s.folderId||null)===f.id).length;
+        const subCount = folderChildren_("playSessions", f.id).length;
+        const hasUnread = playSessions.some(s=> (s.folderId||null)===f.id && isItemUnread("playSessions", s));
+        return `
+        <div class="home-card folder-card">
+          <button type="button" class="folder-card-main" onclick="playSessionBrowserPath=[...playSessionBrowserPath,'${f.id}']; renderAbpSessionsBank();">
+            <span class="home-card-icon">📁</span>
+            <span class="home-card-label">${escapeHtml(f.name)}${hasUnread ? '<span class="card-dot"></span>' : ""}</span>
+            <span class="home-card-desc">${count} sesión${count===1?"":"es"}${subCount?` · ${subCount} carpeta${subCount===1?"":"s"}`:""}</span>
+          </button>
+          <button type="button" class="folder-menu-btn" onclick="openFolderActions('playSessions','${f.id}')" title="Gestionar carpeta">⋯</button>
+        </div>`;
+      }).join("") + `</div>`;
+    }
+  }
+  wrap.innerHTML = html;
+}
+function renderAbpSessionsBank(){
+  renderPlaySessionsBreadcrumb();
+  renderPlaySessionsFolderList();
+  renderSavedPlaySessions();
+}
+document.getElementById("btnNewPlaySessionFolder").onclick = async () => {
+  const name = prompt("Nombre de la nueva carpeta:");
+  if(!name || !name.trim()) return;
+  const cur = playSessionCurrentFolder();
+  const parentId = (cur==="__NONE__") ? null : cur;
+  try{
+    await db.collection("playSessionFolders").add({name:name.trim(), parentId, createdBy: currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp()});
+  }catch(err){ alert("No se ha podido crear la carpeta: " + err.message); }
+};
+document.getElementById("filterPlaySessionSearch").oninput = renderSavedPlaySessions;
 
 /* ---------- Banco de ABP: navegador estilo Drive ---------- */
 let abpBrowserPath = []; // pila de ids de carpeta ("__FAV__" y "__NONE__" son vistas especiales, solo válidas como único elemento)
@@ -1657,11 +1765,17 @@ function attachRealtimeListeners(){
     renderNotifications();
   });
 
+  db.collection("playSessionFolders").orderBy("name").onSnapshot(snap=>{
+    playSessionFolders = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    if(document.getElementById("playSessionsFolderList")) renderPlaySessionsFolderList();
+  });
+
   db.collection("playSessions").orderBy("createdAt","desc").onSnapshot(snap=>{
     const all = snap.docs.map(d=>({id:d.id, ...d.data()}));
     playSessions = all.filter(s=>!s.deleted);
     trashPlaySessions = all.filter(s=>s.deleted);
     renderSavedPlaySessions();
+    if(document.getElementById("playSessionsFolderList")) renderPlaySessionsFolderList();
     renderTrash();
     renderNotifications();
   });
@@ -1869,7 +1983,7 @@ let folderPickerCallback = null;
 function openFolderPicker(section, excludeIds, title, callback){
   folderPickerCallback = callback;
   document.getElementById("folderPickerTitle").textContent = title || "Elegir carpeta";
-  const rootLabel = section==="tasks" ? "🏦 Raíz (Banco de tareas)" : "🏦 Raíz (Banco de ABP)";
+  const rootLabel = section==="tasks" ? "🏦 Raíz (Banco de tareas)" : section==="abp" ? "🏦 Raíz (Banco de ABP)" : "🏦 Raíz (Sesiones de ABP)";
   const rows = [{id:null, name:rootLabel, depth:0}];
   (function walk(pid, depth){
     folderChildren_(section, pid).sort((a,b)=>a.name.localeCompare(b.name,"es")).forEach(f=>{
@@ -1909,6 +2023,8 @@ function openFolderMove(type, id, section){
         await db.collection("tasks").doc(id).update({categoryIds: destId ? [destId] : []});
       } else if(type==="play"){
         await db.collection("plays").doc(id).update({categoryId: destId});
+      } else if(type==="playSession"){
+        await db.collection("playSessions").doc(id).update({folderId: destId});
       }
     }catch(err){
       alert("No se ha podido mover: " + err.message);
@@ -1949,7 +2065,9 @@ document.getElementById("btnDeleteFolder").onclick = async () => {
   const f = list.find(x=>x.id===id);
   if(!f) return;
   const hasSubfolders = folderChildren_(section, id).length>0;
-  const hasItems = section==="tasks" ? tasks.some(t=>taskFolderId(t)===id) : plays.some(p=>(p.categoryId||null)===id);
+  const hasItems = section==="tasks" ? tasks.some(t=>taskFolderId(t)===id)
+    : section==="abp" ? plays.some(p=>(p.categoryId||null)===id)
+    : playSessions.some(s=>(s.folderId||null)===id);
   const msg = (hasSubfolders || hasItems)
     ? "Esta carpeta tiene contenido dentro. Al eliminarla, su contenido subirá a la carpeta superior. ¿Continuar?"
     : "¿Eliminar esta carpeta?";
@@ -1964,9 +2082,13 @@ document.getElementById("btnDeleteFolder").onclick = async () => {
       tasks.filter(t=>taskFolderId(t)===id).forEach(t=>{
         jobs.push(db.collection("tasks").doc(t.id).update({categoryIds: parentId ? [parentId] : []}));
       });
-    } else {
+    } else if(section==="abp"){
       plays.filter(p=>(p.categoryId||null)===id).forEach(p=>{
         jobs.push(db.collection("plays").doc(p.id).update({categoryId: parentId}));
+      });
+    } else {
+      playSessions.filter(s=>(s.folderId||null)===id).forEach(s=>{
+        jobs.push(db.collection("playSessions").doc(s.id).update({folderId: parentId}));
       });
     }
     await Promise.all(jobs);
@@ -1999,6 +2121,17 @@ document.getElementById("btnPickPlayFolder").onclick = () => {
 let selectedPlayFolderId = null;
 function renderPlayFolderLabel(){
   document.getElementById("playFolderLabel").textContent = selectedPlayFolderId ? ("📁 " + abpCatName_(selectedPlayFolderId)) : "🏦 Raíz (sin carpeta)";
+}
+
+document.getElementById("btnPickPlaySessionFolder").onclick = () => {
+  openFolderPicker("playSessions", null, "Elegir carpeta para la sesión", (id) => {
+    selectedPlaySessionFolderId = id;
+    renderPlaySessionFolderLabel();
+  });
+};
+let selectedPlaySessionFolderId = null;
+function renderPlaySessionFolderLabel(){
+  document.getElementById("playSessionFolderLabel").textContent = selectedPlaySessionFolderId ? ("📁 " + playSessionFolderName_(selectedPlaySessionFolderId)) : "🏦 Raíz (sin carpeta)";
 }
 
 
@@ -3334,7 +3467,7 @@ function renderSavedSessions(){
     });
     const monthKeys = Object.keys(monthGroups).sort((a,b)=> b.localeCompare(a));
     const monthsHtml = monthKeys.map((mk, mIdx)=>{
-      const mlist = monthGroups[mk];
+      const mlist = monthGroups[mk].slice().sort((a,b)=> (a.date||"").localeCompare(b.date||""));
       const cardsHtml = mlist.map(sessionCardHtml).join("");
       return `
       <details class="month-group" style="margin:8px 0 0 4px;" ${mIdx===0 ? "open" : ""}>
@@ -3991,6 +4124,7 @@ document.getElementById("btnSavePlaySession").onclick = async () => {
     date: document.getElementById("playSessionDate").value || null,
     notes: document.getElementById("playSessionNotes").value.trim(),
     public: document.getElementById("playSessionPublic").checked,
+    folderId: selectedPlaySessionFolderId,
     plays: JSON.parse(JSON.stringify(playSessionItems))
   };
   try{
@@ -4018,13 +4152,20 @@ function resetPlaySessionForm(){
   document.getElementById("playSessionFilterCategory").value = "";
   document.getElementById("playSessionAddSearch").value = "";
   document.getElementById("playSessionFilterFavOnly").checked = false;
+  selectedPlaySessionFolderId = null;
+  renderPlaySessionFolderLabel();
   playSessionItems = [];
   renderPlaySessionList();
   renderPlaySessionBrowser();
   document.getElementById("playSessionEditorTitle").textContent = "🎬 Crear sesión de ABP";
   document.getElementById("cancelPlaySessionEdit").classList.add("hidden");
 }
-document.getElementById("cancelPlaySessionEdit").onclick = () => { resetPlaySessionForm(); document.getElementById("playSessionMsg").innerHTML=""; };
+document.getElementById("cancelPlaySessionEdit").onclick = () => {
+  resetPlaySessionForm();
+  document.getElementById("playSessionMsg").innerHTML="";
+  showAbpView(abpSessionFormReturnView);
+  if(abpSessionFormReturnView === "sessionsSaved") renderAbpSessionsBank();
+};
 
 window.editPlaySession = (id) => {
   const s = playSessions.find(x=>x.id===id);
@@ -4034,6 +4175,8 @@ window.editPlaySession = (id) => {
   document.getElementById("playSessionDate").value = s.date || "";
   document.getElementById("playSessionNotes").value = s.notes || "";
   document.getElementById("playSessionPublic").checked = !!s.public;
+  selectedPlaySessionFolderId = s.folderId || null;
+  renderPlaySessionFolderLabel();
   playSessionItems = JSON.parse(JSON.stringify(s.plays || []));
   renderPlaySessionList();
   renderPlaySessionBrowser();
@@ -4041,6 +4184,7 @@ window.editPlaySession = (id) => {
   document.getElementById("cancelPlaySessionEdit").classList.remove("hidden");
   document.getElementById("playSessionMsg").innerHTML = "";
   document.querySelector('.tab[data-tab="abp"]').click();
+  abpSessionFormReturnView = "sessionsSaved";
   showAbpView("sessions");
   document.getElementById("playSessionEditorPanel").scrollIntoView({behavior:"smooth"});
 };
@@ -4065,8 +4209,27 @@ window.copyPublicLink = (id) => {
 
 function renderSavedPlaySessions(){
   const wrap = document.getElementById("playSessionsSaved");
-  if(playSessions.length===0){ wrap.innerHTML = '<div class="empty">🎬 Todavía no se han guardado sesiones de ABP.</div>'; return; }
-  wrap.innerHTML = playSessions.map(s=>{
+  const search = document.getElementById("filterPlaySessionSearch") ? document.getElementById("filterPlaySessionSearch").value.trim().toLowerCase() : "";
+  const curId = playSessionCurrentFolder();
+  const list = playSessions.filter(s=>{
+    const folderId = s.folderId || null;
+    if(search){
+      // con texto de búsqueda, se busca en todas las sesiones, no solo en la carpeta actual
+    } else if(curId === "__NONE__"){
+      if(folderId) return false;
+    } else if(curId !== null){
+      if(folderId !== curId) return false;
+    } else {
+      return false; // en la raíz, sin buscar, no se listan sesiones sueltas (solo carpetas arriba)
+    }
+    if(search && !(s.name||"").toLowerCase().includes(search)) return false;
+    return true;
+  });
+  if(list.length===0){
+    wrap.innerHTML = (curId===null && !search) ? "" : '<div class="empty">🎬 No hay sesiones de ABP que coincidan.</div>';
+    return;
+  }
+  wrap.innerHTML = list.map(s=>{
     const canManage = currentCoach && (currentCoach.role===ROLE_GESTOR || s.createdBy===currentUser.uid);
     const publicUrl = location.origin + location.pathname + "#public=" + s.id;
     const itemsHtml = (s.plays||[]).map(item=>`<li>${escapeHtml(item.title)}${item.categoryName?` <span class="muted">· ${escapeHtml(item.categoryName)}</span>`:""}</li>`).join("");
@@ -4279,7 +4442,7 @@ window.purgePlaySession = async (id) => {
 /* ============================================================
    COPIA DE SEGURIDAD COMPLETA (exportar / restaurar)
 ============================================================= */
-const BACKUP_COLLECTIONS = ["tasks","sessions","categories","coaches","abpCategories","plays","playSessions","gameModelFiles"];
+const BACKUP_COLLECTIONS = ["tasks","sessions","categories","coaches","abpCategories","plays","playSessions","playSessionFolders","gameModelFiles"];
 
 document.getElementById("btnExportBackup").onclick = async () => {
   const msgEl = document.getElementById("backupExportMsg");
@@ -4413,6 +4576,10 @@ service cloud.firestore {
       allow read: if isActive() || resource.data.public == true;
       allow create: if isActive();
       allow update, delete: if isActive() && (resource.data.createdBy == request.auth.uid || isGestor());
+    }
+    match /playSessionFolders/{folderId} {
+      allow read: if isActive();
+      allow write: if isEditor();
     }
     match /gameModelFiles/{fileId} {
       allow read: if isActive();
