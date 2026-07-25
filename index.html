@@ -530,7 +530,17 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
               <input type="text" id="taskTitle" required>
             </div>
             <div>
-              <label>Categorías</label>
+              <label>Categoría</label>
+              <select id="taskGroupSelect">
+                <option value="ataque">⚔️ Ataque</option>
+                <option value="defensa">🛡️ Defensa</option>
+                <option value="transiciones">🔄 Transiciones</option>
+                <option value="especiales">⚡ Situaciones especiales</option>
+                <option value="porteros">🧤 Entrenamiento de porteros</option>
+              </select>
+            </div>
+            <div>
+              <label>Subcategorías</label>
               <div id="taskCategoryCheckboxes" class="checkbox-list"></div>
             </div>
             <div>
@@ -645,14 +655,24 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
             <h2 style="font-size:1.05rem;">📂 Banco de tareas</h2>
             <button class="btn ghost small" id="btnExportTasksExcel">📊 Exportar a Excel</button>
           </div>
-          <p class="muted">Elige una categoría para ver sus tareas.</p>
+          <p class="muted">Elige una categoría para ver sus subcategorías.</p>
           <div id="taskCategoryList"><div class="empty">Cargando categorías...</div></div>
         </div>
       </div>
 
-      <!-- ---------- TAREAS: tareas de una categoría ---------- -->
+      <!-- ---------- TAREAS: subcategorías de una categoría ---------- -->
+      <div id="tasksBankGroupView" class="hidden">
+        <button type="button" class="btn ghost small" id="tasksBankGroupBack" style="margin-bottom:10px;">← Categorías</button>
+        <div class="card">
+          <h2 style="font-size:1.05rem;" id="tasksBankGroupTitle">Categoría</h2>
+          <p class="muted">Elige una subcategoría para ver sus tareas.</p>
+          <div id="taskGroupCategoryList"><div class="empty">Cargando subcategorías...</div></div>
+        </div>
+      </div>
+
+      <!-- ---------- TAREAS: tareas de una subcategoría ---------- -->
       <div id="tasksBankCategoryView" class="hidden">
-        <button type="button" class="btn ghost small" id="tasksBankCategoryBack" style="margin-bottom:10px;">← Categorías</button>
+        <button type="button" class="btn ghost small" id="tasksBankCategoryBack" style="margin-bottom:10px;">← Subcategorías</button>
         <div class="card">
           <h2 style="font-size:1.05rem;" id="tasksBankCategoryTitle">Categoría</h2>
           <div class="filterbar">
@@ -959,7 +979,15 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
 <div id="categoryModal" class="modal-bg hidden">
   <div class="modal">
     <h2 style="font-size:1.05rem;">Categorías de tareas</h2>
+    <p class="muted" style="margin-top:-6px;">Crea una subcategoría dentro de una de las 5 categorías fijas.</p>
     <div class="row">
+      <select id="newCategoryGroup" style="flex:0 0 auto;">
+        <option value="ataque">⚔️ Ataque</option>
+        <option value="defensa">🛡️ Defensa</option>
+        <option value="transiciones">🔄 Transiciones</option>
+        <option value="especiales">⚡ Situaciones especiales</option>
+        <option value="porteros">🧤 Entrenamiento de porteros</option>
+      </select>
       <input type="text" id="newCategoryName" placeholder="Ej: Finalización, Portero, Físico...">
       <button class="btn accent" id="btnAddCategory" style="flex:0 0 auto;">Añadir</button>
     </div>
@@ -1121,6 +1149,15 @@ db.settings({ experimentalForceLongPolling: true, useFetchStreams: false });
 let currentUser = null;   // firebase auth user
 let currentCoach = null;  // firestore coach doc {name, role, active, email}
 let categories = [];
+const TASK_GROUPS = [
+  {id:"ataque", name:"Ataque", icon:"⚔️"},
+  {id:"defensa", name:"Defensa", icon:"🛡️"},
+  {id:"transiciones", name:"Transiciones", icon:"🔄"},
+  {id:"especiales", name:"Situaciones especiales", icon:"⚡"},
+  {id:"porteros", name:"Entrenamiento de porteros", icon:"🧤"}
+];
+function groupName_(id){ const g = TASK_GROUPS.find(x=>x.id===id); return g ? g.name : ""; }
+function catGroup_(c){ return (c && c.group) || "ataque"; }
 let tasks = [];
 let coaches = [];
 let sessions = [];
@@ -1348,6 +1385,7 @@ function showTasksView(view){
   document.getElementById("tasksHome").classList.toggle("hidden", view!=="home");
   document.getElementById("tasksNewTaskView").classList.toggle("hidden", view!=="new");
   document.getElementById("tasksBankView").classList.toggle("hidden", view!=="bank");
+  document.getElementById("tasksBankGroupView").classList.toggle("hidden", view!=="group");
   document.getElementById("tasksBankCategoryView").classList.toggle("hidden", view!=="category");
 }
 let taskFormReturnView = "home"; // adónde volver al terminar de crear/editar una tarea
@@ -1359,11 +1397,43 @@ document.getElementById("tasksNewBack").onclick = () => {
   if(taskFormReturnView === "category") renderTaskList();
 };
 document.getElementById("tasksBankBack").onclick = () => showTasksView("home");
-document.getElementById("tasksBankCategoryBack").onclick = () => showTasksView("bank");
+document.getElementById("tasksBankGroupBack").onclick = () => showTasksView("bank");
+document.getElementById("tasksBankCategoryBack").onclick = () => showTasksView(tasksBankCategoryBackTo);
 
-let currentTaskCategoryId = null; // id de categoría real, "__NONE__" (sin categoría) o "__FAV__" (favoritos)
-window.openTaskCategory = (categoryId) => {
+let currentTaskGroupId = null; // id de una de las 5 categorías fijas
+window.openTaskGroup = (groupId) => {
+  currentTaskGroupId = groupId;
+  const g = TASK_GROUPS.find(x=>x.id===groupId);
+  document.getElementById("tasksBankGroupTitle").textContent = g ? `${g.icon} ${g.name}` : "Categoría";
+  renderTaskGroupCategoryList();
+  showTasksView("group");
+};
+function renderTaskGroupCategoryList(){
+  const wrap = document.getElementById("taskGroupCategoryList");
+  const subs = categories.filter(c=>catGroup_(c)===currentTaskGroupId);
+  if(subs.length===0){
+    wrap.innerHTML = '<p class="muted">Todavía no hay subcategorías aquí. Puedes crearlas pulsando "+ Categoría" al crear una tarea.</p>';
+    return;
+  }
+  const counts = {};
+  tasks.forEach(t=> taskCategoryIds(t).forEach(id=>{ counts[id]=(counts[id]||0)+1; }));
+  wrap.innerHTML = `<div class="home-grid">` + subs.map(c=>{
+    const n = counts[c.id]||0;
+    const hasUnread = tasks.some(t=> taskCategoryIds(t).includes(c.id) && isItemUnread("tasks", t));
+    return `
+    <button type="button" class="home-card" onclick="openTaskCategory('${c.id}','group')">
+      <span class="home-card-icon">🏷️</span>
+      <span class="home-card-label">${escapeHtml(c.name)}${hasUnread ? '<span class="card-dot"></span>' : ""}</span>
+      <span class="home-card-desc">${n} tarea${n===1?"":"s"}</span>
+    </button>`;
+  }).join("") + `</div>`;
+}
+
+let currentTaskCategoryId = null; // id de subcategoría real, "__NONE__" (sin categoría) o "__FAV__" (favoritos)
+let tasksBankCategoryBackTo = "bank"; // a qué vista volver desde la lista de tareas: "bank" o "group"
+window.openTaskCategory = (categoryId, backTo) => {
   currentTaskCategoryId = categoryId;
+  tasksBankCategoryBackTo = backTo || "bank";
   const name = categoryId === "__FAV__" ? "⭐ Favoritos" : categoryId === "__NONE__" ? "Sin categoría" : (catName_(categoryId) || "Categoría");
   document.getElementById("tasksBankCategoryTitle").textContent = name;
   document.getElementById("filterSearch").value = "";
@@ -1375,15 +1445,11 @@ function renderTaskCategoryList(){
   const favIds = (currentCoach && Array.isArray(currentCoach.favoriteTaskIds)) ? currentCoach.favoriteTaskIds : [];
   const favCount = tasks.filter(t=>favIds.includes(t.id)).length;
   const favCard = `
-    <button type="button" class="home-card fav-card" onclick="openTaskCategory('__FAV__')">
+    <button type="button" class="home-card fav-card" onclick="openTaskCategory('__FAV__','bank')">
       <span class="home-card-icon">⭐</span>
       <span class="home-card-label">Favoritos</span>
       <span class="home-card-desc">${favCount} tarea${favCount===1?"":"s"}</span>
     </button>`;
-  if(categories.length===0 && tasks.length===0){
-    wrap.innerHTML = `<div class="home-grid">${favCard}</div>`;
-    return;
-  }
   const counts = {};
   let uncategorized = 0;
   tasks.forEach(t=>{
@@ -1391,25 +1457,27 @@ function renderTaskCategoryList(){
     if(ids.length===0){ uncategorized++; return; }
     ids.forEach(id=>{ counts[id] = (counts[id]||0)+1; });
   });
-  let html = categories.map(c=>{
-    const n = counts[c.id]||0;
-    const hasUnread = tasks.some(t=> taskCategoryIds(t).includes(c.id) && isItemUnread("tasks", t));
+  const groupCards = TASK_GROUPS.map(g=>{
+    const subs = categories.filter(c=>catGroup_(c)===g.id);
+    const n = subs.reduce((sum,c)=> sum + (counts[c.id]||0), 0);
+    const hasUnread = tasks.some(t=> taskCategoryIds(t).some(id=> subs.some(c=>c.id===id)) && isItemUnread("tasks", t));
     return `
-    <button type="button" class="home-card" onclick="openTaskCategory('${c.id}')">
-      <span class="home-card-icon">🏷️</span>
-      <span class="home-card-label">${escapeHtml(c.name)}${hasUnread ? '<span class="card-dot"></span>' : ""}</span>
-      <span class="home-card-desc">${n} tarea${n===1?"":"s"}</span>
+    <button type="button" class="home-card" onclick="openTaskGroup('${g.id}')">
+      <span class="home-card-icon">${g.icon}</span>
+      <span class="home-card-label">${escapeHtml(g.name)}${hasUnread ? '<span class="card-dot"></span>' : ""}</span>
+      <span class="home-card-desc">${n} tarea${n===1?"":"s"} · ${subs.length} subcat.</span>
     </button>`;
   }).join("");
+  let uncatCard = "";
   if(uncategorized>0){
-    html += `
-    <button type="button" class="home-card" onclick="openTaskCategory('__NONE__')">
+    uncatCard = `
+    <button type="button" class="home-card" onclick="openTaskCategory('__NONE__','bank')">
       <span class="home-card-icon">❔</span>
       <span class="home-card-label">Sin categoría</span>
       <span class="home-card-desc">${uncategorized} tarea${uncategorized===1?"":"s"}</span>
     </button>`;
   }
-  wrap.innerHTML = `<div class="home-grid">${favCard}${html}</div>`;
+  wrap.innerHTML = `<div class="home-grid">${favCard}${groupCards}${uncatCard}</div>`;
 }
 
 /* ---------- Navegación interna de ABP (submenú / nueva jugada / banco por categorías) ---------- */
@@ -1510,8 +1578,14 @@ document.getElementById("brandHomeBtn").onclick = () => {
 function attachRealtimeListeners(){
   db.collection("categories").orderBy("name").onSnapshot(snap=>{
     categories = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    // Migración: las categorías antiguas (creadas antes de tener categoría/subcategoría)
+    // no tienen "group" todavía. Las metemos en "Ataque" para que Carlos las reclasifique.
+    categories.filter(c=>!c.group).forEach(c=>{
+      db.collection("categories").doc(c.id).update({group:"ataque"}).catch(()=>{});
+    });
     renderCategorySelects();
     renderCategoryModalList();
+    renderTaskCategoryList();
   });
 
   db.collection("tasks").orderBy("createdAt","desc").onSnapshot(snap=>{
@@ -1780,44 +1854,77 @@ document.getElementById("btnCloseCategoryModal").onclick = () => document.getEle
 
 document.getElementById("btnAddCategory").onclick = async () => {
   const input = document.getElementById("newCategoryName");
+  const group = document.getElementById("newCategoryGroup").value;
   const name = input.value.trim();
   if(!name) return;
-  await db.collection("categories").add({name, createdBy: currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp()});
+  await db.collection("categories").add({name, group, createdBy: currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp()});
   input.value = "";
 };
 
 function renderCategoryModalList(){
   const wrap = document.getElementById("categoryModalList");
   if(categories.length===0){ wrap.innerHTML = '<p class="muted">Todavía no hay categorías.</p>'; return; }
-  wrap.innerHTML = categories.map(c=>`
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);">
-      <span>${escapeHtml(c.name)}</span>
-      <button class="btn danger small" onclick="deleteCategory('${c.id}')">Eliminar</button>
-    </div>`).join("");
+  wrap.innerHTML = TASK_GROUPS.map(g=>{
+    const subs = categories.filter(c=>catGroup_(c)===g.id);
+    if(subs.length===0) return "";
+    return `
+    <div style="margin-top:14px;">
+      <div class="muted" style="font-weight:600;margin-bottom:4px;">${g.icon} ${escapeHtml(g.name)}</div>
+      ${subs.map(c=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;">
+          <span>${escapeHtml(c.name)}</span>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <select onchange="moveCategoryGroup('${c.id}', this.value)" style="padding:4px;">
+              ${TASK_GROUPS.map(g2=>`<option value="${g2.id}" ${catGroup_(c)===g2.id?"selected":""}>${escapeHtml(g2.name)}</option>`).join("")}
+            </select>
+            <button class="btn danger small" onclick="deleteCategory('${c.id}')">Eliminar</button>
+          </div>
+        </div>`).join("")}
+    </div>`;
+  }).join("");
 }
+window.moveCategoryGroup = async (id, group) => {
+  await db.collection("categories").doc(id).update({group});
+};
 window.deleteCategory = async (id) => {
   if(!confirm("¿Eliminar esta categoría? Las tareas existentes la mantendrán como texto pero dejará de estar en la lista.")) return;
   await db.collection("categories").doc(id).delete();
 };
 
 function renderCategorySelects(){
-  const opts = categories.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
+  renderTaskCategoryCheckboxes();
+  document.getElementById("sessionAddCategory").innerHTML = '<option value="">Todas las categorías</option>' +
+    TASK_GROUPS.map(g=>{
+      const subs = categories.filter(c=>catGroup_(c)===g.id);
+      if(subs.length===0) return "";
+      return `<optgroup label="${g.icon} ${escapeHtml(g.name)}">${subs.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("")}</optgroup>`;
+    }).join("");
+  renderTaskCategoryList();
+}
+
+/* Subcategorías del formulario de "Nueva tarea", filtradas por la categoría elegida */
+let selectedTaskCategoryIds = new Set();
+function renderTaskCategoryCheckboxes(){
   const box = document.getElementById("taskCategoryCheckboxes");
-  const previouslyChecked = new Set(
-    Array.from(box.querySelectorAll("input[type=checkbox]:checked")).map(el=>el.value)
-  );
-  if(categories.length===0){
-    box.innerHTML = '<span class="empty-hint">Todavía no hay categorías.</span>';
+  const group = document.getElementById("taskGroupSelect").value;
+  const subs = categories.filter(c=>catGroup_(c)===group);
+  if(subs.length===0){
+    box.innerHTML = '<span class="empty-hint">Todavía no hay subcategorías en esta categoría. Créalas con "+ Categoría".</span>';
   } else {
-    box.innerHTML = categories.map(c=>`
+    box.innerHTML = subs.map(c=>`
       <label>
-        <input type="checkbox" value="${c.id}" ${previouslyChecked.has(c.id) ? "checked" : ""}>
+        <input type="checkbox" value="${c.id}" ${selectedTaskCategoryIds.has(c.id) ? "checked" : ""}>
         ${escapeHtml(c.name)}
       </label>`).join("");
   }
-  document.getElementById("sessionAddCategory").innerHTML = '<option value="">Todas las categorías</option>' + opts;
-  renderTaskCategoryList();
+  box.querySelectorAll("input[type=checkbox]").forEach(el=>{
+    el.onchange = () => {
+      if(el.checked) selectedTaskCategoryIds.add(el.value);
+      else selectedTaskCategoryIds.delete(el.value);
+    };
+  });
 }
+document.getElementById("taskGroupSelect").onchange = renderTaskCategoryCheckboxes;
 
 
 /* ============================================================
@@ -2566,9 +2673,7 @@ document.getElementById("taskForm").onsubmit = async (e) => {
   if(playersMin!=null && playersMax!=null && playersMin > playersMax){
     [playersMin, playersMax] = [playersMax, playersMin];
   }
-  const categoryIds = Array.from(
-    document.querySelectorAll('#taskCategoryCheckboxes input[type=checkbox]:checked')
-  ).map(el => el.value);
+  const categoryIds = Array.from(selectedTaskCategoryIds);
   const payload = {
     title: document.getElementById("taskTitle").value.trim(),
     categoryIds,
@@ -2612,6 +2717,9 @@ function resetTaskForm(){
   document.getElementById("cancelEdit").classList.add("hidden");
   document.getElementById("taskLevelFrom").value = AGE_LEVELS[0];
   document.getElementById("taskLevelTo").value = AGE_LEVELS[AGE_LEVELS.length-1];
+  selectedTaskCategoryIds = new Set();
+  document.getElementById("taskGroupSelect").value = "ataque";
+  renderTaskCategoryCheckboxes();
   tokens = []; frames = []; arrows = []; texts = []; shapes = []; paths = [];
   tokenSeq = 0; arrowSeq = 0; textSeq = 0; shapeSeq = 0; pathSeq = 0;
   historyStack = []; selected = null; dragObj = null;
@@ -2625,10 +2733,11 @@ window.editTask = (id) => {
   if(!t) return;
   editingTaskId = id;
   document.getElementById("taskTitle").value = t.title || "";
-  const editIds = new Set(taskCategoryIds(t));
-  document.querySelectorAll('#taskCategoryCheckboxes input[type=checkbox]').forEach(el=>{
-    el.checked = editIds.has(el.value);
-  });
+  const ids = taskCategoryIds(t);
+  selectedTaskCategoryIds = new Set(ids);
+  const firstCat = categories.find(c=>c.id===ids[0]);
+  document.getElementById("taskGroupSelect").value = firstCat ? catGroup_(firstCat) : "ataque";
+  renderTaskCategoryCheckboxes();
   document.getElementById("taskPhase").value = t.phase || "principal";
   document.getElementById("taskDuration").value = t.duration || 15;
   document.getElementById("taskObjectives").value = t.objectives || "";
