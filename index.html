@@ -140,6 +140,19 @@ input,select,textarea{font-family:inherit;}
 .home-card-label{font-family:'Oswald',sans-serif;text-transform:uppercase;letter-spacing:.03em;font-weight:600;font-size:.9rem;color:var(--ink);}
 .home-card-desc{font-size:.72rem;color:var(--muted);}
 
+.breadcrumb{font-size:.82rem;margin-top:8px;line-height:1.6;}
+.breadcrumb .crumb{cursor:pointer;color:var(--accent,#c0392b);}
+.breadcrumb .crumb:hover{text-decoration:underline;}
+.breadcrumb .crumb.current{color:var(--ink);font-weight:600;cursor:default;text-decoration:none;}
+.breadcrumb .crumb-sep{color:var(--muted);margin:0 2px;}
+.folder-card{position:relative;padding-top:26px;}
+.folder-card-main{all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;width:100%;box-sizing:border-box;}
+.folder-menu-btn{
+  position:absolute;top:6px;right:6px;background:transparent;border:none;font-size:1.1rem;
+  line-height:1;padding:4px 8px;cursor:pointer;color:var(--muted);border-radius:6px;
+}
+.folder-menu-btn:hover{background:rgba(0,0,0,.06);color:var(--ink);}
+
 .card{
   background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
   padding:16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.04);
@@ -521,7 +534,6 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
         <div class="card" id="editorPanel">
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <h2 style="font-size:1.05rem;">📋 Nueva tarea</h2>
-          <button class="btn ghost small" id="btnNewCategory">+ Categoría</button>
         </div>
         <form id="taskForm">
           <div class="row">
@@ -530,18 +542,11 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
               <input type="text" id="taskTitle" required>
             </div>
             <div>
-              <label>Categoría</label>
-              <select id="taskGroupSelect">
-                <option value="ataque">⚔️ Ataque</option>
-                <option value="defensa">🛡️ Defensa</option>
-                <option value="transiciones">🔄 Transiciones</option>
-                <option value="especiales">⚡ Situaciones especiales</option>
-                <option value="porteros">🧤 Entrenamiento de porteros</option>
-              </select>
-            </div>
-            <div>
-              <label>Subcategorías</label>
-              <div id="taskCategoryCheckboxes" class="checkbox-list"></div>
+              <label>Carpeta</label>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <span id="taskFolderLabel" class="muted" style="flex:1;min-width:120px;">🏦 Raíz (sin carpeta)</span>
+                <button type="button" class="btn ghost small" id="btnPickTaskFolder">📁 Elegir carpeta</button>
+              </div>
             </div>
             <div>
               <label>Fase de la sesión</label>
@@ -647,35 +652,20 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
         </div>
       </div>
 
-      <!-- ---------- TAREAS: Banco de tareas (categorías) ---------- -->
+      <!-- ---------- TAREAS: Banco de tareas (estilo Drive) ---------- -->
       <div id="tasksBankView" class="hidden">
         <button type="button" class="btn ghost small" id="tasksBankBack" style="margin-bottom:10px;">← Volver</button>
         <div class="card">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
             <h2 style="font-size:1.05rem;">📂 Banco de tareas</h2>
-            <button class="btn ghost small" id="btnExportTasksExcel">📊 Exportar a Excel</button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="btn ghost small" id="btnNewTaskFolder">📁+ Carpeta</button>
+              <button class="btn ghost small" id="btnExportTasksExcel">📊 Exportar a Excel</button>
+            </div>
           </div>
-          <p class="muted">Elige una categoría para ver sus subcategorías.</p>
-          <div id="taskCategoryList"><div class="empty">Cargando categorías...</div></div>
-        </div>
-      </div>
-
-      <!-- ---------- TAREAS: subcategorías de una categoría ---------- -->
-      <div id="tasksBankGroupView" class="hidden">
-        <button type="button" class="btn ghost small" id="tasksBankGroupBack" style="margin-bottom:10px;">← Categorías</button>
-        <div class="card">
-          <h2 style="font-size:1.05rem;" id="tasksBankGroupTitle">Categoría</h2>
-          <p class="muted">Elige una subcategoría para ver sus tareas.</p>
-          <div id="taskGroupCategoryList"><div class="empty">Cargando subcategorías...</div></div>
-        </div>
-      </div>
-
-      <!-- ---------- TAREAS: tareas de una subcategoría ---------- -->
-      <div id="tasksBankCategoryView" class="hidden">
-        <button type="button" class="btn ghost small" id="tasksBankCategoryBack" style="margin-bottom:10px;">← Subcategorías</button>
-        <div class="card">
-          <h2 style="font-size:1.05rem;" id="tasksBankCategoryTitle">Categoría</h2>
-          <div class="filterbar">
+          <div id="taskBreadcrumb" class="breadcrumb"></div>
+          <div id="taskFolderList" style="margin-top:10px;"></div>
+          <div class="filterbar" style="margin-top:10px;">
             <input type="text" id="filterSearch" placeholder="Buscar por título...">
             <label class="fav-filter"><input type="checkbox" id="filterFavOnly"> ⭐ Solo favoritas</label>
           </div>
@@ -725,7 +715,10 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
 
         <h3 style="margin-top:14px;font-size:.9rem;">Añadir tareas</h3>
         <div class="filterbar">
-          <select id="sessionAddCategory"><option value="">Todas las categorías</option></select>
+          <select id="sessionAddFolder"><option value="">Elige carpeta...</option></select>
+          <input type="text" id="sessionAddSearch" placeholder="🔍 Buscar tarea por nombre...">
+        </div>
+        <div class="filterbar" style="margin-top:6px;">
           <select id="sessionFilterPhase">
             <option value="">Todas las fases</option>
             <option value="calentamiento">Calentamiento</option>
@@ -821,7 +814,6 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
         <div class="card" id="playEditorPanel">
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <h2 style="font-size:1.05rem;" id="playFormTitle">🎯 Nueva jugada</h2>
-          <button class="btn ghost small" id="btnNewAbpCategory">+ Categoría</button>
         </div>
         <form id="playForm">
           <div class="row">
@@ -830,8 +822,11 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
               <input type="text" id="playTitle" required>
             </div>
             <div>
-              <label>Categoría</label>
-              <select id="playCategory"></select>
+              <label>Carpeta</label>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <span id="playFolderLabel" class="muted" style="flex:1;min-width:120px;">🏦 Raíz (sin carpeta)</span>
+                <button type="button" class="btn ghost small" id="btnPickPlayFolder">📁 Elegir carpeta</button>
+              </div>
             </div>
           </div>
           <div class="row" style="margin-top:10px;">
@@ -855,13 +850,21 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
         </div>
       </div>
 
-      <!-- ---------- ABP: Banco de ABP (solo categorías) ---------- -->
+      <!-- ---------- ABP: Banco de ABP (estilo Drive) ---------- -->
       <div id="abpBankView" class="hidden">
         <button type="button" class="btn ghost small" id="abpBankBack" style="margin-bottom:10px;">← Volver</button>
         <div class="card">
-          <h2 style="font-size:1.05rem;">📂 Banco de ABP</h2>
-          <p class="muted">Elige una categoría para ver sus jugadas.</p>
-          <div id="abpCategoryList"><div class="empty">Cargando categorías...</div></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <h2 style="font-size:1.05rem;">📂 Banco de ABP</h2>
+            <button class="btn ghost small" id="btnNewAbpFolder">📁+ Carpeta</button>
+          </div>
+          <div id="abpBreadcrumb" class="breadcrumb"></div>
+          <div id="abpFolderList" style="margin-top:10px;"></div>
+          <div class="filterbar" style="margin-top:10px;">
+            <input type="text" id="filterAbpSearch" placeholder="Buscar por título...">
+            <label class="fav-filter"><input type="checkbox" id="filterAbpFavOnly"> ⭐ Solo favoritas</label>
+          </div>
+          <div id="playList"><div class="empty">Cargando jugadas...</div></div>
         </div>
       </div>
 
@@ -889,7 +892,8 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
 
           <h3 style="margin-top:14px;font-size:.9rem;">Añadir jugadas</h3>
           <div class="filterbar">
-            <select id="playSessionFilterCategory"><option value="">Todas las categorías</option></select>
+            <select id="playSessionFilterCategory"><option value="">Elige categoría...</option></select>
+            <input type="text" id="playSessionAddSearch" placeholder="🔍 Buscar jugada por nombre...">
             <label class="fav-filter"><input type="checkbox" id="playSessionFilterFavOnly"> ⭐ Solo favoritas</label>
           </div>
           <div id="playSessionBrowser"></div>
@@ -907,19 +911,6 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
         <div class="card">
           <h2 style="font-size:1.05rem;">Sesiones de ABP guardadas</h2>
           <div id="playSessionsSaved"><div class="empty">Cargando sesiones...</div></div>
-        </div>
-      </div>
-
-      <!-- ---------- ABP: jugadas de una categoría ---------- -->
-      <div id="abpCategoryView" class="hidden">
-        <button type="button" class="btn ghost small" id="abpCategoryBack" style="margin-bottom:10px;">← Categorías</button>
-        <div class="card">
-          <h2 style="font-size:1.05rem;" id="abpCategoryTitle">Categoría</h2>
-          <div class="filterbar">
-            <input type="text" id="filterAbpSearch" placeholder="Buscar por título...">
-            <label class="fav-filter"><input type="checkbox" id="filterAbpFavOnly"> ⭐ Solo favoritas</label>
-          </div>
-          <div id="playList"><div class="empty">Cargando jugadas...</div></div>
         </div>
       </div>
 
@@ -975,37 +966,25 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
   <footer>Sporting FS Almería · Panel interno de entrenadores</footer>
 </div>
 
-<!-- ---------- Category modal ---------- -->
-<div id="categoryModal" class="modal-bg hidden">
+<!-- ---------- Folder picker modal (shared: elegir carpeta / mover a...) ---------- -->
+<div id="folderPickerModal" class="modal-bg hidden">
   <div class="modal">
-    <h2 style="font-size:1.05rem;">Categorías de tareas</h2>
-    <p class="muted" style="margin-top:-6px;">Crea una subcategoría dentro de una de las 5 categorías fijas.</p>
-    <div class="row">
-      <select id="newCategoryGroup" style="flex:0 0 auto;">
-        <option value="ataque">⚔️ Ataque</option>
-        <option value="defensa">🛡️ Defensa</option>
-        <option value="transiciones">🔄 Transiciones</option>
-        <option value="especiales">⚡ Situaciones especiales</option>
-        <option value="porteros">🧤 Entrenamiento de porteros</option>
-      </select>
-      <input type="text" id="newCategoryName" placeholder="Ej: Finalización, Portero, Físico...">
-      <button class="btn accent" id="btnAddCategory" style="flex:0 0 auto;">Añadir</button>
-    </div>
-    <p class="muted" style="margin-top:6px;">Cambia la categoría de una subcategoría con el desplegable de su fila.</p>
-    <div id="categoryModalList" style="margin-top:12px;"></div>
-    <button class="btn ghost" id="btnCloseCategoryModal" style="margin-top:14px;width:100%;">Cerrar</button>
+    <h2 style="font-size:1.05rem;" id="folderPickerTitle">Elegir carpeta</h2>
+    <div id="folderPickerList" style="margin-top:12px;max-height:52vh;overflow-y:auto;"></div>
+    <button class="btn ghost" id="btnCloseFolderPicker" style="margin-top:14px;width:100%;">Cancelar</button>
   </div>
 </div>
 
-<div id="abpCategoryModal" class="modal-bg hidden">
+<!-- ---------- Folder actions modal (shared: renombrar / mover / eliminar carpeta) ---------- -->
+<div id="folderActionsModal" class="modal-bg hidden">
   <div class="modal">
-    <h2 style="font-size:1.05rem;">Categorías de ABP</h2>
-    <div class="row">
-      <input type="text" id="newAbpCategoryName" placeholder="Ej: Córner a favor, Falta lateral...">
-      <button class="btn accent" id="btnAddAbpCategory" style="flex:0 0 auto;">Añadir</button>
+    <h2 style="font-size:1.05rem;" id="folderActionsTitle">Carpeta</h2>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px;">
+      <button type="button" class="btn ghost" id="btnRenameFolder">✏️ Renombrar</button>
+      <button type="button" class="btn ghost" id="btnMoveFolder">📁 Mover a...</button>
+      <button type="button" class="btn danger" id="btnDeleteFolder">🗑️ Eliminar</button>
     </div>
-    <div id="abpCategoryModalList" style="margin-top:12px;"></div>
-    <button class="btn ghost" id="btnCloseAbpCategoryModal" style="margin-top:14px;width:100%;">Cerrar</button>
+    <button class="btn ghost" id="btnCloseFolderActions" style="margin-top:14px;width:100%;">Cerrar</button>
   </div>
 </div>
 
@@ -1149,20 +1128,47 @@ db.settings({ experimentalForceLongPolling: true, useFetchStreams: false });
 
 let currentUser = null;   // firebase auth user
 let currentCoach = null;  // firestore coach doc {name, role, active, email}
-let categories = [];
-const TASK_GROUPS = [
-  {id:"ataque", name:"Ataque", icon:"⚔️"},
-  {id:"defensa", name:"Defensa", icon:"🛡️"},
-  {id:"transiciones", name:"Transiciones", icon:"🔄"},
-  {id:"especiales", name:"Situaciones especiales", icon:"⚡"},
-  {id:"porteros", name:"Entrenamiento de porteros", icon:"🧤"}
+let categories = [];   // carpetas del Banco de tareas (drive-like: cada una puede tener parentId)
+// Semilla de las 5 carpetas fijas originales: se crean una sola vez con estos ids,
+// pero a partir de ahí son carpetas normales (se pueden renombrar, mover o eliminar).
+const TASK_FOLDER_SEED = [
+  {id:"ataque", name:"Ataque"},
+  {id:"defensa", name:"Defensa"},
+  {id:"transiciones", name:"Transiciones"},
+  {id:"especiales", name:"Situaciones especiales"},
+  {id:"porteros", name:"Entrenamiento de porteros"}
 ];
-function groupName_(id){ const g = TASK_GROUPS.find(x=>x.id===id); return g ? g.name : ""; }
-function catGroup_(c){ return (c && c.group) || "ataque"; }
+/* ---------- Helpers genéricos de árbol de carpetas (Banco de tareas / Banco de ABP) ---------- */
+function folderList_(section){ return section==="tasks" ? categories : abpCategories; }
+function folderColl_(section){ return section==="tasks" ? "categories" : "abpCategories"; }
+function folderChildren_(section, parentId){
+  return folderList_(section).filter(f=>(f.parentId||null)===(parentId||null));
+}
+function folderDescendantIds_(section, id){
+  const ids = new Set();
+  (function walk(pid){
+    folderChildren_(section, pid).forEach(f=>{ ids.add(f.id); walk(f.id); });
+  })(id);
+  return ids;
+}
+let taskFolderSeedDone = false;
+async function ensureTaskFolderSeed(){
+  if(taskFolderSeedDone) return;
+  const missing = TASK_FOLDER_SEED.filter(seed => !categories.some(c=>c.id===seed.id));
+  if(missing.length===0){ taskFolderSeedDone = true; return; }
+  taskFolderSeedDone = true; // evita reintentos en cada snapshot mientras se están creando
+  try{
+    for(const seed of missing){
+      await db.collection("categories").doc(seed.id).set({
+        name: seed.name, parentId: null, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, {merge:true});
+    }
+  }catch(err){ taskFolderSeedDone = false; }
+}
 let tasks = [];
 let coaches = [];
 let sessions = [];
-let abpCategories = [];
+let abpCategories = [];   // carpetas del Banco de ABP
 let plays = [];
 let playSessions = [];
 let gameModelFiles = [];
@@ -1329,9 +1335,9 @@ function initAppUI(){
   rolePill.classList.toggle("editor", role === ROLE_EDITOR);
   document.getElementById("editorPanel").classList.toggle("hidden", !canEditContent);
   document.getElementById("tasksGoNew").classList.toggle("hidden", !canEditContent);
-  document.getElementById("btnNewCategory").classList.toggle("hidden", !canEditContent);
+  document.getElementById("btnNewTaskFolder").classList.toggle("hidden", !canEditContent);
   document.getElementById("playEditorPanel").classList.toggle("hidden", !canEditContent);
-  document.getElementById("btnNewAbpCategory").classList.toggle("hidden", !canEditContent);
+  document.getElementById("btnNewAbpFolder").classList.toggle("hidden", !canEditContent);
   document.getElementById("modeloUploadPanel").classList.toggle("hidden", !canEditContent);
   document.getElementById("tabCoachesBtn").classList.toggle("hidden", !isGestor);
   document.getElementById("homeCoachesBtn").classList.toggle("hidden", !isGestor);
@@ -1386,171 +1392,186 @@ function showTasksView(view){
   document.getElementById("tasksHome").classList.toggle("hidden", view!=="home");
   document.getElementById("tasksNewTaskView").classList.toggle("hidden", view!=="new");
   document.getElementById("tasksBankView").classList.toggle("hidden", view!=="bank");
-  document.getElementById("tasksBankGroupView").classList.toggle("hidden", view!=="group");
-  document.getElementById("tasksBankCategoryView").classList.toggle("hidden", view!=="category");
 }
 let taskFormReturnView = "home"; // adónde volver al terminar de crear/editar una tarea
 document.getElementById("tasksGoNew").onclick = () => { taskFormReturnView = "home"; showTasksView("new"); };
-document.getElementById("tasksGoBank").onclick = () => { showTasksView("bank"); renderTaskCategoryList(); };
+document.getElementById("tasksGoBank").onclick = () => { showTasksView("bank"); renderTaskBank(); };
 document.getElementById("tasksNewBack").onclick = () => {
   resetTaskForm();
   showTasksView(taskFormReturnView);
-  if(taskFormReturnView === "category") renderTaskList();
+  if(taskFormReturnView === "bank") renderTaskBank();
 };
 document.getElementById("tasksBankBack").onclick = () => showTasksView("home");
-document.getElementById("tasksBankGroupBack").onclick = () => showTasksView("bank");
-document.getElementById("tasksBankCategoryBack").onclick = () => showTasksView(tasksBankCategoryBackTo);
 
-let currentTaskGroupId = null; // id de una de las 5 categorías fijas
-window.openTaskGroup = (groupId) => {
-  currentTaskGroupId = groupId;
-  const g = TASK_GROUPS.find(x=>x.id===groupId);
-  document.getElementById("tasksBankGroupTitle").textContent = g ? `${g.icon} ${g.name}` : "Categoría";
-  renderTaskGroupCategoryList();
-  showTasksView("group");
-};
-function renderTaskGroupCategoryList(){
-  const wrap = document.getElementById("taskGroupCategoryList");
-  const subs = categories.filter(c=>catGroup_(c)===currentTaskGroupId);
-  if(subs.length===0){
-    wrap.innerHTML = '<p class="muted">Todavía no hay subcategorías aquí. Puedes crearlas pulsando "+ Categoría" al crear una tarea.</p>';
-    return;
-  }
-  const counts = {};
-  tasks.forEach(t=> taskCategoryIds(t).forEach(id=>{ counts[id]=(counts[id]||0)+1; }));
-  wrap.innerHTML = `<div class="home-grid">` + subs.map(c=>{
-    const n = counts[c.id]||0;
-    const hasUnread = tasks.some(t=> taskCategoryIds(t).includes(c.id) && isItemUnread("tasks", t));
-    return `
-    <button type="button" class="home-card" onclick="openTaskCategory('${c.id}','group')">
-      <span class="home-card-icon">🏷️</span>
-      <span class="home-card-label">${escapeHtml(c.name)}${hasUnread ? '<span class="card-dot"></span>' : ""}</span>
-      <span class="home-card-desc">${n} tarea${n===1?"":"s"}</span>
-    </button>`;
-  }).join("") + `</div>`;
+/* ---------- Banco de tareas: navegador estilo Drive ---------- */
+let taskBrowserPath = []; // pila de ids de carpeta ("__FAV__" y "__NONE__" son vistas especiales, solo válidas como único elemento)
+function taskCurrentFolder(){ return taskBrowserPath.length ? taskBrowserPath[taskBrowserPath.length-1] : null; }
+function taskFolderId(t){ return taskCategoryIds(t)[0] || null; }
+
+function renderTaskBreadcrumb(){
+  const el = document.getElementById("taskBreadcrumb");
+  const crumbs = [{idx:0, label:"🏦 Raíz"}];
+  taskBrowserPath.forEach((id,i)=>{
+    const label = id==="__FAV__" ? "⭐ Favoritos" : id==="__NONE__" ? "❔ Sin carpeta" : (catName_(id) || "Carpeta");
+    crumbs.push({idx:i+1, label});
+  });
+  el.innerHTML = crumbs.map((c,i)=>`<span class="crumb${i===crumbs.length-1?" current":""}" onclick="taskBrowserPath=taskBrowserPath.slice(0,${c.idx}); renderTaskBank();">${escapeHtml(c.label)}</span>`).join(' <span class="crumb-sep">›</span> ');
 }
-
-let currentTaskCategoryId = null; // id de subcategoría real, "__NONE__" (sin categoría) o "__FAV__" (favoritos)
-let tasksBankCategoryBackTo = "bank"; // a qué vista volver desde la lista de tareas: "bank" o "group"
-window.openTaskCategory = (categoryId, backTo) => {
-  currentTaskCategoryId = categoryId;
-  tasksBankCategoryBackTo = backTo || "bank";
-  const name = categoryId === "__FAV__" ? "⭐ Favoritos" : categoryId === "__NONE__" ? "Sin categoría" : (catName_(categoryId) || "Categoría");
-  document.getElementById("tasksBankCategoryTitle").textContent = name;
-  document.getElementById("filterSearch").value = "";
-  showTasksView("category");
-  renderTaskList();
-};
-function renderTaskCategoryList(){
-  const wrap = document.getElementById("taskCategoryList");
-  const favIds = (currentCoach && Array.isArray(currentCoach.favoriteTaskIds)) ? currentCoach.favoriteTaskIds : [];
-  const favCount = tasks.filter(t=>favIds.includes(t.id)).length;
-  const favCard = `
-    <button type="button" class="home-card fav-card" onclick="openTaskCategory('__FAV__','bank')">
+function renderTaskFolderList(){
+  const wrap = document.getElementById("taskFolderList");
+  const curId = taskCurrentFolder();
+  document.getElementById("btnNewTaskFolder").classList.toggle("hidden", curId==="__FAV__" || curId==="__NONE__");
+  let html = "";
+  if(curId===null){
+    const favIds = (currentCoach && Array.isArray(currentCoach.favoriteTaskIds)) ? currentCoach.favoriteTaskIds : [];
+    const favCount = tasks.filter(t=>favIds.includes(t.id)).length;
+    const noneCount = tasks.filter(t=>!taskFolderId(t)).length;
+    html += `<div class="home-grid">`;
+    html += `
+    <button type="button" class="home-card fav-card" onclick="taskBrowserPath=['__FAV__']; renderTaskBank();">
       <span class="home-card-icon">⭐</span>
       <span class="home-card-label">Favoritos</span>
       <span class="home-card-desc">${favCount} tarea${favCount===1?"":"s"}</span>
     </button>`;
-  const counts = {};
-  let uncategorized = 0;
-  tasks.forEach(t=>{
-    const ids = taskCategoryIds(t);
-    if(ids.length===0){ uncategorized++; return; }
-    ids.forEach(id=>{ counts[id] = (counts[id]||0)+1; });
-  });
-  const groupCards = TASK_GROUPS.map(g=>{
-    const subs = categories.filter(c=>catGroup_(c)===g.id);
-    const n = subs.reduce((sum,c)=> sum + (counts[c.id]||0), 0);
-    const hasUnread = tasks.some(t=> taskCategoryIds(t).some(id=> subs.some(c=>c.id===id)) && isItemUnread("tasks", t));
-    return `
-    <button type="button" class="home-card" onclick="openTaskGroup('${g.id}')">
-      <span class="home-card-icon">${g.icon}</span>
-      <span class="home-card-label">${escapeHtml(g.name)}${hasUnread ? '<span class="card-dot"></span>' : ""}</span>
-      <span class="home-card-desc">${n} tarea${n===1?"":"s"} · ${subs.length} subcat.</span>
-    </button>`;
-  }).join("");
-  let uncatCard = "";
-  if(uncategorized>0){
-    uncatCard = `
-    <button type="button" class="home-card" onclick="openTaskCategory('__NONE__','bank')">
-      <span class="home-card-icon">❔</span>
-      <span class="home-card-label">Sin categoría</span>
-      <span class="home-card-desc">${uncategorized} tarea${uncategorized===1?"":"s"}</span>
-    </button>`;
+    if(noneCount>0){
+      html += `
+      <button type="button" class="home-card" onclick="taskBrowserPath=['__NONE__']; renderTaskBank();">
+        <span class="home-card-icon">❔</span>
+        <span class="home-card-label">Sin carpeta</span>
+        <span class="home-card-desc">${noneCount} tarea${noneCount===1?"":"s"}</span>
+      </button>`;
+    }
+    html += `</div>`;
   }
-  wrap.innerHTML = `<div class="home-grid">${favCard}${groupCards}${uncatCard}</div>`;
+  if(curId!=="__FAV__" && curId!=="__NONE__"){
+    const folders = folderChildren_("tasks", curId).sort((a,b)=>a.name.localeCompare(b.name,"es"));
+    if(folders.length){
+      html += `<div class="home-grid" style="margin-top:10px;">` + folders.map(f=>{
+        const count = tasks.filter(t=>taskFolderId(t)===f.id).length;
+        const subCount = folderChildren_("tasks", f.id).length;
+        const hasUnread = tasks.some(t=> taskFolderId(t)===f.id && isItemUnread("tasks", t));
+        return `
+        <div class="home-card folder-card">
+          <button type="button" class="folder-card-main" onclick="taskBrowserPath=[...taskBrowserPath,'${f.id}']; renderTaskBank();">
+            <span class="home-card-icon">📁</span>
+            <span class="home-card-label">${escapeHtml(f.name)}${hasUnread ? '<span class="card-dot"></span>' : ""}</span>
+            <span class="home-card-desc">${count} tarea${count===1?"":"s"}${subCount?` · ${subCount} carpeta${subCount===1?"":"s"}`:""}</span>
+          </button>
+          <button type="button" class="folder-menu-btn" onclick="openFolderActions('tasks','${f.id}')" title="Gestionar carpeta">⋯</button>
+        </div>`;
+      }).join("") + `</div>`;
+    }
+  }
+  wrap.innerHTML = html;
 }
+function renderTaskBank(){
+  renderTaskBreadcrumb();
+  renderTaskFolderList();
+  renderTaskList();
+}
+document.getElementById("btnNewTaskFolder").onclick = async () => {
+  const name = prompt("Nombre de la nueva carpeta:");
+  if(!name || !name.trim()) return;
+  const cur = taskCurrentFolder();
+  const parentId = (cur==="__FAV__"||cur==="__NONE__") ? null : cur;
+  try{
+    await db.collection("categories").add({name:name.trim(), parentId, createdBy: currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp()});
+  }catch(err){ alert("No se ha podido crear la carpeta: " + err.message); }
+};
 
-/* ---------- Navegación interna de ABP (submenú / nueva jugada / banco por categorías) ---------- */
+/* ---------- Navegación interna de ABP (submenú / nueva jugada / banco por carpetas) ---------- */
 function showAbpView(view){
   document.getElementById("abpHome").classList.toggle("hidden", view!=="home");
   document.getElementById("abpNewPlayView").classList.toggle("hidden", view!=="new");
   document.getElementById("abpBankView").classList.toggle("hidden", view!=="bank");
   document.getElementById("abpSessionsView").classList.toggle("hidden", view!=="sessions");
-  document.getElementById("abpCategoryView").classList.toggle("hidden", view!=="category");
 }
 let abpFormReturnView = "home"; // adónde volver al terminar de crear/editar una jugada
 document.getElementById("abpGoNew").onclick = () => { abpFormReturnView = "home"; showAbpView("new"); };
-document.getElementById("abpGoBank").onclick = () => { showAbpView("bank"); renderAbpCategoryList(); };
+document.getElementById("abpGoBank").onclick = () => { showAbpView("bank"); renderAbpBank(); };
 document.getElementById("abpGoSessions").onclick = () => showAbpView("sessions");
 document.getElementById("abpNewBack").onclick = () => {
   resetPlayForm();
   showAbpView(abpFormReturnView);
-  if(abpFormReturnView === "category") renderPlayList();
+  if(abpFormReturnView === "bank") renderPlayList();
 };
 document.getElementById("abpBankBack").onclick = () => showAbpView("home");
 document.getElementById("abpSessionsBack").onclick = () => showAbpView("home");
-document.getElementById("abpCategoryBack").onclick = () => showAbpView("bank");
 
-let currentAbpCategoryId = null; // id de categoría real, "__NONE__" (sin categoría) o "__FAV__" (favoritos)
-window.openAbpCategory = (categoryId) => {
-  currentAbpCategoryId = categoryId;
-  const name = categoryId === "__FAV__" ? "⭐ Favoritos" : categoryId === "__NONE__" ? "Sin categoría" : (abpCatName_(categoryId) || "Categoría");
-  document.getElementById("abpCategoryTitle").textContent = name;
-  document.getElementById("filterAbpSearch").value = "";
-  showAbpView("category");
-  renderPlayList();
-};
-function renderAbpCategoryList(){
-  const wrap = document.getElementById("abpCategoryList");
-  const favIds = (currentCoach && Array.isArray(currentCoach.favoritePlayIds)) ? currentCoach.favoritePlayIds : [];
-  const favCount = plays.filter(p=>favIds.includes(p.id)).length;
-  const favCard = `
-    <button type="button" class="home-card fav-card" onclick="openAbpCategory('__FAV__')">
+/* ---------- Banco de ABP: navegador estilo Drive ---------- */
+let abpBrowserPath = []; // pila de ids de carpeta ("__FAV__" y "__NONE__" son vistas especiales, solo válidas como único elemento)
+function abpCurrentFolder(){ return abpBrowserPath.length ? abpBrowserPath[abpBrowserPath.length-1] : null; }
+
+function renderAbpBreadcrumb(){
+  const el = document.getElementById("abpBreadcrumb");
+  const crumbs = [{idx:0, label:"🏦 Raíz"}];
+  abpBrowserPath.forEach((id,i)=>{
+    const label = id==="__FAV__" ? "⭐ Favoritos" : id==="__NONE__" ? "❔ Sin carpeta" : (abpCatName_(id) || "Carpeta");
+    crumbs.push({idx:i+1, label});
+  });
+  el.innerHTML = crumbs.map((c,i)=>`<span class="crumb${i===crumbs.length-1?" current":""}" onclick="abpBrowserPath=abpBrowserPath.slice(0,${c.idx}); renderAbpBank();">${escapeHtml(c.label)}</span>`).join(' <span class="crumb-sep">›</span> ');
+}
+function renderAbpFolderList(){
+  const wrap = document.getElementById("abpFolderList");
+  const curId = abpCurrentFolder();
+  document.getElementById("btnNewAbpFolder").classList.toggle("hidden", curId==="__FAV__" || curId==="__NONE__");
+  let html = "";
+  if(curId===null){
+    const favIds = (currentCoach && Array.isArray(currentCoach.favoritePlayIds)) ? currentCoach.favoritePlayIds : [];
+    const favCount = plays.filter(p=>favIds.includes(p.id)).length;
+    const noneCount = plays.filter(p=>!p.categoryId).length;
+    html += `<div class="home-grid">`;
+    html += `
+    <button type="button" class="home-card fav-card" onclick="abpBrowserPath=['__FAV__']; renderAbpBank();">
       <span class="home-card-icon">⭐</span>
       <span class="home-card-label">Favoritos</span>
       <span class="home-card-desc">${favCount} jugada${favCount===1?"":"s"}</span>
     </button>`;
-  if(abpCategories.length===0 && plays.length===0){
-    wrap.innerHTML = `<div class="home-grid">${favCard}</div>`;
-    return;
+    if(noneCount>0){
+      html += `
+      <button type="button" class="home-card" onclick="abpBrowserPath=['__NONE__']; renderAbpBank();">
+        <span class="home-card-icon">❔</span>
+        <span class="home-card-label">Sin carpeta</span>
+        <span class="home-card-desc">${noneCount} jugada${noneCount===1?"":"s"}</span>
+      </button>`;
+    }
+    html += `</div>`;
   }
-  const counts = {};
-  let uncategorized = 0;
-  plays.forEach(p=>{
-    if(!p.categoryId){ uncategorized++; return; }
-    counts[p.categoryId] = (counts[p.categoryId]||0)+1;
-  });
-  let html = abpCategories.map(c=>{
-    const n = counts[c.id]||0;
-    const hasUnread = plays.some(p=> p.categoryId===c.id && isItemUnread("plays", p));
-    return `
-    <button type="button" class="home-card" onclick="openAbpCategory('${c.id}')">
-      <span class="home-card-icon">🎯</span>
-      <span class="home-card-label">${escapeHtml(c.name)}${hasUnread ? '<span class="card-dot"></span>' : ""}</span>
-      <span class="home-card-desc">${n} jugada${n===1?"":"s"}</span>
-    </button>`;
-  }).join("");
-  if(uncategorized>0){
-    html += `
-    <button type="button" class="home-card" onclick="openAbpCategory('__NONE__')">
-      <span class="home-card-icon">❔</span>
-      <span class="home-card-label">Sin categoría</span>
-      <span class="home-card-desc">${uncategorized} jugada${uncategorized===1?"":"s"}</span>
-    </button>`;
+  if(curId!=="__FAV__" && curId!=="__NONE__"){
+    const folders = folderChildren_("abp", curId).sort((a,b)=>a.name.localeCompare(b.name,"es"));
+    if(folders.length){
+      html += `<div class="home-grid" style="margin-top:10px;">` + folders.map(f=>{
+        const count = plays.filter(p=>(p.categoryId||null)===f.id).length;
+        const subCount = folderChildren_("abp", f.id).length;
+        const hasUnread = plays.some(p=> (p.categoryId||null)===f.id && isItemUnread("plays", p));
+        return `
+        <div class="home-card folder-card">
+          <button type="button" class="folder-card-main" onclick="abpBrowserPath=[...abpBrowserPath,'${f.id}']; renderAbpBank();">
+            <span class="home-card-icon">📁</span>
+            <span class="home-card-label">${escapeHtml(f.name)}${hasUnread ? '<span class="card-dot"></span>' : ""}</span>
+            <span class="home-card-desc">${count} jugada${count===1?"":"s"}${subCount?` · ${subCount} carpeta${subCount===1?"":"s"}`:""}</span>
+          </button>
+          <button type="button" class="folder-menu-btn" onclick="openFolderActions('abp','${f.id}')" title="Gestionar carpeta">⋯</button>
+        </div>`;
+      }).join("") + `</div>`;
+    }
   }
-  wrap.innerHTML = `<div class="home-grid">${favCard}${html}</div>`;
+  wrap.innerHTML = html;
 }
+function renderAbpBank(){
+  renderAbpBreadcrumb();
+  renderAbpFolderList();
+  renderPlayList();
+}
+document.getElementById("btnNewAbpFolder").onclick = async () => {
+  const name = prompt("Nombre de la nueva carpeta:");
+  if(!name || !name.trim()) return;
+  const cur = abpCurrentFolder();
+  const parentId = (cur==="__FAV__"||cur==="__NONE__") ? null : cur;
+  try{
+    await db.collection("abpCategories").add({name:name.trim(), parentId, createdBy: currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp()});
+  }catch(err){ alert("No se ha podido crear la carpeta: " + err.message); }
+};
 
 /* ---------- Navegación interna de Sesiones (submenú / crear / guardadas) ---------- */
 function showSessionsView(view){
@@ -1579,14 +1600,17 @@ document.getElementById("brandHomeBtn").onclick = () => {
 function attachRealtimeListeners(){
   db.collection("categories").orderBy("name").onSnapshot(snap=>{
     categories = snap.docs.map(d=>({id:d.id, ...d.data()}));
-    // Migración: las categorías antiguas (creadas antes de tener categoría/subcategoría)
-    // no tienen "group" todavía. Las metemos en "Ataque" para que Carlos las reclasifique.
-    categories.filter(c=>!c.group).forEach(c=>{
-      db.collection("categories").doc(c.id).update({group:"ataque"}).catch(()=>{});
+    ensureTaskFolderSeed();
+    // Migración: categorías antiguas que aún tengan "group" (ataque/defensa/...) en vez de "parentId"
+    categories.filter(c=>c.group && !c.parentId).forEach(c=>{
+      db.collection("categories").doc(c.id).update({
+        parentId: c.group,
+        group: firebase.firestore.FieldValue.delete()
+      }).catch(()=>{});
     });
     renderCategorySelects();
-    renderCategoryModalList();
-    renderTaskCategoryList();
+    if(document.getElementById("taskFolderList")) renderTaskFolderList();
+    renderTaskFolderLabel();
   });
 
   db.collection("tasks").orderBy("createdAt","desc").onSnapshot(snap=>{
@@ -1594,7 +1618,7 @@ function attachRealtimeListeners(){
     tasks = all.filter(t=>!t.deleted);
     trashTasks = all.filter(t=>t.deleted);
     renderTaskList();
-    renderTaskCategoryList();
+    if(document.getElementById("taskFolderList")) renderTaskFolderList();
     renderSessionTaskBrowser();
     renderTrash();
     renderNotifications();
@@ -1618,7 +1642,8 @@ function attachRealtimeListeners(){
   db.collection("abpCategories").orderBy("name").onSnapshot(snap=>{
     abpCategories = snap.docs.map(d=>({id:d.id, ...d.data()}));
     renderAbpCategorySelects();
-    renderAbpCategoryModalList();
+    if(document.getElementById("abpFolderList")) renderAbpFolderList();
+    renderPlayFolderLabel();
   });
 
   db.collection("plays").orderBy("createdAt","desc").onSnapshot(snap=>{
@@ -1626,6 +1651,7 @@ function attachRealtimeListeners(){
     plays = all.filter(p=>!p.deleted);
     trashPlays = all.filter(p=>p.deleted);
     renderPlayList();
+    if(document.getElementById("abpFolderList")) renderAbpFolderList();
     renderPlaySessionBrowser();
     renderTrash();
     renderNotifications();
@@ -1798,8 +1824,9 @@ function renderNotifications(){
 
   // Re-pintar listados para que se vean los puntos por elemento
   if(document.getElementById("taskList")) renderTaskList();
-  if(document.getElementById("abpCategoryList")) renderAbpCategoryList();
+  if(document.getElementById("taskFolderList")) renderTaskFolderList();
   if(document.getElementById("playList")) renderPlayList();
+  if(document.getElementById("abpFolderList")) renderAbpFolderList();
   if(document.getElementById("sessionsSaved")) renderSavedSessions();
   if(document.getElementById("playSessionsSaved")) renderSavedPlaySessions();
 }
@@ -1814,130 +1841,165 @@ document.addEventListener("click", (e) => {
 });
 document.getElementById("btnMarkAllSeen").onclick = () => window.markAllNotificationsSeen();
 
-document.getElementById("btnNewAbpCategory").onclick = () => document.getElementById("abpCategoryModal").classList.remove("hidden");
-document.getElementById("btnCloseAbpCategoryModal").onclick = () => document.getElementById("abpCategoryModal").classList.add("hidden");
-
-document.getElementById("btnAddAbpCategory").onclick = async () => {
-  const input = document.getElementById("newAbpCategoryName");
-  const name = input.value.trim();
-  if(!name) return;
-  await db.collection("abpCategories").add({name, createdBy: currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp()});
-  input.value = "";
-};
-
-function renderAbpCategoryModalList(){
-  const wrap = document.getElementById("abpCategoryModalList");
-  if(abpCategories.length===0){ wrap.innerHTML = '<p class="muted">Todavía no hay categorías.</p>'; return; }
-  wrap.innerHTML = abpCategories.map(c=>`
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);">
-      <span>${escapeHtml(c.name)}</span>
-      <button class="btn danger small" onclick="deleteAbpCategory('${c.id}')">Eliminar</button>
-    </div>`).join("");
-}
-window.deleteAbpCategory = async (id) => {
-  if(!confirm("¿Eliminar esta categoría de ABP?")) return;
-  await db.collection("abpCategories").doc(id).delete();
-};
-
 function abpCatName_(id){ const c = abpCategories.find(x=>x.id===id); return c ? c.name : ""; }
 
+/* Construye las opciones de un <select> con el árbol de carpetas indentado */
+function folderSelectOptions_(section, placeholder){
+  const rows = [];
+  (function walk(pid, depth){
+    folderChildren_(section, pid).sort((a,b)=>a.name.localeCompare(b.name,"es")).forEach(f=>{
+      rows.push(`<option value="${f.id}">${"— ".repeat(depth)}${escapeHtml(f.name)}</option>`);
+      walk(f.id, depth+1);
+    });
+  })(null, 0);
+  return `<option value="">${escapeHtml(placeholder)}</option>` + rows.join("");
+}
+
 function renderAbpCategorySelects(){
-  const opts = abpCategories.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
-  document.getElementById("playCategory").innerHTML = opts || '<option value="">Sin categorías</option>';
-  document.getElementById("playSessionFilterCategory").innerHTML = '<option value="">Todas las categorías</option>' + opts;
+  document.getElementById("playSessionFilterCategory").innerHTML = folderSelectOptions_("abp", "Elige categoría...");
 }
 
 /* ============================================================
-   CATEGORIES
+   CARPETAS (Banco de tareas / Banco de ABP) — estilo Drive
 ============================================================= */
-document.getElementById("btnNewCategory").onclick = () => document.getElementById("categoryModal").classList.remove("hidden");
-document.getElementById("btnCloseCategoryModal").onclick = () => document.getElementById("categoryModal").classList.add("hidden");
+function catName_(id){ const c = categories.find(x=>x.id===id); return c ? c.name : ""; }
 
-document.getElementById("btnAddCategory").onclick = async () => {
-  const input = document.getElementById("newCategoryName");
-  const group = document.getElementById("newCategoryGroup").value;
-  const name = input.value.trim();
-  if(!name) return;
-  await db.collection("categories").add({name, group, createdBy: currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp()});
-  input.value = "";
+/* ---------- Selector de carpeta reutilizable ("Elegir carpeta" / "Mover a...") ---------- */
+let folderPickerCallback = null;
+function openFolderPicker(section, excludeIds, title, callback){
+  folderPickerCallback = callback;
+  document.getElementById("folderPickerTitle").textContent = title || "Elegir carpeta";
+  const rootLabel = section==="tasks" ? "🏦 Raíz (Banco de tareas)" : "🏦 Raíz (Banco de ABP)";
+  const rows = [{id:null, name:rootLabel, depth:0}];
+  (function walk(pid, depth){
+    folderChildren_(section, pid).sort((a,b)=>a.name.localeCompare(b.name,"es")).forEach(f=>{
+      if(!excludeIds || !excludeIds.has(f.id)){
+        rows.push({id:f.id, name:f.name, depth});
+        walk(f.id, depth+1);
+      }
+    });
+  })(null, 1);
+  document.getElementById("folderPickerList").innerHTML = rows.map(r=>`
+    <button type="button" class="btn ghost small" style="width:100%;text-align:left;margin-bottom:4px;padding-left:${10+r.depth*18}px;" onclick="chooseFolderPicker(${r.id===null?"null":`'${r.id}'`})">${r.depth>0?"📁 ":""}${escapeHtml(r.name)}</button>
+  `).join("");
+  document.getElementById("folderPickerModal").classList.remove("hidden");
+}
+window.chooseFolderPicker = (id) => {
+  document.getElementById("folderPickerModal").classList.add("hidden");
+  if(folderPickerCallback) folderPickerCallback(id);
+  folderPickerCallback = null;
+};
+document.getElementById("btnCloseFolderPicker").onclick = () => {
+  document.getElementById("folderPickerModal").classList.add("hidden");
+  folderPickerCallback = null;
 };
 
-function renderCategoryModalList(){
-  const wrap = document.getElementById("categoryModalList");
-  if(categories.length===0){ wrap.innerHTML = '<p class="muted">Todavía no hay categorías.</p>'; return; }
-  wrap.innerHTML = TASK_GROUPS.map(g=>{
-    const subs = categories.filter(c=>catGroup_(c)===g.id);
-    if(subs.length===0) return "";
-    return `
-    <div style="margin-top:14px;">
-      <div class="muted" style="font-weight:600;margin-bottom:4px;">${g.icon} ${escapeHtml(g.name)}</div>
-      ${subs.map(c=>`
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;">
-          <span>${escapeHtml(c.name)}</span>
-          <div style="display:flex;gap:6px;align-items:center;">
-            <select data-catid="${c.id}" class="moveCategorySelect" style="padding:6px;">
-              ${TASK_GROUPS.map(g2=>`<option value="${g2.id}" ${catGroup_(c)===g2.id?"selected":""}>${g2.icon} ${escapeHtml(g2.name)}</option>`).join("")}
-            </select>
-            <button class="btn danger small" onclick="deleteCategory('${c.id}')">Eliminar</button>
-          </div>
-        </div>`).join("")}
-    </div>`;
-  }).join("");
-  wrap.querySelectorAll(".moveCategorySelect").forEach(sel=>{
-    sel.onchange = async () => {
-      const catId = sel.dataset.catid;
-      const newGroup = sel.value;
-      sel.disabled = true;
-      try{
-        await db.collection("categories").doc(catId).update({group: newGroup});
-      }catch(err){
-        alert("No se ha podido mover la categoría: " + err.message);
-        renderCategoryModalList();
-      }finally{
-        sel.disabled = false;
+/* ---------- "Mover a..." para una carpeta, tarea o jugada ---------- */
+function openFolderMove(type, id, section){
+  let excludeIds = null;
+  if(type==="folder"){
+    excludeIds = folderDescendantIds_(section, id);
+    excludeIds.add(id);
+  }
+  openFolderPicker(section, excludeIds, "Mover a...", async (destId) => {
+    try{
+      if(type==="folder"){
+        await db.collection(folderColl_(section)).doc(id).update({parentId: destId});
+      } else if(type==="task"){
+        await db.collection("tasks").doc(id).update({categoryIds: destId ? [destId] : []});
+      } else if(type==="play"){
+        await db.collection("plays").doc(id).update({categoryId: destId});
       }
-    };
+    }catch(err){
+      alert("No se ha podido mover: " + err.message);
+    }
   });
 }
-window.deleteCategory = async (id) => {
-  if(!confirm("¿Eliminar esta categoría? Las tareas existentes la mantendrán como texto pero dejará de estar en la lista.")) return;
-  await db.collection("categories").doc(id).delete();
+window.openFolderMove = openFolderMove;
+
+/* ---------- Gestionar carpeta (renombrar / mover / eliminar) ---------- */
+let folderActionsContext = null;
+window.openFolderActions = (section, id) => {
+  const f = folderList_(section).find(x=>x.id===id);
+  if(!f) return;
+  folderActionsContext = {section, id};
+  document.getElementById("folderActionsTitle").textContent = "📁 " + f.name;
+  document.getElementById("folderActionsModal").classList.remove("hidden");
+};
+document.getElementById("btnCloseFolderActions").onclick = () => document.getElementById("folderActionsModal").classList.add("hidden");
+document.getElementById("btnRenameFolder").onclick = async () => {
+  const {section, id} = folderActionsContext;
+  const f = folderList_(section).find(x=>x.id===id);
+  const name = prompt("Nuevo nombre de la carpeta:", f ? f.name : "");
+  document.getElementById("folderActionsModal").classList.add("hidden");
+  if(!name || !name.trim()) return;
+  try{
+    await db.collection(folderColl_(section)).doc(id).update({name: name.trim()});
+  }catch(err){ alert("No se ha podido renombrar: " + err.message); }
+};
+document.getElementById("btnMoveFolder").onclick = () => {
+  const {section, id} = folderActionsContext;
+  document.getElementById("folderActionsModal").classList.add("hidden");
+  openFolderMove("folder", id, section);
+};
+document.getElementById("btnDeleteFolder").onclick = async () => {
+  const {section, id} = folderActionsContext;
+  document.getElementById("folderActionsModal").classList.add("hidden");
+  const list = folderList_(section);
+  const f = list.find(x=>x.id===id);
+  if(!f) return;
+  const hasSubfolders = folderChildren_(section, id).length>0;
+  const hasItems = section==="tasks" ? tasks.some(t=>taskFolderId(t)===id) : plays.some(p=>(p.categoryId||null)===id);
+  const msg = (hasSubfolders || hasItems)
+    ? "Esta carpeta tiene contenido dentro. Al eliminarla, su contenido subirá a la carpeta superior. ¿Continuar?"
+    : "¿Eliminar esta carpeta?";
+  if(!confirm(msg)) return;
+  try{
+    const parentId = f.parentId || null;
+    const jobs = [];
+    folderChildren_(section, id).forEach(sub=>{
+      jobs.push(db.collection(folderColl_(section)).doc(sub.id).update({parentId}));
+    });
+    if(section==="tasks"){
+      tasks.filter(t=>taskFolderId(t)===id).forEach(t=>{
+        jobs.push(db.collection("tasks").doc(t.id).update({categoryIds: parentId ? [parentId] : []}));
+      });
+    } else {
+      plays.filter(p=>(p.categoryId||null)===id).forEach(p=>{
+        jobs.push(db.collection("plays").doc(p.id).update({categoryId: parentId}));
+      });
+    }
+    await Promise.all(jobs);
+    await db.collection(folderColl_(section)).doc(id).delete();
+  }catch(err){
+    alert("No se ha podido eliminar: " + err.message);
+  }
 };
 
 function renderCategorySelects(){
-  renderTaskCategoryCheckboxes();
-  document.getElementById("sessionAddCategory").innerHTML = '<option value="">Todas las categorías</option>' +
-    TASK_GROUPS.map(g=>{
-      const subs = categories.filter(c=>catGroup_(c)===g.id);
-      if(subs.length===0) return "";
-      return `<optgroup label="${g.icon} ${escapeHtml(g.name)}">${subs.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("")}</optgroup>`;
-    }).join("");
-  renderTaskCategoryList();
+  updateSessionAddFolderOptions();
+}
+document.getElementById("btnPickTaskFolder").onclick = () => {
+  openFolderPicker("tasks", null, "Elegir carpeta para la tarea", (id) => {
+    selectedTaskFolderId = id;
+    renderTaskFolderLabel();
+  });
+};
+let selectedTaskFolderId = null;
+function renderTaskFolderLabel(){
+  document.getElementById("taskFolderLabel").textContent = selectedTaskFolderId ? ("📁 " + catName_(selectedTaskFolderId)) : "🏦 Raíz (sin carpeta)";
 }
 
-/* Subcategorías del formulario de "Nueva tarea", filtradas por la categoría elegida */
-let selectedTaskCategoryIds = new Set();
-function renderTaskCategoryCheckboxes(){
-  const box = document.getElementById("taskCategoryCheckboxes");
-  const group = document.getElementById("taskGroupSelect").value;
-  const subs = categories.filter(c=>catGroup_(c)===group);
-  if(subs.length===0){
-    box.innerHTML = '<span class="empty-hint">Todavía no hay subcategorías en esta categoría. Créalas con "+ Categoría".</span>';
-  } else {
-    box.innerHTML = subs.map(c=>`
-      <label>
-        <input type="checkbox" value="${c.id}" ${selectedTaskCategoryIds.has(c.id) ? "checked" : ""}>
-        ${escapeHtml(c.name)}
-      </label>`).join("");
-  }
-  box.querySelectorAll("input[type=checkbox]").forEach(el=>{
-    el.onchange = () => {
-      if(el.checked) selectedTaskCategoryIds.add(el.value);
-      else selectedTaskCategoryIds.delete(el.value);
-    };
+document.getElementById("btnPickPlayFolder").onclick = () => {
+  openFolderPicker("abp", null, "Elegir carpeta para la jugada", (id) => {
+    selectedPlayFolderId = id;
+    renderPlayFolderLabel();
   });
+};
+let selectedPlayFolderId = null;
+function renderPlayFolderLabel(){
+  document.getElementById("playFolderLabel").textContent = selectedPlayFolderId ? ("📁 " + abpCatName_(selectedPlayFolderId)) : "🏦 Raíz (sin carpeta)";
 }
-document.getElementById("taskGroupSelect").onchange = renderTaskCategoryCheckboxes;
 
 
 /* ============================================================
@@ -2686,7 +2748,7 @@ document.getElementById("taskForm").onsubmit = async (e) => {
   if(playersMin!=null && playersMax!=null && playersMin > playersMax){
     [playersMin, playersMax] = [playersMax, playersMin];
   }
-  const categoryIds = Array.from(selectedTaskCategoryIds);
+  const categoryIds = selectedTaskFolderId ? [selectedTaskFolderId] : [];
   const payload = {
     title: document.getElementById("taskTitle").value.trim(),
     categoryIds,
@@ -2721,7 +2783,7 @@ document.getElementById("taskForm").onsubmit = async (e) => {
 document.getElementById("cancelEdit").onclick = () => {
   resetTaskForm();
   showTasksView(taskFormReturnView);
-  if(taskFormReturnView === "category") renderTaskList();
+  if(taskFormReturnView === "bank") renderTaskBank();
 };
 
 function resetTaskForm(){
@@ -2730,9 +2792,8 @@ function resetTaskForm(){
   document.getElementById("cancelEdit").classList.add("hidden");
   document.getElementById("taskLevelFrom").value = AGE_LEVELS[0];
   document.getElementById("taskLevelTo").value = AGE_LEVELS[AGE_LEVELS.length-1];
-  selectedTaskCategoryIds = new Set();
-  document.getElementById("taskGroupSelect").value = "ataque";
-  renderTaskCategoryCheckboxes();
+  selectedTaskFolderId = null;
+  renderTaskFolderLabel();
   tokens = []; frames = []; arrows = []; texts = []; shapes = []; paths = [];
   tokenSeq = 0; arrowSeq = 0; textSeq = 0; shapeSeq = 0; pathSeq = 0;
   historyStack = []; selected = null; dragObj = null;
@@ -2746,11 +2807,8 @@ window.editTask = (id) => {
   if(!t) return;
   editingTaskId = id;
   document.getElementById("taskTitle").value = t.title || "";
-  const ids = taskCategoryIds(t);
-  selectedTaskCategoryIds = new Set(ids);
-  const firstCat = categories.find(c=>c.id===ids[0]);
-  document.getElementById("taskGroupSelect").value = firstCat ? catGroup_(firstCat) : "ataque";
-  renderTaskCategoryCheckboxes();
+  selectedTaskFolderId = taskFolderId(t);
+  renderTaskFolderLabel();
   document.getElementById("taskPhase").value = t.phase || "principal";
   document.getElementById("taskDuration").value = t.duration || 15;
   document.getElementById("taskObjectives").value = t.objectives || "";
@@ -2778,7 +2836,7 @@ window.editTask = (id) => {
   redrawBoard(); renderFramesList();
   document.getElementById("cancelEdit").classList.remove("hidden");
   document.querySelector('.tab[data-tab="tasks"]').click();
-  taskFormReturnView = "category";
+  taskFormReturnView = "bank";
   showTasksView("new");
   document.getElementById("editorPanel").scrollIntoView({behavior:"smooth"});
 };
@@ -2809,7 +2867,7 @@ window.toggleFavoriteTask = async (id) => {
   else currentCoach.favoriteTaskIds.push(id);
   renderTaskList();
   renderSessionTaskBrowser();
-  renderTaskCategoryList();
+  if(document.getElementById("taskFolderList")) renderTaskFolderList();
   try{
     await db.collection("coaches").doc(currentUser.uid).update({ favoriteTaskIds: currentCoach.favoriteTaskIds });
   }catch(e){}
@@ -2822,7 +2880,7 @@ window.toggleFavoritePlay = async (id) => {
   else currentCoach.favoritePlayIds.push(id);
   renderPlayList();
   renderPlaySessionBrowser();
-  renderAbpCategoryList();
+  if(document.getElementById("abpFolderList")) renderAbpFolderList();
   try{
     await db.collection("coaches").doc(currentUser.uid).update({ favoritePlayIds: currentCoach.favoritePlayIds });
   }catch(e){}
@@ -2834,22 +2892,30 @@ document.getElementById("filterFavOnly").onchange = renderTaskList;
 
 function renderTaskList(){
   const wrap = document.getElementById("taskList");
-  const search = document.getElementById("filterSearch").value.toLowerCase();
+  const search = document.getElementById("filterSearch").value.trim().toLowerCase();
   const favOnly = document.getElementById("filterFavOnly").checked;
+  const curId = taskCurrentFolder();
   let list = tasks.filter(t=>{
-    const ids = taskCategoryIds(t);
-    if(currentTaskCategoryId === "__FAV__"){
+    const folderId = taskFolderId(t);
+    if(search){
+      // con texto de búsqueda, se busca en todo el banco, no solo en la carpeta actual
+    } else if(curId === "__FAV__"){
       if(!isTaskFavorite(t.id)) return false;
-    } else if(currentTaskCategoryId === "__NONE__"){
-      if(ids.length>0) return false;
-    } else if(currentTaskCategoryId){
-      if(!ids.includes(currentTaskCategoryId)) return false;
+    } else if(curId === "__NONE__"){
+      if(folderId) return false;
+    } else if(curId !== null){
+      if(folderId !== curId) return false;
+    } else {
+      return false; // en la raíz, sin buscar, no se listan tareas sueltas (solo carpetas arriba)
     }
     if(search && !(t.title||"").toLowerCase().includes(search)) return false;
     if(favOnly && !isTaskFavorite(t.id)) return false;
     return true;
   });
-  if(list.length===0){ wrap.innerHTML = '<div class="empty">🔍 No hay tareas que coincidan.</div>'; return; }
+  if(list.length===0){
+    wrap.innerHTML = (curId===null && !search) ? "" : '<div class="empty">🔍 No hay tareas que coincidan.</div>';
+    return;
+  }
   const canEditContent = currentCoach.role === ROLE_GESTOR || currentCoach.role === ROLE_EDITOR;
   wrap.innerHTML = list.map(t=>{
     const catNames = taskCategoryNames(t);
@@ -3000,7 +3066,11 @@ window.setCoachActive = async (id, active) => {
 let sessionBlocks = { calentamiento: [], principal: [], vuelta: [] };
 let editingSessionId = null;
 
-document.getElementById("sessionAddCategory").onchange = renderSessionTaskBrowser;
+function updateSessionAddFolderOptions(){
+  document.getElementById("sessionAddFolder").innerHTML = folderSelectOptions_("tasks", "Elige carpeta...");
+}
+document.getElementById("sessionAddFolder").onchange = renderSessionTaskBrowser;
+document.getElementById("sessionAddSearch").oninput = renderSessionTaskBrowser;
 document.getElementById("sessionFilterPhase").onchange = () => {
   const phase = document.getElementById("sessionFilterPhase").value;
   if(phase) document.getElementById("sessionAddBlock").value = phase;
@@ -3011,13 +3081,20 @@ document.getElementById("sessionFilterPlayers").oninput = renderSessionTaskBrows
 document.getElementById("sessionFilterFavOnly").onchange = renderSessionTaskBrowser;
 function renderSessionTaskBrowser(){
   const wrap = document.getElementById("sessionTaskBrowser");
-  const catFilter = document.getElementById("sessionAddCategory").value;
+  const folderFilter = document.getElementById("sessionAddFolder").value;
+  const searchFilter = document.getElementById("sessionAddSearch").value.trim().toLowerCase();
   const phaseFilter = document.getElementById("sessionFilterPhase").value;
   const levelFilter = document.getElementById("sessionFilterLevel").value;
   const playersFilter = document.getElementById("sessionFilterPlayers").value ? Number(document.getElementById("sessionFilterPlayers").value) : null;
   const favOnly = document.getElementById("sessionFilterFavOnly").checked;
+  if(!folderFilter && !searchFilter && !favOnly){
+    wrap.innerHTML = '<p class="muted" style="padding:10px 0;">👆 Elige una carpeta o escribe un nombre para ver las tareas disponibles.</p>';
+    return;
+  }
+  const includeIds = folderFilter ? new Set([folderFilter, ...folderDescendantIds_("tasks", folderFilter)]) : null;
   const list = tasks.filter(t=>{
-    if(catFilter && !taskCategoryIds(t).includes(catFilter)) return false;
+    if(includeIds && !includeIds.has(taskFolderId(t))) return false;
+    if(searchFilter && !(t.title||"").toLowerCase().includes(searchFilter)) return false;
     if(phaseFilter && t.phase!==phaseFilter) return false;
     if(levelFilter && t.levelFrom && t.levelTo){
       const idxSel = AGE_LEVELS.indexOf(levelFilter);
@@ -3149,6 +3226,9 @@ function resetSessionForm(){
   document.getElementById("sessionObjectives").value = "";
   document.getElementById("sessionNotes").value = "";
   sessionBlocks = { calentamiento: [], principal: [], vuelta: [] };
+  document.getElementById("sessionAddFolder").value = "";
+  document.getElementById("sessionAddSearch").value = "";
+  updateSessionAddFolderOptions();
   renderSessionTaskList();
   renderSessionTaskBrowser();
   document.getElementById("sessionEditorTitle").textContent = "🗓️ Crear sesión de entrenamiento";
@@ -3668,7 +3748,7 @@ document.getElementById("playForm").onsubmit = async (e) => {
   msgEl.innerHTML = "";
   const payload = {
     title: document.getElementById("playTitle").value.trim(),
-    categoryId: document.getElementById("playCategory").value || null,
+    categoryId: selectedPlayFolderId,
     videoUrl: document.getElementById("playVideoUrl").value.trim(),
     observations: document.getElementById("playObservations").value.trim(),
     animation: { frames: frames },
@@ -3692,7 +3772,7 @@ document.getElementById("playForm").onsubmit = async (e) => {
 document.getElementById("cancelPlayEdit").onclick = () => {
   resetPlayForm();
   showAbpView(abpFormReturnView);
-  if(abpFormReturnView === "category") renderPlayList();
+  if(abpFormReturnView === "bank") renderAbpBank();
 };
 
 function resetPlayForm(){
@@ -3700,6 +3780,8 @@ function resetPlayForm(){
   document.getElementById("playForm").reset();
   document.getElementById("cancelPlayEdit").classList.add("hidden");
   document.getElementById("playFormTitle").textContent = "🎯 Nueva jugada";
+  selectedPlayFolderId = null;
+  renderPlayFolderLabel();
   tokens = []; frames = []; arrows = []; texts = []; shapes = []; paths = [];
   tokenSeq = 0; arrowSeq = 0; textSeq = 0; shapeSeq = 0; pathSeq = 0;
   historyStack = []; selected = null; dragObj = null;
@@ -3713,7 +3795,8 @@ window.editPlay = (id) => {
   if(!p) return;
   editingPlayId = id;
   document.getElementById("playTitle").value = p.title || "";
-  document.getElementById("playCategory").value = p.categoryId || "";
+  selectedPlayFolderId = p.categoryId || null;
+  renderPlayFolderLabel();
   document.getElementById("playVideoUrl").value = p.videoUrl || "";
   document.getElementById("playObservations").value = p.observations || "";
   frames = (p.animation && p.animation.frames) ? JSON.parse(JSON.stringify(p.animation.frames)) : [];
@@ -3734,7 +3817,7 @@ window.editPlay = (id) => {
   document.getElementById("cancelPlayEdit").classList.remove("hidden");
   document.getElementById("playFormTitle").textContent = "✏️ Editando jugada: " + (p.title||"");
   document.querySelector('.tab[data-tab="abp"]').click();
-  abpFormReturnView = "category";
+  abpFormReturnView = "bank";
   showAbpView("new");
   document.getElementById("playEditorPanel").scrollIntoView({behavior:"smooth"});
 };
@@ -3773,15 +3856,28 @@ function renderPlayList(){
   const wrap = document.getElementById("playList");
   const search = document.getElementById("filterAbpSearch").value.trim().toLowerCase();
   const favOnly = document.getElementById("filterAbpFavOnly").checked;
+  const curId = abpCurrentFolder();
   const list = plays.filter(p=>{
-    if(currentAbpCategoryId === "__FAV__"){ if(!isPlayFavorite(p.id)) return false; }
-    else if(currentAbpCategoryId === "__NONE__"){ if(p.categoryId) return false; }
-    else if(currentAbpCategoryId){ if(p.categoryId !== currentAbpCategoryId) return false; }
+    const folderId = p.categoryId || null;
+    if(search){
+      // con texto de búsqueda, se busca en todo el banco, no solo en la carpeta actual
+    } else if(curId === "__FAV__"){
+      if(!isPlayFavorite(p.id)) return false;
+    } else if(curId === "__NONE__"){
+      if(folderId) return false;
+    } else if(curId !== null){
+      if(folderId !== curId) return false;
+    } else {
+      return false; // en la raíz, sin buscar, no se listan jugadas sueltas (solo carpetas arriba)
+    }
     if(search && !(p.title||"").toLowerCase().includes(search)) return false;
     if(favOnly && !isPlayFavorite(p.id)) return false;
     return true;
   });
-  if(list.length===0){ wrap.innerHTML = '<div class="empty">🔍 No hay jugadas que coincidan.</div>'; return; }
+  if(list.length===0){
+    wrap.innerHTML = (curId===null && !search) ? "" : '<div class="empty">🔍 No hay jugadas que coincidan.</div>';
+    return;
+  }
   wrap.innerHTML = list.map(p=>{
     const frameCount = (p.animation && p.animation.frames) ? p.animation.frames.length : 0;
     return `
@@ -3812,12 +3908,19 @@ let editingPlaySessionId = null;
 
 document.getElementById("playSessionFilterCategory").onchange = renderPlaySessionBrowser;
 document.getElementById("playSessionFilterFavOnly").onchange = renderPlaySessionBrowser;
+document.getElementById("playSessionAddSearch").oninput = renderPlaySessionBrowser;
 
 function renderPlaySessionBrowser(){
   const wrap = document.getElementById("playSessionBrowser");
   const catFilter = document.getElementById("playSessionFilterCategory").value;
   const favOnly = document.getElementById("playSessionFilterFavOnly").checked;
-  const list = plays.filter(p=> (!catFilter || p.categoryId===catFilter) && (!favOnly || isPlayFavorite(p.id)) );
+  const searchFilter = document.getElementById("playSessionAddSearch").value.trim().toLowerCase();
+  if(!catFilter && !favOnly && !searchFilter){
+    wrap.innerHTML = '<p class="muted" style="padding:10px 0;">👆 Elige una categoría o escribe un nombre para ver las jugadas disponibles.</p>';
+    return;
+  }
+  const includeIds = catFilter ? new Set([catFilter, ...folderDescendantIds_("abp", catFilter)]) : null;
+  const list = plays.filter(p=> (!includeIds || includeIds.has(p.categoryId||null)) && (!favOnly || isPlayFavorite(p.id)) && (!searchFilter || (p.title||"").toLowerCase().includes(searchFilter)) );
   if(list.length===0){ wrap.innerHTML = '<div class="empty">🔍 No hay jugadas que coincidan.</div>'; return; }
   const inSession = new Set(playSessionItems.map(x=>x.playId));
   wrap.innerHTML = list.map(p=>{
@@ -3912,6 +4015,9 @@ function resetPlaySessionForm(){
   document.getElementById("playSessionDate").value = "";
   document.getElementById("playSessionNotes").value = "";
   document.getElementById("playSessionPublic").checked = false;
+  document.getElementById("playSessionFilterCategory").value = "";
+  document.getElementById("playSessionAddSearch").value = "";
+  document.getElementById("playSessionFilterFavOnly").checked = false;
   playSessionItems = [];
   renderPlaySessionList();
   renderPlaySessionBrowser();
