@@ -991,19 +991,9 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
       <input type="text" id="newCategoryName" placeholder="Ej: Finalización, Portero, Físico...">
       <button class="btn accent" id="btnAddCategory" style="flex:0 0 auto;">Añadir</button>
     </div>
-    <p class="muted" style="margin-top:6px;">Toca el nombre de una subcategoría para moverla a otra categoría.</p>
+    <p class="muted" style="margin-top:6px;">Cambia la categoría de una subcategoría con el desplegable de su fila.</p>
     <div id="categoryModalList" style="margin-top:12px;"></div>
     <button class="btn ghost" id="btnCloseCategoryModal" style="margin-top:14px;width:100%;">Cerrar</button>
-  </div>
-</div>
-
-<!-- ---------- Move category modal ---------- -->
-<div id="moveCategoryModal" class="modal-bg hidden">
-  <div class="modal">
-    <h2 style="font-size:1.05rem;">Mover a...</h2>
-    <p class="muted" id="moveCategoryName" style="margin-top:-6px;"></p>
-    <div id="moveCategoryList" style="margin-top:12px;"></div>
-    <button class="btn ghost" id="btnCloseMoveCategoryModal" style="margin-top:14px;width:100%;">Cancelar</button>
   </div>
 </div>
 
@@ -1882,26 +1872,33 @@ function renderCategoryModalList(){
     <div style="margin-top:14px;">
       <div class="muted" style="font-weight:600;margin-bottom:4px;">${g.icon} ${escapeHtml(g.name)}</div>
       ${subs.map(c=>`
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">
-          <span style="cursor:pointer;" onclick="openMoveCategoryMenu('${c.id}')">${escapeHtml(c.name)} <span class="muted" style="font-size:.78em;">↕ mover</span></span>
-          <button class="btn danger small" onclick="deleteCategory('${c.id}')">Eliminar</button>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;">
+          <span>${escapeHtml(c.name)}</span>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <select data-catid="${c.id}" class="moveCategorySelect" style="padding:6px;">
+              ${TASK_GROUPS.map(g2=>`<option value="${g2.id}" ${catGroup_(c)===g2.id?"selected":""}>${g2.icon} ${escapeHtml(g2.name)}</option>`).join("")}
+            </select>
+            <button class="btn danger small" onclick="deleteCategory('${c.id}')">Eliminar</button>
+          </div>
         </div>`).join("")}
     </div>`;
   }).join("");
+  wrap.querySelectorAll(".moveCategorySelect").forEach(sel=>{
+    sel.onchange = async () => {
+      const catId = sel.dataset.catid;
+      const newGroup = sel.value;
+      sel.disabled = true;
+      try{
+        await db.collection("categories").doc(catId).update({group: newGroup});
+      }catch(err){
+        alert("No se ha podido mover la categoría: " + err.message);
+        renderCategoryModalList();
+      }finally{
+        sel.disabled = false;
+      }
+    };
+  });
 }
-function openMoveCategoryMenu(catId){
-  const c = categories.find(x=>x.id===catId);
-  if(!c) return;
-  document.getElementById("moveCategoryName").textContent = `"${c.name}" está ahora en: ${groupName_(catGroup_(c))}`;
-  document.getElementById("moveCategoryList").innerHTML = TASK_GROUPS.map(g=>`
-    <button type="button" class="btn ${catGroup_(c)===g.id ? "accent" : "ghost"} small" style="width:100%;margin-bottom:6px;justify-content:flex-start;" onclick="moveCategoryGroup('${c.id}','${g.id}'); document.getElementById('moveCategoryModal').classList.add('hidden');">${g.icon} ${escapeHtml(g.name)}${catGroup_(c)===g.id ? " ✓" : ""}</button>
-  `).join("");
-  document.getElementById("moveCategoryModal").classList.remove("hidden");
-}
-document.getElementById("btnCloseMoveCategoryModal").onclick = () => document.getElementById("moveCategoryModal").classList.add("hidden");
-window.moveCategoryGroup = async (id, group) => {
-  await db.collection("categories").doc(id).update({group});
-};
 window.deleteCategory = async (id) => {
   if(!confirm("¿Eliminar esta categoría? Las tareas existentes la mantendrán como texto pero dejará de estar en la lista.")) return;
   await db.collection("categories").doc(id).delete();
