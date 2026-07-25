@@ -991,8 +991,19 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
       <input type="text" id="newCategoryName" placeholder="Ej: Finalización, Portero, Físico...">
       <button class="btn accent" id="btnAddCategory" style="flex:0 0 auto;">Añadir</button>
     </div>
+    <p class="muted" style="margin-top:6px;">Mantén pulsada una subcategoría para moverla a otra categoría.</p>
     <div id="categoryModalList" style="margin-top:12px;"></div>
     <button class="btn ghost" id="btnCloseCategoryModal" style="margin-top:14px;width:100%;">Cerrar</button>
+  </div>
+</div>
+
+<!-- ---------- Move category modal ---------- -->
+<div id="moveCategoryModal" class="modal-bg hidden">
+  <div class="modal">
+    <h2 style="font-size:1.05rem;">Mover a...</h2>
+    <p class="muted" id="moveCategoryName" style="margin-top:-6px;"></p>
+    <div id="moveCategoryList" style="margin-top:12px;"></div>
+    <button class="btn ghost" id="btnCloseMoveCategoryModal" style="margin-top:14px;width:100%;">Cancelar</button>
   </div>
 </div>
 
@@ -1871,18 +1882,32 @@ function renderCategoryModalList(){
     <div style="margin-top:14px;">
       <div class="muted" style="font-weight:600;margin-bottom:4px;">${g.icon} ${escapeHtml(g.name)}</div>
       ${subs.map(c=>`
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;">
-          <span>${escapeHtml(c.name)}</span>
-          <div style="display:flex;gap:6px;align-items:center;">
-            <select onchange="moveCategoryGroup('${c.id}', this.value)" style="padding:4px;">
-              ${TASK_GROUPS.map(g2=>`<option value="${g2.id}" ${catGroup_(c)===g2.id?"selected":""}>${escapeHtml(g2.name)}</option>`).join("")}
-            </select>
-            <button class="btn danger small" onclick="deleteCategory('${c.id}')">Eliminar</button>
-          </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);">
+          <span style="user-select:none;-webkit-user-select:none;touch-action:none;cursor:pointer;" oncontextmenu="return false;" onpointerdown="startLongPress(event,'${c.id}')" onpointerup="cancelLongPress()" onpointerleave="cancelLongPress()" onpointercancel="cancelLongPress()">${escapeHtml(c.name)}</span>
+          <button class="btn danger small" onclick="deleteCategory('${c.id}')">Eliminar</button>
         </div>`).join("")}
     </div>`;
   }).join("");
 }
+let longPressTimer = null;
+window.startLongPress = (e, catId) => {
+  e.preventDefault();
+  cancelLongPress();
+  longPressTimer = setTimeout(()=>{ longPressTimer = null; openMoveCategoryMenu(catId); }, 500);
+};
+window.cancelLongPress = () => {
+  if(longPressTimer){ clearTimeout(longPressTimer); longPressTimer = null; }
+};
+function openMoveCategoryMenu(catId){
+  const c = categories.find(x=>x.id===catId);
+  if(!c) return;
+  document.getElementById("moveCategoryName").textContent = `"${c.name}" está ahora en: ${groupName_(catGroup_(c))}`;
+  document.getElementById("moveCategoryList").innerHTML = TASK_GROUPS.map(g=>`
+    <button type="button" class="btn ${catGroup_(c)===g.id ? "accent" : "ghost"} small" style="width:100%;margin-bottom:6px;justify-content:flex-start;" onclick="moveCategoryGroup('${c.id}','${g.id}'); document.getElementById('moveCategoryModal').classList.add('hidden');">${g.icon} ${escapeHtml(g.name)}${catGroup_(c)===g.id ? " ✓" : ""}</button>
+  `).join("");
+  document.getElementById("moveCategoryModal").classList.remove("hidden");
+}
+document.getElementById("btnCloseMoveCategoryModal").onclick = () => document.getElementById("moveCategoryModal").classList.add("hidden");
 window.moveCategoryGroup = async (id, group) => {
   await db.collection("categories").doc(id).update({group});
 };
