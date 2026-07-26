@@ -661,6 +661,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
             <h2 style="font-size:1.05rem;">📂 Banco de tareas</h2>
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
               <button class="btn ghost small" id="btnNewTaskFolder">📁+ Carpeta</button>
+              <button class="btn ghost small" id="btnDebugTaskFolders">🔧 Ver datos de carpetas</button>
               <button class="btn ghost small" id="btnExportTasksExcel">📊 Exportar a Excel</button>
             </div>
           </div>
@@ -1490,7 +1491,7 @@ function renderTaskFolderList(){
     html += `</div>`;
   }
   if(curId!=="__FAV__" && curId!=="__NONE__"){
-    const folders = folderChildren_("tasks", curId).sort((a,b)=>a.name.localeCompare(b.name,"es"));
+    const folders = folderChildren_("tasks", curId).sort((a,b)=>(a.name||"").localeCompare(b.name||"","es"));
     if(folders.length){
       html += `<div class="home-grid" style="margin-top:10px;">` + folders.map(f=>{
         const count = tasks.filter(t=>taskFolderId(t)===f.id).length;
@@ -1523,6 +1524,32 @@ document.getElementById("btnNewTaskFolder").onclick = async () => {
   try{
     await db.collection("categories").add({name:name.trim(), parentId, createdBy: currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp()});
   }catch(err){ alert("No se ha podido crear la carpeta: " + err.message); }
+};
+document.getElementById("btnDebugTaskFolders").onclick = () => {
+  const ids = new Set(categories.map(c=>c.id));
+  const lines = categories.map(c=>{
+    const parentOk = !c.parentId ? "RAÍZ" : (ids.has(c.parentId) ? "ok" : "⚠️ apunta a un padre que NO existe");
+    return `• "${c.name || '(SIN NOMBRE)'}"  [id: ${c.id}]  parentId: ${c.parentId || "(ninguno)"}  → ${parentOk}`;
+  });
+  const taskCounts = {};
+  let noFolder = 0;
+  tasks.forEach(t=>{
+    const fid = taskFolderId(t);
+    if(!fid) { noFolder++; return; }
+    taskCounts[fid] = (taskCounts[fid]||0) + 1;
+  });
+  const taskLines = Object.keys(taskCounts).map(fid=>{
+    const exists = ids.has(fid) ? "" : "  ⚠️ esa carpeta NO existe";
+    return `• ${taskCounts[fid]} tarea(s) → carpeta id: ${fid}${exists}`;
+  });
+  const report = `CARPETAS (${categories.length}):\n${lines.join("\n")}\n\nTAREAS SIN NINGUNA CARPETA ASIGNADA: ${noFolder}\n\nTAREAS AGRUPADAS POR ID DE CARPETA:\n${taskLines.join("\n")}\n\nTotal de tareas: ${tasks.length}`;
+  console.log(report);
+  const w = window.open("", "_blank");
+  if(w){
+    w.document.write(`<pre style="white-space:pre-wrap;font-family:monospace;font-size:13px;padding:16px;">${report.replace(/[&<>]/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]))}</pre>`);
+  } else {
+    alert(report);
+  }
 };
 
 /* ---------- Navegación interna de ABP (submenú / nueva jugada / banco por carpetas) ---------- */
@@ -1582,7 +1609,7 @@ function renderPlaySessionsFolderList(){
     }
   }
   if(curId!=="__NONE__"){
-    const folders = folderChildren_("playSessions", curId).sort((a,b)=>a.name.localeCompare(b.name,"es"));
+    const folders = folderChildren_("playSessions", curId).sort((a,b)=>(a.name||"").localeCompare(b.name||"","es"));
     if(folders.length){
       html += `<div class="home-grid" style="margin-top:10px;">` + folders.map(f=>{
         const count = playSessions.filter(s=>(s.folderId||null)===f.id).length;
@@ -1658,7 +1685,7 @@ function renderAbpFolderList(){
     html += `</div>`;
   }
   if(curId!=="__FAV__" && curId!=="__NONE__"){
-    const folders = folderChildren_("abp", curId).sort((a,b)=>a.name.localeCompare(b.name,"es"));
+    const folders = folderChildren_("abp", curId).sort((a,b)=>(a.name||"").localeCompare(b.name||"","es"));
     if(folders.length){
       html += `<div class="home-grid" style="margin-top:10px;">` + folders.map(f=>{
         const count = plays.filter(p=>(p.categoryId||null)===f.id).length;
@@ -1980,7 +2007,7 @@ function abpCatName_(id){ const c = abpCategories.find(x=>x.id===id); return c ?
 function folderSelectOptions_(section, placeholder){
   const rows = [];
   (function walk(pid, depth){
-    folderChildren_(section, pid).sort((a,b)=>a.name.localeCompare(b.name,"es")).forEach(f=>{
+    folderChildren_(section, pid).sort((a,b)=>(a.name||"").localeCompare(b.name||"","es")).forEach(f=>{
       rows.push(`<option value="${f.id}">${"— ".repeat(depth)}${escapeHtml(f.name)}</option>`);
       walk(f.id, depth+1);
     });
@@ -2005,7 +2032,7 @@ function openFolderPicker(section, excludeIds, title, callback){
   const rootLabel = section==="tasks" ? "🏦 Raíz (Banco de tareas)" : section==="abp" ? "🏦 Raíz (Banco de ABP)" : "🏦 Raíz (Sesiones de ABP)";
   const rows = [{id:null, name:rootLabel, depth:0}];
   (function walk(pid, depth){
-    folderChildren_(section, pid).sort((a,b)=>a.name.localeCompare(b.name,"es")).forEach(f=>{
+    folderChildren_(section, pid).sort((a,b)=>(a.name||"").localeCompare(b.name||"","es")).forEach(f=>{
       if(!excludeIds || !excludeIds.has(f.id)){
         rows.push({id:f.id, name:f.name, depth});
         walk(f.id, depth+1);
