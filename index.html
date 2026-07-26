@@ -3237,6 +3237,19 @@ window.editTask = (id) => {
 };
 
 window.deleteTask = async (id) => {
+  const curId = taskCurrentFolder();
+  const isRealFolder = curId && curId!=="__FAV__" && curId!=="__NONE__";
+  if(isRealFolder){
+    const t = tasks.find(x=>x.id===id);
+    const ids = t ? taskCategoryIds(t) : [];
+    if(ids.length > 1){
+      if(!confirm("Esta tarea está en varias carpetas. ¿Quitarla solo de esta carpeta? (seguirá existiendo en las demás)")) return;
+      try{
+        await db.collection("tasks").doc(id).update({ categoryIds: ids.filter(x=>x!==curId) });
+      }catch(err){ alert("No se ha podido quitar de la carpeta: " + err.message); }
+      return;
+    }
+  }
   if(!confirm("¿Mover esta tarea a la papelera? Podrás restaurarla más tarde desde la Papelera.")) return;
   await db.collection("tasks").doc(id).update({
     deleted: true,
@@ -4238,6 +4251,20 @@ window.editPlay = (id) => {
 };
 
 window.deletePlay = async (id) => {
+  const inFav = abpBrowserPath.length>0 && abpBrowserPath[0]==="__FAV__";
+  const curId = abpCurrentFolder();
+  const isRealFolder = curId && curId!=="__FAV__" && curId!=="__NONE__" && !inFav;
+  if(isRealFolder){
+    const p = plays.find(x=>x.id===id);
+    const ids = p ? playCategoryIds(p) : [];
+    if(ids.length > 1){
+      if(!confirm("Esta jugada está en varias carpetas. ¿Quitarla solo de esta carpeta? (seguirá existiendo en las demás)")) return;
+      try{
+        await db.collection("plays").doc(id).update({ categoryIds: ids.filter(x=>x!==curId) });
+      }catch(err){ alert("No se ha podido quitar de la carpeta: " + err.message); }
+      return;
+    }
+  }
   if(!confirm("¿Mover esta jugada a la papelera? Podrás restaurarla más tarde desde la Papelera.")) return;
   await db.collection("plays").doc(id).update({
     deleted: true,
