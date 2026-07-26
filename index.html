@@ -2635,6 +2635,12 @@ function tokenRadius(type){
   if(type==="goal") return 30;
   return 20; // jugadores y porteros
 }
+function tokenHitRadius(t){
+  // La portería mantiene una zona de selección pequeña y fija aunque se agrande visualmente,
+  // para no "tapar" con su hitbox a fichas u otros elementos cercanos.
+  if(t.type==="goal") return 16;
+  return tokenRadius(t.type)*(t.scale||1);
+}
 
 const COURT_IMG = new Image();
 COURT_IMG.src = COURT_DATA_URI;
@@ -3026,7 +3032,7 @@ function selectAt(p){
   for(let i=tokens.length-1;i>=0;i--){
     const t = tokens[i];
     const tx=t.x*canvas.width, ty=t.y*canvas.height;
-    const rad = tokenRadius(t.type)*(t.scale||1);
+    const rad = tokenHitRadius(t);
     const dist = Math.hypot(px-tx,py-ty);
     if(dist <= rad+tol){
       const score = dist - rad; // menor = toque más "dentro" de esa ficha en concreto
