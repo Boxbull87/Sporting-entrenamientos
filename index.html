@@ -3010,12 +3010,22 @@ function distToSegment(p,a,b){
   const cx=a.x+t*dx, cy=a.y+t*dy;
   return Math.hypot(p.x-cx, p.y-cy);
 }
+function touchToleranceCanvasPx_(){
+  const rect = canvas.getBoundingClientRect();
+  if(!rect.width) return 12;
+  const scale = canvas.width / rect.width; // unidades del lienzo por cada px real de pantalla
+  return 30 * scale; // margen cómodo para un dedo, ajustado al tamaño real en pantalla
+}
+let dragIsTouch = false;
+const TOUCH_LIFT = 0.09; // desplaza la ficha hacia arriba mientras se arrastra con el dedo, para que no quede tapada
 function selectAt(p){
   const px = p.x*canvas.width, py = p.y*canvas.height;
+  const tol = touchToleranceCanvasPx_();
+  const relTol = tol / canvas.width;
   for(let i=tokens.length-1;i>=0;i--){
     const t = tokens[i];
     const tx=t.x*canvas.width, ty=t.y*canvas.height;
-    const r = (tokenRadius(t.type)*(t.scale||1))+10;
+    const r = (tokenRadius(t.type)*(t.scale||1))+tol;
     if(Math.hypot(px-tx,py-ty) <= r){
       selected = {kind:"token", id:t.id};
       if(t.type==="goal") lastGoalId = t.id;
@@ -3029,7 +3039,7 @@ function selectAt(p){
     ctx.font = "bold "+Math.round(16*(o.scale||1))+"px sans-serif";
     const w = ctx.measureText(o.text).width, h = 18*(o.scale||1);
     const x = o.x*canvas.width, y = o.y*canvas.height;
-    if(px>=x-6 && px<=x+w+6 && py>=y-h-4 && py<=y+8){
+    if(px>=x-6-tol && px<=x+w+6+tol && py>=y-h-4-tol && py<=y+8+tol){
       selected = {kind:"text", id:o.id};
       pushUndoSnapshot();
       dragObj = selected; dragLastPos = p;
@@ -3038,9 +3048,9 @@ function selectAt(p){
   }
   for(let i=shapes.length-1;i>=0;i--){
     const s = shapes[i];
-    const nx = (p.x-s.cx)/s.rx, ny=(p.y-s.cy)/s.ry;
+    const nx = (p.x-s.cx)/(s.rx+relTol), ny=(p.y-s.cy)/(s.ry+relTol);
     const d2 = nx*nx+ny*ny;
-    if(d2<=1.25 && d2>=0.7){
+    if(d2<=1.25 && d2>=0.55){
       selected = {kind:"shape", id:s.id};
       pushUndoSnapshot();
       dragObj = selected; dragLastPos = p;
@@ -3050,7 +3060,7 @@ function selectAt(p){
   for(let i=paths.length-1;i>=0;i--){
     const pth = paths[i];
     for(let j=0;j<pth.points.length-1;j++){
-      if(distToSegment(p, pth.points[j], pth.points[j+1]) < 0.02){
+      if(distToSegment(p, pth.points[j], pth.points[j+1]) < Math.max(0.02, relTol)){
         selected = {kind:"path", id:pth.id};
         pushUndoSnapshot();
         dragObj = selected; dragLastPos = p;
@@ -3060,7 +3070,7 @@ function selectAt(p){
   }
   for(let i=arrows.length-1;i>=0;i--){
     const a = arrows[i];
-    if(distToSegment(p, {x:a.x1,y:a.y1}, {x:a.x2,y:a.y2}) < 0.02){
+    if(distToSegment(p, {x:a.x1,y:a.y1}, {x:a.x2,y:a.y2}) < Math.max(0.02, relTol)){
       selected = {kind:"arrow", id:a.id};
       pushUndoSnapshot();
       dragObj = selected; dragLastPos = p;
@@ -3073,7 +3083,8 @@ function selectAt(p){
 function moveDragObj(p){
   if(!dragObj) return;
   if(dragObj.kind==="token"){
-    const t = tokens.find(o=>o.id===dragObj.id); if(t){ t.x=p.x; t.y=p.y; }
+    const t = tokens.find(o=>o.id===dragObj.id);
+    if(t){ t.x=p.x; t.y = dragIsTouch ? Math.max(0, p.y-TOUCH_LIFT) : p.y; }
   } else if(dragObj.kind==="text"){
     const o = texts.find(o=>o.id===dragObj.id); if(o){ o.x=p.x; o.y=p.y; }
   } else if(dragObj.kind==="shape"){
@@ -3165,18 +3176,20 @@ function boardPointerUp(){
 }
 canvas.addEventListener("mousedown", e=> boardPointerDown(relPos(e.clientX,e.clientY)));
 canvas.addEventListener("mousemove", e=> boardPointerMove(relPos(e.clientX,e.clientY)));
-window.addEventListener("mouseup", ()=> boardPointerUp());
+window.addEventListener("mouseup", ()=> { dragIsTouch = false; boardPointerUp(); });
 canvas.addEventListener("touchstart", e=>{
+  dragIsTouch = true;
   const touch = e.touches[0];
   boardPointerDown(relPos(touch.clientX, touch.clientY));
-  if(mode!=="select") e.preventDefault();
+  e.preventDefault();
 }, {passive:false});
 canvas.addEventListener("touchmove", e=>{
   const touch = e.touches[0];
   boardPointerMove(relPos(touch.clientX, touch.clientY));
-  if(dragObj || shapeDraft || pencilDraft) e.preventDefault();
+  e.preventDefault();
 }, {passive:false});
-canvas.addEventListener("touchend", ()=> boardPointerUp());
+canvas.addEventListener("touchend", ()=> { boardPointerUp(); dragIsTouch = false; });
+canvas.addEventListener("touchcancel", ()=> { boardPointerUp(); dragIsTouch = false; });
 
 document.getElementById("saveFrame").onclick = () => saveCurrentFrame();
 function updateFrameCount(){
