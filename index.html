@@ -3022,17 +3022,23 @@ function selectAt(p){
   const px = p.x*canvas.width, py = p.y*canvas.height;
   const tol = touchToleranceCanvasPx_();
   const relTol = tol / canvas.width;
+  let bestToken = null, bestScore = Infinity;
   for(let i=tokens.length-1;i>=0;i--){
     const t = tokens[i];
     const tx=t.x*canvas.width, ty=t.y*canvas.height;
-    const r = (tokenRadius(t.type)*(t.scale||1))+tol;
-    if(Math.hypot(px-tx,py-ty) <= r){
-      selected = {kind:"token", id:t.id};
-      if(t.type==="goal") lastGoalId = t.id;
-      pushUndoSnapshot();
-      dragObj = selected; dragLastPos = p;
-      redrawBoard(); return;
+    const rad = tokenRadius(t.type)*(t.scale||1);
+    const dist = Math.hypot(px-tx,py-ty);
+    if(dist <= rad+tol){
+      const score = dist - rad; // menor = toque más "dentro" de esa ficha en concreto
+      if(score < bestScore){ bestScore = score; bestToken = t; }
     }
+  }
+  if(bestToken){
+    selected = {kind:"token", id:bestToken.id};
+    if(bestToken.type==="goal") lastGoalId = bestToken.id;
+    pushUndoSnapshot();
+    dragObj = selected; dragLastPos = p;
+    redrawBoard(); return;
   }
   for(let i=texts.length-1;i>=0;i--){
     const o = texts[i];
