@@ -874,6 +874,8 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
             <h2 style="font-size:1.05rem;">📂 Banco de ABP</h2>
             <button class="btn ghost small" id="btnNewAbpFolder">📁+ Carpeta</button>
+            <button class="btn ghost small" id="btnDebugAbpFolders">🔧 Ver datos de carpetas</button>
+            <button class="btn ghost small" id="btnRepairAbpCategoryFolder">🩹 Reparar carpeta Categorías</button>
           </div>
           <div id="abpBreadcrumb" class="breadcrumb"></div>
           <div id="abpFolderList" style="margin-top:10px;"></div>
@@ -1916,6 +1918,67 @@ document.getElementById("btnNewAbpFolder").onclick = async () => {
   try{
     await db.collection("abpCategories").add({name:name.trim(), parentId, createdBy: currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp()});
   }catch(err){ alert("No se ha podido crear la carpeta: " + err.message); }
+};
+document.getElementById("btnRepairAbpCategoryFolder").onclick = async () => {
+  if(!currentCoach || (currentCoach.role !== ROLE_GESTOR && currentCoach.role !== ROLE_EDITOR)){
+    alert("Solo un gestor o editor puede crear/reparar esta carpeta.");
+    return;
+  }
+  try{
+    const rootDoc = abpCategories.find(c=>c.id===ABP_CATEGORY_ROOT_ID);
+    if(!rootDoc){
+      await db.collection("abpCategories").doc(ABP_CATEGORY_ROOT_ID).set({
+        name: ABP_CATEGORY_ROOT_NAME, parentId: null, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, {merge:true});
+    } else if(rootDoc.parentId){
+      await db.collection("abpCategories").doc(ABP_CATEGORY_ROOT_ID).update({ parentId: null });
+    }
+    for(const seed of ABP_CATEGORY_SEED){
+      const c = abpCategories.find(x=>x.id===seed.id);
+      if(!c){
+        await db.collection("abpCategories").doc(seed.id).set({
+          name: seed.name, parentId: ABP_CATEGORY_ROOT_ID, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, {merge:true});
+      } else if(c.parentId !== ABP_CATEGORY_ROOT_ID){
+        await db.collection("abpCategories").doc(seed.id).update({ parentId: ABP_CATEGORY_ROOT_ID });
+      }
+    }
+    alert("Listo. La carpeta \"Categorías\" y sus 7 subcarpetas deberían existir ya, con parentId correcto. Vuelve a entrar en Banco de ABP.");
+  }catch(err){
+    alert("No se ha podido reparar: " + err.message);
+  }
+};
+document.getElementById("btnDebugAbpFolders").onclick = () => {
+  const ids = new Set(abpCategories.map(c=>c.id));
+  const lines = abpCategories.map(c=>{
+    const parentOk = !c.parentId ? "RAÍZ" : (ids.has(c.parentId) ? "ok" : "⚠️ apunta a un padre que NO existe");
+    return `• "${c.name || '(SIN NOMBRE)'}"  [id: ${c.id}]  parentId: ${c.parentId || "(ninguno)"}  → ${parentOk}`;
+  });
+  const rootDoc = abpCategories.find(c=>c.id===ABP_CATEGORY_ROOT_ID);
+  const childStatus = ABP_CATEGORY_SEED.map(seed=>{
+    const c = abpCategories.find(x=>x.id===seed.id);
+    if(!c) return `• "${seed.name}" [${seed.id}] → NO EXISTE`;
+    return `• "${seed.name}" [${seed.id}] → parentId: ${c.parentId||"(ninguno)"} ${c.parentId===ABP_CATEGORY_ROOT_ID?"(ok)":"⚠️ mal enlazada"}`;
+  });
+  const playCounts = {};
+  let noFolder = 0;
+  plays.forEach(p=>{
+    const pids = playCategoryIds(p);
+    if(pids.length===0){ noFolder++; return; }
+    pids.forEach(fid=>{ playCounts[fid] = (playCounts[fid]||0)+1; });
+  });
+  const playLines = Object.keys(playCounts).map(fid=>{
+    const exists = ids.has(fid) ? "" : "  ⚠️ esa carpeta NO existe";
+    return `• ${playCounts[fid]} jugada(s) → carpeta id: ${fid}${exists}`;
+  });
+  const report = `CARPETA RAÍZ "Categorías" (id: ${ABP_CATEGORY_ROOT_ID}): ${rootDoc ? ("existe, parentId=" + (rootDoc.parentId||"(ninguno)")) : "⚠️ NO EXISTE"}\n\nSUBCARPETAS DE CATEGORÍA DE EDAD:\n${childStatus.join("\n")}\n\nTODAS LAS CARPETAS DE ABP (${abpCategories.length}):\n${lines.join("\n")}\n\nJUGADAS SIN NINGUNA CARPETA: ${noFolder}\n\nJUGADAS POR ID DE CARPETA:\n${playLines.join("\n")}\n\nTotal de jugadas: ${plays.length}\nTu rol actual: ${currentCoach ? currentCoach.role : "(desconocido)"}`;
+  console.log(report);
+  const w = window.open("", "_blank");
+  if(w){
+    w.document.write(`<pre style="white-space:pre-wrap;font-family:monospace;font-size:13px;padding:16px;">${report.replace(/[&<>]/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]))}</pre>`);
+  } else {
+    alert(report);
+  }
 };
 
 /* ---------- Navegación interna de Sesiones (submenú / crear / guardadas) ---------- */
