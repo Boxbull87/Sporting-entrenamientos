@@ -620,16 +620,6 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
               <button type="button" class="btn small ghost" id="rotateGoal">🔄 Rotar portería</button>
             </div>
             <div class="board-toolbar">
-              <select id="templateSelect" style="max-width:180px;">
-                <option value="">📐 Plantilla de partida...</option>
-                <option value="1-3-1">1-3-1</option>
-                <option value="4-0">4-0</option>
-                <option value="cuadrado">Cuadrado (2-2)</option>
-                <option value="rombo">Rombo (1-2-1)</option>
-              </select>
-              <button type="button" class="btn small ghost" id="applyTemplate">Aplicar plantilla</button>
-            </div>
-            <div class="board-toolbar">
               <button type="button" class="btn small ghost" id="toggleArrowMode">➜ Flecha</button>
               <button type="button" class="btn small ghost" id="toggleDottedMode">┄ Línea de puntos</button>
               <button type="button" class="btn small ghost" id="toggleTextMode">🔤 Texto</button>
@@ -2853,65 +2843,6 @@ function redrawBoard(){
 
 function pushHistory(kind,id){ /* mantenido por compatibilidad; el deshacer real usa pushUndoSnapshot() */ }
 
-/* ---- Plantillas de formación inicial ---- */
-const BOARD_TEMPLATES = {
-  "1-3-1": [
-    {type:"GA", x:0.06, y:0.5},
-    {type:"A", x:0.28, y:0.5},
-    {type:"A", x:0.55, y:0.18},
-    {type:"A", x:0.55, y:0.5},
-    {type:"A", x:0.55, y:0.82},
-    {type:"A", x:0.82, y:0.5}
-  ],
-  "4-0": [
-    {type:"GA", x:0.06, y:0.5},
-    {type:"A", x:0.4, y:0.15},
-    {type:"A", x:0.4, y:0.38},
-    {type:"A", x:0.4, y:0.62},
-    {type:"A", x:0.4, y:0.85}
-  ],
-  "cuadrado": [
-    {type:"GA", x:0.06, y:0.5},
-    {type:"A", x:0.45, y:0.2},
-    {type:"A", x:0.45, y:0.8},
-    {type:"A", x:0.75, y:0.2},
-    {type:"A", x:0.75, y:0.8}
-  ],
-  "rombo": [
-    {type:"GA", x:0.06, y:0.5},
-    {type:"A", x:0.35, y:0.5},
-    {type:"A", x:0.6, y:0.18},
-    {type:"A", x:0.6, y:0.82},
-    {type:"A", x:0.85, y:0.5}
-  ]
-};
-function applyTemplate(name){
-  const layout = BOARD_TEMPLATES[name];
-  if(!layout) return;
-  if(tokens.length>0 && !confirm("Esto sustituirá las fichas que tengas ahora en la pizarra (las flechas, textos y formas se mantienen). ¿Continuar?")) return;
-  pushUndoSnapshot();
-  tokens = tokens.filter(t=>false); // vaciar solo fichas
-  tokenSeq = 0;
-  layout.forEach(item=>{
-    tokenSeq++;
-    const sameTeam = tokens.filter(t=>t.type===item.type).length;
-    tokens.push({
-      id: "t"+tokenSeq,
-      type: item.type,
-      num: (item.type==="GA"||item.type==="GB"||item.type==="GC"||item.type==="GD") ? "" : sameTeam+1,
-      scale: 1,
-      x: item.x, y: item.y
-    });
-  });
-  selected = null; dragObj = null;
-  redrawBoard();
-  updateFrameCount();
-}
-document.getElementById("applyTemplate").onclick = () => {
-  const val = document.getElementById("templateSelect").value;
-  if(!val){ alert("Elige antes una plantilla de la lista."); return; }
-  applyTemplate(val);
-};
 
 function addToken(type){
   pushUndoSnapshot();
@@ -3425,81 +3356,12 @@ function drawInterpolatedStep_(cx, cvs, frameA, frameB, t){
     const match = toTokens.find(x=>x.id===tok.id) || tok;
     return {...tok, x: tok.x+(match.x-tok.x)*t, y: tok.y+(match.y-tok.y)*t};
   });
-
-  const fromArrows = frameArrows(frameA);
-  const toArrows = frameArrows(frameB);
-  const arrowAlpha = {};
-  const interpArrows = fromArrows.map(a=>{
-    const match = toArrows.find(x=>x.id===a.id);
-    if(match){
-      arrowAlpha[a.id] = 1;
-      return {...a, x1:a.x1+(match.x1-a.x1)*t, y1:a.y1+(match.y1-a.y1)*t, x2:a.x2+(match.x2-a.x2)*t, y2:a.y2+(match.y2-a.y2)*t, width:(a.width||2.5)+((match.width||2.5)-(a.width||2.5))*t};
-    }
-    arrowAlpha[a.id] = 1-t;
-    return a;
-  });
-  toArrows.forEach(a=>{
-    if(!fromArrows.some(x=>x.id===a.id)){
-      arrowAlpha[a.id] = t;
-      interpArrows.push(a);
-    }
-  });
-
-  const fromShapes = frameShapes(frameA);
-  const toShapes = frameShapes(frameB);
-  const shapeAlpha = {};
-  const interpShapes = fromShapes.map(s=>{
-    const match = toShapes.find(x=>x.id===s.id);
-    if(match){
-      shapeAlpha[s.id] = 1;
-      return {...s, cx:s.cx+(match.cx-s.cx)*t, cy:s.cy+(match.cy-s.cy)*t, rx:s.rx+(match.rx-s.rx)*t, ry:s.ry+(match.ry-s.ry)*t};
-    }
-    shapeAlpha[s.id] = 1-t;
-    return s;
-  });
-  toShapes.forEach(s=>{
-    if(!fromShapes.some(x=>x.id===s.id)){
-      shapeAlpha[s.id] = t;
-      interpShapes.push(s);
-    }
-  });
-
-  const fromTexts = frameTexts(frameA);
-  const toTexts = frameTexts(frameB);
-  const textAlpha = {};
-  const interpTexts = fromTexts.map(x=>{
-    const match = toTexts.find(y=>y.id===x.id);
-    textAlpha[x.id] = match ? 1 : (1-t);
-    return x;
-  });
-  toTexts.forEach(x=>{
-    if(!fromTexts.some(y=>y.id===x.id)){
-      textAlpha[x.id] = t;
-      interpTexts.push(x);
-    }
-  });
-
-  const fromPaths = framePaths(frameA);
-  const toPaths = framePaths(frameB);
-  const pathAlpha = {};
-  const interpPaths = fromPaths.map(x=>{
-    const match = toPaths.find(y=>y.id===x.id);
-    pathAlpha[x.id] = match ? 1 : (1-t);
-    return x;
-  });
-  toPaths.forEach(x=>{
-    if(!fromPaths.some(y=>y.id===x.id)){
-      pathAlpha[x.id] = t;
-      interpPaths.push(x);
-    }
-  });
-
   drawCourtOn(cx,cvs);
-  drawShapesOn(cx,cvs, interpShapes, s=>shapeAlpha[s.id]!=null?shapeAlpha[s.id]:1);
-  drawPathsOn(cx,cvs, interpPaths, p=>pathAlpha[p.id]!=null?pathAlpha[p.id]:1);
-  drawArrowsOn(cx,cvs, interpArrows, a=>arrowAlpha[a.id]!=null?arrowAlpha[a.id]:1);
-  drawTokensOn(cx,cvs,interpTokens);
-  drawTextsOn(cx,cvs, interpTexts, x=>textAlpha[x.id]!=null?textAlpha[x.id]:1);
+  drawShapesOn(cx,cvs, frameShapes(frameA));
+  drawPathsOn(cx,cvs, framePaths(frameA));
+  drawArrowsOn(cx,cvs, frameArrows(frameA));
+  drawTokensOn(cx,cvs, interpTokens);
+  drawTextsOn(cx,cvs, frameTexts(frameA));
 }
 function drawStaticFrame_(cx, cvs, f){
   drawCourtOn(cx,cvs);
@@ -3543,6 +3405,16 @@ function playFrames(frameList, cvs, cx, onDone){
 redrawBoard();
 
 /* ---- Exportar animación como GIF ---- */
+let gifWorkerBlobUrl_ = null;
+async function getGifWorkerUrl_(){
+  if(gifWorkerBlobUrl_) return gifWorkerBlobUrl_;
+  const resp = await fetch("https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js");
+  if(!resp.ok) throw new Error("No se ha podido descargar el componente necesario para el GIF (código " + resp.status + ").");
+  const text = await resp.text();
+  const blob = new Blob([text], {type:"application/javascript"});
+  gifWorkerBlobUrl_ = URL.createObjectURL(blob);
+  return gifWorkerBlobUrl_;
+}
 document.getElementById("exportGifBtn").onclick = async () => {
   const btn = document.getElementById("exportGifBtn");
   if(frames.length===0){ alert("Guarda al menos un fotograma antes de exportar."); return; }
@@ -3553,6 +3425,7 @@ document.getElementById("exportGifBtn").onclick = async () => {
   const originalText = btn.textContent;
   btn.disabled = true; btn.textContent = "⏳ Generando GIF...";
   try{
+    const workerUrl = await getGifWorkerUrl_();
     const off = document.createElement("canvas");
     off.width = canvas.width; off.height = canvas.height;
     const octx = off.getContext("2d");
@@ -3561,7 +3434,7 @@ document.getElementById("exportGifBtn").onclick = async () => {
       quality: 10,
       width: off.width,
       height: off.height,
-      workerScript: "https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js"
+      workerScript: workerUrl
     });
     const stepsPerTransition = 16;
     const frameDelay = Math.max(30, Math.round(1400/stepsPerTransition));
@@ -3578,12 +3451,27 @@ document.getElementById("exportGifBtn").onclick = async () => {
       drawStaticFrame_(octx, off, frames[frames.length-1]);
       gif.addFrame(off, {copy:true, delay: 900});
     }
+    const timeoutId = setTimeout(()=>{
+      alert("La generación del GIF está tardando demasiado o se ha bloqueado. Inténtalo de nuevo; si sigue fallando, puede que tu red bloquee la descarga del componente necesario.");
+      btn.disabled = false; btn.textContent = originalText;
+    }, 30000);
     gif.on("finished", (blob) => {
+      clearTimeout(timeoutId);
+      if(!blob || blob.size===0){
+        alert("El GIF se ha generado vacío. Inténtalo de nuevo.");
+        btn.disabled = false; btn.textContent = originalText;
+        return;
+      }
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url; a.download = "jugada.gif";
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       setTimeout(()=>URL.revokeObjectURL(url), 8000);
+      btn.disabled = false; btn.textContent = originalText;
+    });
+    gif.on("abort", ()=>{
+      clearTimeout(timeoutId);
+      alert("Se ha cancelado la generación del GIF.");
       btn.disabled = false; btn.textContent = originalText;
     });
     gif.render();
