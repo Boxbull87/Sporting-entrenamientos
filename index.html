@@ -431,6 +431,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
 
 <!-- ================= APP ================= -->
 <div id="app" class="hidden">
+  <div id="syncErrorBanner" class="hidden" style="background:#fdecea;color:#611a15;border-bottom:2px solid #e74c3c;padding:10px 14px;font-size:.85rem;"></div>
   <div class="topbar">
     <div class="brand" id="brandHomeBtn" style="cursor:pointer;" title="Ir al menú principal"><img class="crest crest-img" alt="Escudo"> Sporting FS Almería</div>
     <div class="userbox">
@@ -1716,6 +1717,13 @@ document.getElementById("brandHomeBtn").onclick = () => {
 /* ============================================================
    REALTIME LISTENERS
 ============================================================= */
+function showSyncError_(label, err){
+  console.error("Error cargando " + label, err);
+  const el = document.getElementById("syncErrorBanner");
+  if(!el) return;
+  el.classList.remove("hidden");
+  el.innerHTML += `<div>⚠️ No se ha podido cargar "${escapeHtml(label)}": ${escapeHtml(err && err.message ? err.message : String(err))}</div>`;
+}
 function attachRealtimeListeners(){
   db.collection("categories").orderBy("name").onSnapshot(snap=>{
     categories = snap.docs.map(d=>({id:d.id, ...d.data()}));
@@ -1730,7 +1738,7 @@ function attachRealtimeListeners(){
     renderCategorySelects();
     if(document.getElementById("taskFolderList")) renderTaskFolderList();
     renderTaskFolderLabel();
-  });
+  }, err => showSyncError_("categorías", err));
 
   db.collection("tasks").orderBy("createdAt","desc").onSnapshot(snap=>{
     const all = snap.docs.map(d=>({id:d.id, ...d.data()}));
@@ -1742,12 +1750,12 @@ function attachRealtimeListeners(){
     renderTrash();
     renderNotifications();
     handleDeepLink();
-  });
+  }, err => showSyncError_("tareas", err));
 
   db.collection("coaches").orderBy("createdAt","asc").onSnapshot(snap=>{
     coaches = snap.docs.map(d=>({id:d.id, ...d.data()}));
     renderCoachList();
-  });
+  }, err => showSyncError_("entrenadores", err));
 
   db.collection("sessions").orderBy("createdAt","desc").onSnapshot(snap=>{
     const all = snap.docs.map(d=>({id:d.id, ...d.data()}));
@@ -1756,14 +1764,14 @@ function attachRealtimeListeners(){
     renderSavedSessions();
     renderTrash();
     renderNotifications();
-  });
+  }, err => showSyncError_("sesiones de entrenamiento", err));
 
   db.collection("abpCategories").orderBy("name").onSnapshot(snap=>{
     abpCategories = snap.docs.map(d=>({id:d.id, ...d.data()}));
     renderAbpCategorySelects();
     if(document.getElementById("abpFolderList")) renderAbpFolderList();
     renderPlayFolderLabel();
-  });
+  }, err => showSyncError_("carpetas de ABP", err));
 
   db.collection("plays").orderBy("createdAt","desc").onSnapshot(snap=>{
     const all = snap.docs.map(d=>({id:d.id, ...d.data()}));
@@ -1774,12 +1782,12 @@ function attachRealtimeListeners(){
     renderPlaySessionBrowser();
     renderTrash();
     renderNotifications();
-  });
+  }, err => showSyncError_("jugadas de ABP", err));
 
   db.collection("playSessionFolders").orderBy("name").onSnapshot(snap=>{
     playSessionFolders = snap.docs.map(d=>({id:d.id, ...d.data()}));
     if(document.getElementById("playSessionsFolderList")) renderPlaySessionsFolderList();
-  });
+  }, err => showSyncError_("carpetas de sesiones de ABP", err));
 
   db.collection("playSessions").orderBy("createdAt","desc").onSnapshot(snap=>{
     const all = snap.docs.map(d=>({id:d.id, ...d.data()}));
@@ -1789,13 +1797,13 @@ function attachRealtimeListeners(){
     if(document.getElementById("playSessionsFolderList")) renderPlaySessionsFolderList();
     renderTrash();
     renderNotifications();
-  });
+  }, err => showSyncError_("sesiones de ABP", err));
 
   db.collection("gameModelFiles").orderBy("uploadedAt","desc").onSnapshot(snap=>{
     gameModelFiles = snap.docs.map(d=>({id:d.id, ...d.data()}));
     renderModeloList();
     renderNotifications();
-  });
+  }, err => showSyncError_("modelo de juego", err));
 }
 
 /* ============================================================
