@@ -29,6 +29,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -619,17 +620,29 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
               <button type="button" class="btn small ghost" id="rotateGoal">🔄 Rotar portería</button>
             </div>
             <div class="board-toolbar">
+              <select id="templateSelect" style="max-width:180px;">
+                <option value="">📐 Plantilla de partida...</option>
+                <option value="1-3-1">1-3-1</option>
+                <option value="4-0">4-0</option>
+                <option value="cuadrado">Cuadrado (2-2)</option>
+                <option value="rombo">Rombo (1-2-1)</option>
+              </select>
+              <button type="button" class="btn small ghost" id="applyTemplate">Aplicar plantilla</button>
+            </div>
+            <div class="board-toolbar">
               <button type="button" class="btn small ghost" id="toggleArrowMode">➜ Flecha</button>
               <button type="button" class="btn small ghost" id="toggleDottedMode">┄ Línea de puntos</button>
               <button type="button" class="btn small ghost" id="toggleTextMode">🔤 Texto</button>
               <button type="button" class="btn small ghost" id="toggleCircleMode">⭕ Rodear</button>
               <button type="button" class="btn small ghost" id="togglePencilMode">✏️ Línea libre</button>
               <button type="button" class="btn small ghost" id="undoLast">↩ Deshacer</button>
+              <button type="button" class="btn small ghost" id="redoLast">↪ Rehacer</button>
               <span class="muted" id="modeHint" style="display:none;"></span>
             </div>
             <div class="board-toolbar">
               <button type="button" class="btn small ghost" id="growSelected">🔍+ Agrandar</button>
               <button type="button" class="btn small ghost" id="shrinkSelected">🔍- Reducir</button>
+              <button type="button" class="btn small ghost" id="setTokenLabel">🔢 Dorsal</button>
               <button type="button" class="btn small danger" id="deleteSelected">🗑 Borrar selección</button>
               <button type="button" class="btn small danger" id="clearBoard">Vaciar pizarra</button>
             </div>
@@ -639,10 +652,19 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
               <button type="button" class="btn ghost small" id="playAnim">▶ Reproducir</button>
               <button type="button" class="btn ghost small" id="stopAnim">⏹ Detener</button>
               <button type="button" class="btn ghost small" id="expandEditorBoard">⛶ Ampliar</button>
+              <button type="button" class="btn ghost small" id="exportGifBtn">🎬 Exportar GIF</button>
               <span class="muted" id="frameCount">0 fotogramas</span>
+              <span class="muted" id="boardDirtyIndicator" style="display:none;color:var(--danger,#c0392b);font-weight:600;">● cambios sin guardar</span>
+            </div>
+            <div class="board-toolbar">
+              <button type="button" class="btn small ghost" id="prevFrameBtn">⏮ Anterior</button>
+              <input type="range" id="frameSeek" min="0" max="0" value="0" step="1" style="flex:1;min-width:120px;">
+              <button type="button" class="btn small ghost" id="nextFrameBtn">Siguiente ⏭</button>
+              <label class="muted" style="display:flex;align-items:center;gap:4px;white-space:nowrap;"><input type="checkbox" id="loopPlayback"> 🔁 Bucle</label>
             </div>
             <div class="frames-list" id="framesList"></div>
           </div>
+
 
           <div style="margin-top:16px;display:flex;gap:8px;">
             <button type="submit" class="btn accent">Guardar tarea</button>
@@ -1090,11 +1112,13 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
       <button type="button" class="btn small ghost" id="fsToggleCircleMode">⭕ Rodear</button>
       <button type="button" class="btn small ghost" id="fsTogglePencilMode">✏️ Línea libre</button>
       <button type="button" class="btn small ghost" id="fsUndoLast">↩ Deshacer</button>
+      <button type="button" class="btn small ghost" id="fsRedoLast">↪ Rehacer</button>
       <span class="muted" id="fsModeHint" style="display:none;"></span>
     </div>
     <div class="board-toolbar">
       <button type="button" class="btn small ghost" id="fsGrowSelected">🔍+ Agrandar</button>
       <button type="button" class="btn small ghost" id="fsShrinkSelected">🔍- Reducir</button>
+      <button type="button" class="btn small ghost" id="fsSetTokenLabel">🔢 Dorsal</button>
       <button type="button" class="btn small danger" id="fsDeleteSelected">🗑 Borrar selección</button>
       <button type="button" class="btn small danger" id="fsClearBoard">Vaciar pizarra</button>
     </div>
@@ -1547,6 +1571,7 @@ let taskFormReturnView = "home"; // adónde volver al terminar de crear/editar u
 document.getElementById("tasksGoNew").onclick = () => { taskFormReturnView = "home"; showTasksView("new"); };
 document.getElementById("tasksGoBank").onclick = () => { showTasksView("bank"); renderTaskBank(); };
 document.getElementById("tasksNewBack").onclick = () => {
+  if(!confirmDiscardBoard()) return;
   resetTaskForm();
   showTasksView(taskFormReturnView);
   if(taskFormReturnView === "bank") renderTaskBank();
@@ -1703,6 +1728,7 @@ document.getElementById("abpGoBank").onclick = () => { showAbpView("bank"); rend
 document.getElementById("abpGoSessions").onclick = () => { abpSessionFormReturnView = "home"; showAbpView("sessions"); };
 document.getElementById("abpGoSessionsSaved").onclick = () => { showAbpView("sessionsSaved"); renderAbpSessionsBank(); };
 document.getElementById("abpNewBack").onclick = () => {
+  if(!confirmDiscardBoard()) return;
   resetPlayForm();
   showAbpView(abpFormReturnView);
   if(abpFormReturnView === "bank") renderPlayList();
@@ -2559,7 +2585,44 @@ let pencilDraft = null; // array of points while drawing freehand
 let animRunning = false;
 let animReq = null;
 let lastGoalId = null;
-let historyStack = [];  // generic undo stack: {kind,id}
+let historyStack = [];  // (compatibilidad, ya no se usa para deshacer)
+let undoStack = [];
+let redoStack = [];
+let boardDirty = false;
+function markBoardDirty(){
+  boardDirty = true;
+  const el = document.getElementById("boardDirtyIndicator");
+  if(el) el.style.display = "inline";
+}
+function clearBoardDirty(){
+  boardDirty = false;
+  const el = document.getElementById("boardDirtyIndicator");
+  if(el) el.style.display = "none";
+}
+function confirmDiscardBoard(){
+  if(!boardDirty) return true;
+  return confirm("Tienes cambios sin guardar en la pizarra táctica. Si sales ahora se perderán. ¿Continuar?");
+}
+window.addEventListener("beforeunload", (e)=>{
+  if(boardDirty){ e.preventDefault(); e.returnValue = ""; }
+});
+function boardSnapshot_(){
+  return JSON.stringify({tokens, arrows, texts, shapes, paths, frames, activeFrameIndex});
+}
+function pushUndoSnapshot(){
+  undoStack.push(boardSnapshot_());
+  if(undoStack.length>60) undoStack.shift();
+  redoStack = [];
+  markBoardDirty();
+}
+function restoreBoardSnapshot_(json){
+  const s = JSON.parse(json);
+  tokens = s.tokens; arrows = s.arrows; texts = s.texts; shapes = s.shapes; paths = s.paths;
+  if(s.frames !== undefined) frames = s.frames;
+  if(s.activeFrameIndex !== undefined) activeFrameIndex = s.activeFrameIndex;
+  selected = null; dragObj = null;
+  redrawBoard(); updateFrameCount(); renderFramesList();
+}
 
 function relPos(clientX, clientY){
   const rect = canvas.getBoundingClientRect();
@@ -2680,8 +2743,9 @@ function drawTokensOn(cx,cvs,list){
     cx.fillText(isGK ? "P" : t.num, x, y);
   });
 }
-function drawArrowsOn(cx,cvs,list){
+function drawArrowsOn(cx,cvs,list,alphaFn){
   (list||[]).forEach(a=>{
+    cx.globalAlpha = alphaFn ? alphaFn(a) : 1;
     const x1=a.x1*cvs.width, y1=a.y1*cvs.height, x2=a.x2*cvs.width, y2=a.y2*cvs.height;
     const w = a.width || 2.5;
     cx.strokeStyle = "#fff176"; cx.lineWidth = w;
@@ -2703,33 +2767,40 @@ function drawArrowsOn(cx,cvs,list){
       cx.fillStyle = "#fff176";
       cx.fill();
     }
+    cx.globalAlpha = 1;
   });
 }
-function drawTextsOn(cx,cvs,list){
+function drawTextsOn(cx,cvs,list,alphaFn){
   (list||[]).forEach(t=>{
+    cx.globalAlpha = alphaFn ? alphaFn(t) : 1;
     const x=t.x*cvs.width, y=t.y*cvs.height;
     cx.font = "bold "+Math.round(16*(t.scale||1))+"px sans-serif";
     cx.textAlign = "left"; cx.textBaseline = "alphabetic";
     cx.lineWidth = 3; cx.strokeStyle = "#000"; cx.strokeText(t.text, x, y);
     cx.fillStyle = "#fff"; cx.fillText(t.text, x, y);
+    cx.globalAlpha = 1;
   });
 }
-function drawShapesOn(cx,cvs,list){
+function drawShapesOn(cx,cvs,list,alphaFn){
   (list||[]).forEach(s=>{
+    cx.globalAlpha = alphaFn ? alphaFn(s) : 1;
     const x=s.cx*cvs.width, y=s.cy*cvs.height, rx=Math.max(4,s.rx*cvs.width), ry=Math.max(4,s.ry*cvs.height);
     cx.beginPath();
     cx.ellipse(x,y,rx,ry,0,0,Math.PI*2);
     cx.strokeStyle = "#fff176"; cx.lineWidth = 3; cx.setLineDash([]);
     cx.stroke();
+    cx.globalAlpha = 1;
   });
 }
-function drawPathsOn(cx,cvs,list){
+function drawPathsOn(cx,cvs,list,alphaFn){
   (list||[]).forEach(p=>{
     if(!p.points || p.points.length<2) return;
+    cx.globalAlpha = alphaFn ? alphaFn(p) : 1;
     cx.beginPath();
     cx.moveTo(p.points[0].x*cvs.width, p.points[0].y*cvs.height);
     for(let i=1;i<p.points.length;i++) cx.lineTo(p.points[i].x*cvs.width, p.points[i].y*cvs.height);
     cx.strokeStyle = "#ffffff"; cx.lineWidth = 3; cx.lineCap="round"; cx.lineJoin="round"; cx.stroke();
+    cx.globalAlpha = 1;
   });
 }
 function drawSelectionHighlight(cx,cvs){
@@ -2780,9 +2851,70 @@ function redrawBoard(){
   drawSelectionHighlight(ctx, canvas);
 }
 
-function pushHistory(kind,id){ historyStack.push({kind,id}); }
+function pushHistory(kind,id){ /* mantenido por compatibilidad; el deshacer real usa pushUndoSnapshot() */ }
+
+/* ---- Plantillas de formación inicial ---- */
+const BOARD_TEMPLATES = {
+  "1-3-1": [
+    {type:"GA", x:0.06, y:0.5},
+    {type:"A", x:0.28, y:0.5},
+    {type:"A", x:0.55, y:0.18},
+    {type:"A", x:0.55, y:0.5},
+    {type:"A", x:0.55, y:0.82},
+    {type:"A", x:0.82, y:0.5}
+  ],
+  "4-0": [
+    {type:"GA", x:0.06, y:0.5},
+    {type:"A", x:0.4, y:0.15},
+    {type:"A", x:0.4, y:0.38},
+    {type:"A", x:0.4, y:0.62},
+    {type:"A", x:0.4, y:0.85}
+  ],
+  "cuadrado": [
+    {type:"GA", x:0.06, y:0.5},
+    {type:"A", x:0.45, y:0.2},
+    {type:"A", x:0.45, y:0.8},
+    {type:"A", x:0.75, y:0.2},
+    {type:"A", x:0.75, y:0.8}
+  ],
+  "rombo": [
+    {type:"GA", x:0.06, y:0.5},
+    {type:"A", x:0.35, y:0.5},
+    {type:"A", x:0.6, y:0.18},
+    {type:"A", x:0.6, y:0.82},
+    {type:"A", x:0.85, y:0.5}
+  ]
+};
+function applyTemplate(name){
+  const layout = BOARD_TEMPLATES[name];
+  if(!layout) return;
+  if(tokens.length>0 && !confirm("Esto sustituirá las fichas que tengas ahora en la pizarra (las flechas, textos y formas se mantienen). ¿Continuar?")) return;
+  pushUndoSnapshot();
+  tokens = tokens.filter(t=>false); // vaciar solo fichas
+  tokenSeq = 0;
+  layout.forEach(item=>{
+    tokenSeq++;
+    const sameTeam = tokens.filter(t=>t.type===item.type).length;
+    tokens.push({
+      id: "t"+tokenSeq,
+      type: item.type,
+      num: (item.type==="GA"||item.type==="GB"||item.type==="GC"||item.type==="GD") ? "" : sameTeam+1,
+      scale: 1,
+      x: item.x, y: item.y
+    });
+  });
+  selected = null; dragObj = null;
+  redrawBoard();
+  updateFrameCount();
+}
+document.getElementById("applyTemplate").onclick = () => {
+  const val = document.getElementById("templateSelect").value;
+  if(!val){ alert("Elige antes una plantilla de la lista."); return; }
+  applyTemplate(val);
+};
 
 function addToken(type){
+  pushUndoSnapshot();
   tokenSeq++;
   const sameTeam = tokens.filter(t=>t.type===type).length;
   const isPlayerLike = ["A","B","C","D","GA","GB","GC","GD"].includes(type);
@@ -2824,6 +2956,7 @@ wire2("addGoal","fsAddGoal", ()=>addToken("goal"));
 function rotateGoalFn(){
   const goals = tokens.filter(t=>t.type==="goal");
   if(goals.length===0){ alert("Añade primero una portería."); return; }
+  pushUndoSnapshot();
   const target = goals.find(g=>g.id===lastGoalId) || goals[goals.length-1];
   const order = ["down","right","up","left"];
   const idx = order.indexOf(target.dir||"down");
@@ -2835,9 +2968,10 @@ wire2("rotateGoal","fsRotateGoal", rotateGoalFn);
 
 function clearBoardFn(){
   if(!confirm("¿Vaciar la pizarra y borrar los fotogramas guardados?")) return;
+  pushUndoSnapshot();
   tokens = []; frames = []; arrows = []; texts = []; shapes = []; paths = [];
   tokenSeq = 0; arrowSeq = 0; textSeq = 0; shapeSeq = 0; pathSeq = 0;
-  historyStack = []; selected = null; dragObj = null; lastGoalId = null;
+  selected = null; dragObj = null; lastGoalId = null; activeFrameIndex = null;
   setMode("select");
   redrawBoard(); renderFramesList();
 }
@@ -2878,6 +3012,7 @@ wire2("togglePencilMode","fsTogglePencilMode", ()=>setMode("pencil"));
 function handleArrowClick(p){
   if(!arrowStart){ arrowStart = p; }
   else{
+    pushUndoSnapshot();
     arrowSeq++;
     const id = "a"+arrowSeq;
     arrows.push({id, x1:arrowStart.x, y1:arrowStart.y, x2:p.x, y2:p.y, width:2.5, dashed: mode==="dotted"});
@@ -2889,6 +3024,7 @@ function handleArrowClick(p){
 function handleTextClick(p){
   const txt = prompt("Escribe el texto para la pizarra:");
   if(!txt || !txt.trim()) return;
+  pushUndoSnapshot();
   textSeq++;
   const id = "x"+textSeq;
   texts.push({id, x:p.x, y:p.y, text:txt.trim(), scale:1});
@@ -2897,6 +3033,7 @@ function handleTextClick(p){
 }
 function finalizeShape(){
   const d = shapeDraft; shapeDraft = null;
+  pushUndoSnapshot();
   let rx = Math.abs(d.x2-d.x1)/2, ry = Math.abs(d.y2-d.y1)/2;
   if(rx<0.03) rx = 0.06; if(ry<0.03) ry = 0.06;
   const cx = (d.x1+d.x2)/2, cy = (d.y1+d.y2)/2;
@@ -2909,6 +3046,7 @@ function finalizeShape(){
 function finalizePencil(){
   const pts = pencilDraft; pencilDraft = null;
   if(!pts || pts.length<2) return;
+  pushUndoSnapshot();
   pathSeq++;
   const id = "p"+pathSeq;
   paths.push({id, points: pts});
@@ -2917,17 +3055,20 @@ function finalizePencil(){
 }
 
 function undoLast(){
-  const last = historyStack.pop();
-  if(!last) return;
-  if(selected && selected.id===last.id) selected = null;
-  if(last.kind==="token") tokens = tokens.filter(o=>o.id!==last.id);
-  else if(last.kind==="arrow") arrows = arrows.filter(o=>o.id!==last.id);
-  else if(last.kind==="text") texts = texts.filter(o=>o.id!==last.id);
-  else if(last.kind==="shape") shapes = shapes.filter(o=>o.id!==last.id);
-  else if(last.kind==="path") paths = paths.filter(o=>o.id!==last.id);
-  redrawBoard(); updateFrameCount();
+  if(undoStack.length===0) return;
+  redoStack.push(boardSnapshot_());
+  const prev = undoStack.pop();
+  restoreBoardSnapshot_(prev);
 }
 wire2("undoLast","fsUndoLast", undoLast);
+function redoLast(){
+  if(redoStack.length===0) return;
+  undoStack.push(boardSnapshot_());
+  const next = redoStack.pop();
+  restoreBoardSnapshot_(next);
+  markBoardDirty();
+}
+wire2("redoLast","fsRedoLast", redoLast);
 
 /* ---- Selección, arrastre, agrandar/reducir y borrar ---- */
 function distToSegment(p,a,b){
@@ -2947,6 +3088,7 @@ function selectAt(p){
     if(Math.hypot(px-tx,py-ty) <= r){
       selected = {kind:"token", id:t.id};
       if(t.type==="goal") lastGoalId = t.id;
+      pushUndoSnapshot();
       dragObj = selected; dragLastPos = p;
       redrawBoard(); return;
     }
@@ -2958,6 +3100,7 @@ function selectAt(p){
     const x = o.x*canvas.width, y = o.y*canvas.height;
     if(px>=x-6 && px<=x+w+6 && py>=y-h-4 && py<=y+8){
       selected = {kind:"text", id:o.id};
+      pushUndoSnapshot();
       dragObj = selected; dragLastPos = p;
       redrawBoard(); return;
     }
@@ -2968,6 +3111,7 @@ function selectAt(p){
     const d2 = nx*nx+ny*ny;
     if(d2<=1.25 && d2>=0.7){
       selected = {kind:"shape", id:s.id};
+      pushUndoSnapshot();
       dragObj = selected; dragLastPos = p;
       redrawBoard(); return;
     }
@@ -2977,6 +3121,7 @@ function selectAt(p){
     for(let j=0;j<pth.points.length-1;j++){
       if(distToSegment(p, pth.points[j], pth.points[j+1]) < 0.02){
         selected = {kind:"path", id:pth.id};
+        pushUndoSnapshot();
         dragObj = selected; dragLastPos = p;
         redrawBoard(); return;
       }
@@ -2986,6 +3131,7 @@ function selectAt(p){
     const a = arrows[i];
     if(distToSegment(p, {x:a.x1,y:a.y1}, {x:a.x2,y:a.y2}) < 0.02){
       selected = {kind:"arrow", id:a.id};
+      pushUndoSnapshot();
       dragObj = selected; dragLastPos = p;
       redrawBoard(); return;
     }
@@ -3012,6 +3158,7 @@ function moveDragObj(p){
 }
 function resizeSelected(factor){
   if(!selected){ alert("Primero toca un elemento de la pizarra para seleccionarlo."); return; }
+  pushUndoSnapshot();
   if(selected.kind==="token"){
     const t = tokens.find(o=>o.id===selected.id);
     if(t) t.scale = Math.max(0.5, Math.min(2.2, (t.scale||1)*factor));
@@ -3040,8 +3187,23 @@ function resizeSelected(factor){
 wire2("growSelected","fsGrowSelected", ()=>resizeSelected(1.15));
 wire2("shrinkSelected","fsShrinkSelected", ()=>resizeSelected(0.87));
 
+function setTokenLabel(){
+  if(!selected || selected.kind!=="token"){ alert("Primero toca una ficha de jugador para asignarle un dorsal."); return; }
+  const t = tokens.find(o=>o.id===selected.id);
+  if(!t) return;
+  if(["GA","GB","GC","GD"].includes(t.type)){ alert("Los porteros se muestran siempre con 'P'."); return; }
+  if(t.type==="ball" || t.type==="cone" || t.type==="goal"){ alert("Este elemento no lleva dorsal."); return; }
+  const val = prompt("Dorsal o etiqueta corta para esta ficha (2-3 caracteres):", String(t.num!=null ? t.num : ""));
+  if(val===null) return;
+  pushUndoSnapshot();
+  t.num = val.trim().slice(0,3);
+  redrawBoard();
+}
+wire2("setTokenLabel","fsSetTokenLabel", setTokenLabel);
+
 function deleteSelected(){
   if(!selected){ alert("Primero toca un elemento de la pizarra para seleccionarlo."); return; }
+  pushUndoSnapshot();
   if(selected.kind==="token") tokens = tokens.filter(o=>o.id!==selected.id);
   else if(selected.kind==="text") texts = texts.filter(o=>o.id!==selected.id);
   else if(selected.kind==="shape") shapes = shapes.filter(o=>o.id!==selected.id);
@@ -3088,14 +3250,24 @@ canvas.addEventListener("touchend", ()=> boardPointerUp());
 document.getElementById("saveFrame").onclick = () => saveCurrentFrame();
 function updateFrameCount(){
   document.getElementById("frameCount").textContent = frames.length + " fotogramas";
+  const seek = document.getElementById("frameSeek");
+  if(seek){
+    seek.max = Math.max(0, frames.length-1);
+    seek.value = activeFrameIndex!=null ? activeFrameIndex : 0;
+    seek.disabled = frames.length===0;
+  }
 }
 let activeFrameIndex = null; // qué fotograma está cargado ahora mismo en la pizarra
 function renderFramesList(){
   updateFrameCount();
   const wrap = document.getElementById("framesList");
   wrap.innerHTML = frames.map((f,i)=>`
-    <div class="frame-chip ${activeFrameIndex===i ? "active" : ""}" title="Toca para cargar el fotograma ${i+1} en la pizarra" onclick="loadFrame(${i})">
-      ${i+1}<span class="rm" onclick="event.stopPropagation(); removeFrame(${i})">×</span>
+    <div class="frame-chip ${activeFrameIndex===i ? "active" : ""}" title="Toca para cargar el fotograma ${i+1} en la pizarra">
+      <span onclick="loadFrame(${i})" style="cursor:pointer;">${i+1}</span>
+      <span class="rm" title="Mover a la izquierda" onclick="event.stopPropagation(); moveFrame(${i},-1)" style="cursor:pointer;">◀</span>
+      <span class="rm" title="Mover a la derecha" onclick="event.stopPropagation(); moveFrame(${i},1)" style="cursor:pointer;">▶</span>
+      <span class="rm" title="Duplicar fotograma" onclick="event.stopPropagation(); duplicateFrame(${i})" style="cursor:pointer;">⧉</span>
+      <span class="rm" title="Eliminar fotograma" onclick="event.stopPropagation(); removeFrame(${i})">×</span>
     </div>`).join("");
 }
 window.loadFrame = (i) => {
@@ -3111,7 +3283,7 @@ window.loadFrame = (i) => {
   textSeq = texts.reduce((m,o)=> Math.max(m, parseInt((o.id||"x0").slice(1))||0), 0);
   shapeSeq = shapes.reduce((m,o)=> Math.max(m, parseInt((o.id||"c0").slice(1))||0), 0);
   pathSeq = paths.reduce((m,o)=> Math.max(m, parseInt((o.id||"p0").slice(1))||0), 0);
-  historyStack = []; selected = null; dragObj = null;
+  selected = null; dragObj = null;
   lastGoalId = null;
   activeFrameIndex = i;
   setMode("select");
@@ -3122,13 +3294,48 @@ window.removeFrame = (i) => {
   frames.splice(i,1);
   if(activeFrameIndex === i) activeFrameIndex = null;
   else if(activeFrameIndex !== null && activeFrameIndex > i) activeFrameIndex--;
+  markBoardDirty();
   renderFramesList();
 };
+window.moveFrame = (i, dir) => {
+  const j = i + dir;
+  if(j<0 || j>=frames.length) return;
+  const tmp = frames[i]; frames[i] = frames[j]; frames[j] = tmp;
+  if(activeFrameIndex===i) activeFrameIndex = j;
+  else if(activeFrameIndex===j) activeFrameIndex = i;
+  markBoardDirty();
+  renderFramesList();
+};
+window.duplicateFrame = (i) => {
+  const clone = JSON.parse(JSON.stringify(frames[i]));
+  frames.splice(i+1, 0, clone);
+  markBoardDirty();
+  renderFramesList();
+};
+document.getElementById("prevFrameBtn").onclick = () => {
+  const i = activeFrameIndex==null ? 0 : activeFrameIndex-1;
+  if(i>=0 && i<frames.length) loadFrame(i);
+};
+document.getElementById("nextFrameBtn").onclick = () => {
+  const i = activeFrameIndex==null ? 0 : activeFrameIndex+1;
+  if(i>=0 && i<frames.length) loadFrame(i);
+};
+document.getElementById("frameSeek").oninput = (e) => {
+  const i = Number(e.target.value);
+  if(frames[i]) loadFrame(i);
+};
+
 
 function stopAnimFn(){
   animRunning=false; if(animReq) cancelAnimationFrame(animReq); redrawBoard();
 }
-wire2("playAnim","fsPlayAnim", () => playFrames(frames, canvas, ctx, ()=>{}));
+function playWithLoop_(){
+  playFrames(frames, canvas, ctx, () => {
+    const loop = document.getElementById("loopPlayback");
+    if(loop && loop.checked) playWithLoop_();
+  });
+}
+wire2("playAnim","fsPlayAnim", playWithLoop_);
 wire2("stopAnim","fsStopAnim", stopAnimFn);
 
 /* ---- Pantalla completa (reutiliza el mismo <canvas>, así se conservan los eventos táctiles) ---- */
@@ -3145,6 +3352,7 @@ function saveCurrentFrame(){
     paths: JSON.parse(JSON.stringify(paths))
   });
   activeFrameIndex = frames.length - 1;
+  markBoardDirty();
   renderFramesList();
   const fsCount = document.getElementById("fsFrameCount");
   if(fsCount) fsCount.textContent = frames.length + " fotogramas";
@@ -3210,16 +3418,102 @@ document.getElementById("fsViewStopBtn").onclick = () => {
   }
 };
 
+function drawInterpolatedStep_(cx, cvs, frameA, frameB, t){
+  const fromTokens = frameTokens(frameA);
+  const toTokens = frameTokens(frameB);
+  const interpTokens = fromTokens.map(tok=>{
+    const match = toTokens.find(x=>x.id===tok.id) || tok;
+    return {...tok, x: tok.x+(match.x-tok.x)*t, y: tok.y+(match.y-tok.y)*t};
+  });
+
+  const fromArrows = frameArrows(frameA);
+  const toArrows = frameArrows(frameB);
+  const arrowAlpha = {};
+  const interpArrows = fromArrows.map(a=>{
+    const match = toArrows.find(x=>x.id===a.id);
+    if(match){
+      arrowAlpha[a.id] = 1;
+      return {...a, x1:a.x1+(match.x1-a.x1)*t, y1:a.y1+(match.y1-a.y1)*t, x2:a.x2+(match.x2-a.x2)*t, y2:a.y2+(match.y2-a.y2)*t, width:(a.width||2.5)+((match.width||2.5)-(a.width||2.5))*t};
+    }
+    arrowAlpha[a.id] = 1-t;
+    return a;
+  });
+  toArrows.forEach(a=>{
+    if(!fromArrows.some(x=>x.id===a.id)){
+      arrowAlpha[a.id] = t;
+      interpArrows.push(a);
+    }
+  });
+
+  const fromShapes = frameShapes(frameA);
+  const toShapes = frameShapes(frameB);
+  const shapeAlpha = {};
+  const interpShapes = fromShapes.map(s=>{
+    const match = toShapes.find(x=>x.id===s.id);
+    if(match){
+      shapeAlpha[s.id] = 1;
+      return {...s, cx:s.cx+(match.cx-s.cx)*t, cy:s.cy+(match.cy-s.cy)*t, rx:s.rx+(match.rx-s.rx)*t, ry:s.ry+(match.ry-s.ry)*t};
+    }
+    shapeAlpha[s.id] = 1-t;
+    return s;
+  });
+  toShapes.forEach(s=>{
+    if(!fromShapes.some(x=>x.id===s.id)){
+      shapeAlpha[s.id] = t;
+      interpShapes.push(s);
+    }
+  });
+
+  const fromTexts = frameTexts(frameA);
+  const toTexts = frameTexts(frameB);
+  const textAlpha = {};
+  const interpTexts = fromTexts.map(x=>{
+    const match = toTexts.find(y=>y.id===x.id);
+    textAlpha[x.id] = match ? 1 : (1-t);
+    return x;
+  });
+  toTexts.forEach(x=>{
+    if(!fromTexts.some(y=>y.id===x.id)){
+      textAlpha[x.id] = t;
+      interpTexts.push(x);
+    }
+  });
+
+  const fromPaths = framePaths(frameA);
+  const toPaths = framePaths(frameB);
+  const pathAlpha = {};
+  const interpPaths = fromPaths.map(x=>{
+    const match = toPaths.find(y=>y.id===x.id);
+    pathAlpha[x.id] = match ? 1 : (1-t);
+    return x;
+  });
+  toPaths.forEach(x=>{
+    if(!fromPaths.some(y=>y.id===x.id)){
+      pathAlpha[x.id] = t;
+      interpPaths.push(x);
+    }
+  });
+
+  drawCourtOn(cx,cvs);
+  drawShapesOn(cx,cvs, interpShapes, s=>shapeAlpha[s.id]!=null?shapeAlpha[s.id]:1);
+  drawPathsOn(cx,cvs, interpPaths, p=>pathAlpha[p.id]!=null?pathAlpha[p.id]:1);
+  drawArrowsOn(cx,cvs, interpArrows, a=>arrowAlpha[a.id]!=null?arrowAlpha[a.id]:1);
+  drawTokensOn(cx,cvs,interpTokens);
+  drawTextsOn(cx,cvs, interpTexts, x=>textAlpha[x.id]!=null?textAlpha[x.id]:1);
+}
+function drawStaticFrame_(cx, cvs, f){
+  drawCourtOn(cx,cvs);
+  drawShapesOn(cx,cvs, frameShapes(f));
+  drawPathsOn(cx,cvs, framePaths(f));
+  drawArrowsOn(cx,cvs, frameArrows(f));
+  drawTokensOn(cx,cvs, frameTokens(f));
+  drawTextsOn(cx,cvs, frameTexts(f));
+}
 function playFrames(frameList, cvs, cx, onDone){
   if(frameList.length===0) return;
   animRunning = false; if(animReq) cancelAnimationFrame(animReq);
   if(frameList.length===1){
-    drawCourtOn(cx,cvs);
-    drawShapesOn(cx,cvs, frameShapes(frameList[0]));
-    drawPathsOn(cx,cvs, framePaths(frameList[0]));
-    drawArrowsOn(cx,cvs, frameArrows(frameList[0]));
-    drawTokensOn(cx,cvs, frameTokens(frameList[0]));
-    drawTextsOn(cx,cvs, frameTexts(frameList[0]));
+    drawStaticFrame_(cx, cvs, frameList[0]);
     return;
   }
   animRunning = true;
@@ -3232,29 +3526,13 @@ function playFrames(frameList, cvs, cx, onDone){
     if(start===null) start = ts;
     const elapsed = ts - start;
     let t = Math.min(1, elapsed/stepMs);
-    const from = frameTokens(frameList[frameIdx]);
-    const to = frameTokens(frameList[frameIdx+1]);
-    const interp = from.map(tok=>{
-      const match = to.find(x=>x.id===tok.id) || tok;
-      return {...tok, x: tok.x+(match.x-tok.x)*t, y: tok.y+(match.y-tok.y)*t};
-    });
-    drawCourtOn(cx,cvs);
-    drawShapesOn(cx,cvs, frameShapes(frameList[frameIdx]));
-    drawPathsOn(cx,cvs, framePaths(frameList[frameIdx]));
-    drawArrowsOn(cx,cvs, frameArrows(frameList[frameIdx]));
-    drawTokensOn(cx,cvs,interp);
-    drawTextsOn(cx,cvs, frameTexts(frameList[frameIdx]));
+    drawInterpolatedStep_(cx, cvs, frameList[frameIdx], frameList[frameIdx+1], t);
 
     if(t>=1){
       frameIdx++;
       start = null;
       if(frameIdx>=frameList.length-1){
-        drawCourtOn(cx,cvs);
-        drawShapesOn(cx,cvs, frameShapes(frameList[frameList.length-1]));
-        drawPathsOn(cx,cvs, framePaths(frameList[frameList.length-1]));
-        drawArrowsOn(cx,cvs, frameArrows(frameList[frameList.length-1]));
-        drawTokensOn(cx,cvs, frameTokens(frameList[frameList.length-1]));
-        drawTextsOn(cx,cvs, frameTexts(frameList[frameList.length-1]));
+        drawStaticFrame_(cx, cvs, frameList[frameList.length-1]);
         animRunning=false; onDone(); return;
       }
     }
@@ -3263,6 +3541,57 @@ function playFrames(frameList, cvs, cx, onDone){
   animReq = requestAnimationFrame(step);
 }
 redrawBoard();
+
+/* ---- Exportar animación como GIF ---- */
+document.getElementById("exportGifBtn").onclick = async () => {
+  const btn = document.getElementById("exportGifBtn");
+  if(frames.length===0){ alert("Guarda al menos un fotograma antes de exportar."); return; }
+  if(typeof GIF === "undefined"){
+    alert("No se ha podido cargar la librería para generar el GIF (revisa tu conexión a internet) e inténtalo de nuevo.");
+    return;
+  }
+  const originalText = btn.textContent;
+  btn.disabled = true; btn.textContent = "⏳ Generando GIF...";
+  try{
+    const off = document.createElement("canvas");
+    off.width = canvas.width; off.height = canvas.height;
+    const octx = off.getContext("2d");
+    const gif = new GIF({
+      workers: 2,
+      quality: 10,
+      width: off.width,
+      height: off.height,
+      workerScript: "https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js"
+    });
+    const stepsPerTransition = 16;
+    const frameDelay = Math.max(30, Math.round(1400/stepsPerTransition));
+    if(frames.length===1){
+      drawStaticFrame_(octx, off, frames[0]);
+      gif.addFrame(off, {copy:true, delay: 1200});
+    } else {
+      for(let i=0;i<frames.length-1;i++){
+        for(let s=0;s<stepsPerTransition;s++){
+          drawInterpolatedStep_(octx, off, frames[i], frames[i+1], s/stepsPerTransition);
+          gif.addFrame(off, {copy:true, delay: frameDelay});
+        }
+      }
+      drawStaticFrame_(octx, off, frames[frames.length-1]);
+      gif.addFrame(off, {copy:true, delay: 900});
+    }
+    gif.on("finished", (blob) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = "jugada.gif";
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(()=>URL.revokeObjectURL(url), 8000);
+      btn.disabled = false; btn.textContent = originalText;
+    });
+    gif.render();
+  }catch(err){
+    alert("No se ha podido exportar el GIF: " + err.message);
+    btn.disabled = false; btn.textContent = originalText;
+  }
+};
 
 /* ============================================================
    TASK FORM (create / edit)
@@ -3316,6 +3645,7 @@ document.getElementById("taskForm").onsubmit = async (e) => {
 };
 
 document.getElementById("cancelEdit").onclick = () => {
+  if(!confirmDiscardBoard()) return;
   resetTaskForm();
   showTasksView(taskFormReturnView);
   if(taskFormReturnView === "bank") renderTaskBank();
@@ -3331,8 +3661,9 @@ function resetTaskForm(){
   renderTaskFolderLabel();
   tokens = []; frames = []; arrows = []; texts = []; shapes = []; paths = [];
   tokenSeq = 0; arrowSeq = 0; textSeq = 0; shapeSeq = 0; pathSeq = 0;
-  historyStack = []; selected = null; dragObj = null;
+  historyStack = []; undoStack = []; redoStack = []; selected = null; dragObj = null;
   lastGoalId = null; activeFrameIndex = null;
+  clearBoardDirty();
   setMode("select");
   redrawBoard(); renderFramesList();
 }
@@ -3365,8 +3696,9 @@ window.editTask = (id) => {
   textSeq = texts.reduce((m,o)=> Math.max(m, parseInt((o.id||"x0").slice(1))||0), 0);
   shapeSeq = shapes.reduce((m,o)=> Math.max(m, parseInt((o.id||"c0").slice(1))||0), 0);
   pathSeq = paths.reduce((m,o)=> Math.max(m, parseInt((o.id||"p0").slice(1))||0), 0);
-  historyStack = []; selected = null; dragObj = null;
+  historyStack = []; undoStack = []; redoStack = []; selected = null; dragObj = null;
   lastGoalId = null; activeFrameIndex = frames.length ? frames.length-1 : null;
+  clearBoardDirty();
   setMode("select");
   redrawBoard(); renderFramesList();
   document.getElementById("cancelEdit").classList.remove("hidden");
@@ -4350,6 +4682,7 @@ document.getElementById("playForm").onsubmit = async (e) => {
   }
 };
 document.getElementById("cancelPlayEdit").onclick = () => {
+  if(!confirmDiscardBoard()) return;
   resetPlayForm();
   showAbpView(abpFormReturnView);
   if(abpFormReturnView === "bank") renderAbpBank();
@@ -4366,8 +4699,9 @@ function resetPlayForm(){
   document.getElementById("playLevelTo").value = "";
   tokens = []; frames = []; arrows = []; texts = []; shapes = []; paths = [];
   tokenSeq = 0; arrowSeq = 0; textSeq = 0; shapeSeq = 0; pathSeq = 0;
-  historyStack = []; selected = null; dragObj = null;
+  historyStack = []; undoStack = []; redoStack = []; selected = null; dragObj = null;
   lastGoalId = null; activeFrameIndex = null;
+  clearBoardDirty();
   setMode("select");
   redrawBoard(); renderFramesList();
 }
@@ -4394,8 +4728,9 @@ window.editPlay = (id) => {
   textSeq = texts.reduce((m,o)=> Math.max(m, parseInt((o.id||"x0").slice(1))||0), 0);
   shapeSeq = shapes.reduce((m,o)=> Math.max(m, parseInt((o.id||"c0").slice(1))||0), 0);
   pathSeq = paths.reduce((m,o)=> Math.max(m, parseInt((o.id||"p0").slice(1))||0), 0);
-  historyStack = []; selected = null; dragObj = null;
+  historyStack = []; undoStack = []; redoStack = []; selected = null; dragObj = null;
   lastGoalId = null; activeFrameIndex = frames.length ? frames.length-1 : null;
+  clearBoardDirty();
   setMode("select");
   redrawBoard(); renderFramesList();
   document.getElementById("cancelPlayEdit").classList.remove("hidden");
