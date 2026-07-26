@@ -662,6 +662,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
               <button class="btn ghost small" id="btnNewTaskFolder">📁+ Carpeta</button>
               <button class="btn ghost small" id="btnDebugTaskFolders">🔧 Ver datos de carpetas</button>
+              <button class="btn ghost small" id="btnRepairTaskFolders">🩹 Reparar carpetas fijas</button>
               <button class="btn ghost small" id="btnExportTasksExcel">📊 Exportar a Excel</button>
             </div>
           </div>
@@ -1199,15 +1200,26 @@ function folderExists_(section, id){
 let taskFolderSeedDone = false;
 async function ensureTaskFolderSeed(){
   if(taskFolderSeedDone) return;
+  const canSeed = currentCoach && (currentCoach.role === ROLE_GESTOR || currentCoach.role === ROLE_EDITOR);
   const missing = TASK_FOLDER_SEED.filter(seed => !categories.some(c=>c.id===seed.id));
-  if(missing.length===0){ taskFolderSeedDone = true; return; }
-  if(!currentCoach || (currentCoach.role !== ROLE_GESTOR && currentCoach.role !== ROLE_EDITOR)) return; // solo un gestor/editor puede crearlas; los demás verán el contenido igualmente gracias al fallback de folderChildren_
-  taskFolderSeedDone = true; // evita reintentos en cada snapshot mientras se están creando
+  // Reparación: las 5 carpetas fijas deben tener SIEMPRE parentId null (son la raíz).
+  // Un resto de una migración antigua dejó alguna con parentId apuntando a "ataque"
+  // (incluida "ataque" apuntándose a sí misma), lo que las hacía invisibles.
+  const broken = TASK_FOLDER_SEED.filter(seed => {
+    const c = categories.find(x=>x.id===seed.id);
+    return c && c.parentId;
+  });
+  if(missing.length===0 && broken.length===0){ taskFolderSeedDone = true; return; }
+  if(!canSeed) return; // solo un gestor/editor puede crearlas o repararlas
+  taskFolderSeedDone = true; // evita reintentos en cada snapshot mientras se están creando/reparando
   try{
     for(const seed of missing){
       await db.collection("categories").doc(seed.id).set({
         name: seed.name, parentId: null, createdAt: firebase.firestore.FieldValue.serverTimestamp()
       }, {merge:true});
+    }
+    for(const seed of broken){
+      await db.collection("categories").doc(seed.id).update({ parentId: null });
     }
   }catch(err){ taskFolderSeedDone = false; }
 }
@@ -1524,6 +1536,27 @@ document.getElementById("btnNewTaskFolder").onclick = async () => {
   try{
     await db.collection("categories").add({name:name.trim(), parentId, createdBy: currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp()});
   }catch(err){ alert("No se ha podido crear la carpeta: " + err.message); }
+};
+document.getElementById("btnRepairTaskFolders").onclick = async () => {
+  if(!currentCoach || (currentCoach.role !== ROLE_GESTOR && currentCoach.role !== ROLE_EDITOR)){
+    alert("Solo un gestor o editor puede reparar las carpetas.");
+    return;
+  }
+  try{
+    for(const seed of TASK_FOLDER_SEED){
+      const c = categories.find(x=>x.id===seed.id);
+      if(!c){
+        await db.collection("categories").doc(seed.id).set({
+          name: seed.name, parentId: null, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, {merge:true});
+      } else if(c.parentId){
+        await db.collection("categories").doc(seed.id).update({ parentId: null });
+      }
+    }
+    alert("Listo. Las 5 carpetas fijas ya deberían tener parentId null (raíz). Vuelve a entrar en Banco de tareas.");
+  }catch(err){
+    alert("No se ha podido reparar: " + err.message);
+  }
 };
 document.getElementById("btnDebugTaskFolders").onclick = () => {
   const ids = new Set(categories.map(c=>c.id));
