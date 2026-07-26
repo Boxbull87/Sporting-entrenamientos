@@ -543,11 +543,11 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
               <input type="text" id="taskTitle" required>
             </div>
             <div>
-              <label>Carpeta</label>
-              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                <span id="taskFolderLabel" class="muted" style="flex:1;min-width:120px;">🏦 Raíz (sin carpeta)</span>
-                <button type="button" class="btn ghost small" id="btnPickTaskFolder">📁 Elegir carpeta</button>
+              <label>Carpetas</label>
+              <div id="taskFolderChips" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
+                <span class="muted">🏦 Raíz (sin carpeta)</span>
               </div>
+              <button type="button" class="btn ghost small" id="btnPickTaskFolder">📁+ Añadir carpeta</button>
             </div>
             <div>
               <label>Fase de la sesión</label>
@@ -1460,12 +1460,24 @@ document.getElementById("tasksNewBack").onclick = () => {
   showTasksView(taskFormReturnView);
   if(taskFormReturnView === "bank") renderTaskBank();
 };
-document.getElementById("tasksBankBack").onclick = () => showTasksView("home");
+document.getElementById("tasksBankBack").onclick = () => {
+  if(taskBrowserPath.length > 0){
+    taskBrowserPath.pop();
+    renderTaskBank();
+  } else {
+    showTasksView("home");
+  }
+};
 
 /* ---------- Banco de tareas: navegador estilo Drive ---------- */
 let taskBrowserPath = []; // pila de ids de carpeta ("__FAV__" y "__NONE__" son vistas especiales, solo válidas como único elemento)
 function taskCurrentFolder(){ return taskBrowserPath.length ? taskBrowserPath[taskBrowserPath.length-1] : null; }
 function taskFolderId(t){ return taskCategoryIds(t)[0] || null; }
+function taskInFolder_(t, folderId){ return taskCategoryIds(t).includes(folderId); }
+function taskHasNoValidFolder_(t){
+  const ids = taskCategoryIds(t);
+  return ids.length===0 || !ids.some(id=>folderExists_("tasks", id));
+}
 
 function renderTaskBreadcrumb(){
   const el = document.getElementById("taskBreadcrumb");
@@ -1484,7 +1496,7 @@ function renderTaskFolderList(){
   if(curId===null){
     const favIds = (currentCoach && Array.isArray(currentCoach.favoriteTaskIds)) ? currentCoach.favoriteTaskIds : [];
     const favCount = tasks.filter(t=>favIds.includes(t.id)).length;
-    const noneCount = tasks.filter(t=>!taskFolderId(t) || !folderExists_("tasks", taskFolderId(t))).length;
+    const noneCount = tasks.filter(t=>taskHasNoValidFolder_(t)).length;
     html += `<div class="home-grid">`;
     html += `
     <button type="button" class="home-card fav-card" onclick="taskBrowserPath=['__FAV__']; renderTaskBank();">
@@ -1506,9 +1518,9 @@ function renderTaskFolderList(){
     const folders = folderChildren_("tasks", curId).sort((a,b)=>(a.name||"").localeCompare(b.name||"","es"));
     if(folders.length){
       html += `<div class="home-grid" style="margin-top:10px;">` + folders.map(f=>{
-        const count = tasks.filter(t=>taskFolderId(t)===f.id).length;
+        const count = tasks.filter(t=>taskInFolder_(t, f.id)).length;
         const subCount = folderChildren_("tasks", f.id).length;
-        const hasUnread = tasks.some(t=> taskFolderId(t)===f.id && isItemUnread("tasks", t));
+        const hasUnread = tasks.some(t=> taskInFolder_(t, f.id) && isItemUnread("tasks", t));
         return `
         <div class="home-card folder-card">
           <button type="button" class="folder-card-main" onclick="taskBrowserPath=[...taskBrowserPath,'${f.id}']; renderTaskBank();">
@@ -1567,9 +1579,9 @@ document.getElementById("btnDebugTaskFolders").onclick = () => {
   const taskCounts = {};
   let noFolder = 0;
   tasks.forEach(t=>{
-    const fid = taskFolderId(t);
-    if(!fid) { noFolder++; return; }
-    taskCounts[fid] = (taskCounts[fid]||0) + 1;
+    const fids = taskCategoryIds(t);
+    if(fids.length===0) { noFolder++; return; }
+    fids.forEach(fid=>{ taskCounts[fid] = (taskCounts[fid]||0) + 1; });
   });
   const taskLines = Object.keys(taskCounts).map(fid=>{
     const exists = ids.has(fid) ? "" : "  ⚠️ esa carpeta NO existe";
@@ -1604,12 +1616,26 @@ document.getElementById("abpNewBack").onclick = () => {
   showAbpView(abpFormReturnView);
   if(abpFormReturnView === "bank") renderPlayList();
 };
-document.getElementById("abpBankBack").onclick = () => showAbpView("home");
+document.getElementById("abpBankBack").onclick = () => {
+  if(abpBrowserPath.length > 0){
+    abpBrowserPath.pop();
+    renderAbpBank();
+  } else {
+    showAbpView("home");
+  }
+};
 document.getElementById("abpSessionsBack").onclick = () => {
   showAbpView(abpSessionFormReturnView);
   if(abpSessionFormReturnView === "sessionsSaved") renderAbpSessionsBank();
 };
-document.getElementById("abpSessionsSavedBack").onclick = () => showAbpView("home");
+document.getElementById("abpSessionsSavedBack").onclick = () => {
+  if(playSessionBrowserPath.length > 0){
+    playSessionBrowserPath.pop();
+    renderAbpSessionsBank();
+  } else {
+    showAbpView("home");
+  }
+};
 
 /* ---------- Sesiones de ABP creadas: navegador de carpetas estilo Drive ---------- */
 let playSessionBrowserPath = []; // pila de ids de carpeta ("__NONE__" es vista especial)
@@ -2144,7 +2170,7 @@ document.getElementById("btnDeleteFolder").onclick = async () => {
   const f = list.find(x=>x.id===id);
   if(!f) return;
   const hasSubfolders = folderChildren_(section, id).length>0;
-  const hasItems = section==="tasks" ? tasks.some(t=>taskFolderId(t)===id)
+  const hasItems = section==="tasks" ? tasks.some(t=>taskInFolder_(t, id))
     : section==="abp" ? plays.some(p=>(p.categoryId||null)===id)
     : playSessions.some(s=>(s.folderId||null)===id);
   const msg = (hasSubfolders || hasItems)
@@ -2158,8 +2184,9 @@ document.getElementById("btnDeleteFolder").onclick = async () => {
       jobs.push(db.collection(folderColl_(section)).doc(sub.id).update({parentId}));
     });
     if(section==="tasks"){
-      tasks.filter(t=>taskFolderId(t)===id).forEach(t=>{
-        jobs.push(db.collection("tasks").doc(t.id).update({categoryIds: parentId ? [parentId] : []}));
+      tasks.filter(t=>taskInFolder_(t, id)).forEach(t=>{
+        const newIds = Array.from(new Set(taskCategoryIds(t).map(x=> x===id ? parentId : x).filter(Boolean)));
+        jobs.push(db.collection("tasks").doc(t.id).update({categoryIds: newIds}));
       });
     } else if(section==="abp"){
       plays.filter(p=>(p.categoryId||null)===id).forEach(p=>{
@@ -2181,14 +2208,26 @@ function renderCategorySelects(){
   updateSessionAddFolderOptions();
 }
 document.getElementById("btnPickTaskFolder").onclick = () => {
-  openFolderPicker("tasks", null, "Elegir carpeta para la tarea", (id) => {
-    selectedTaskFolderId = id;
+  openFolderPicker("tasks", null, "Añadir carpeta a la tarea", (id) => {
+    if(id && !selectedTaskFolderIds.includes(id)) selectedTaskFolderIds.push(id);
     renderTaskFolderLabel();
   });
 };
-let selectedTaskFolderId = null;
+let selectedTaskFolderIds = [];
+window.removeTaskFolder = (id) => {
+  selectedTaskFolderIds = selectedTaskFolderIds.filter(x=>x!==id);
+  renderTaskFolderLabel();
+};
 function renderTaskFolderLabel(){
-  document.getElementById("taskFolderLabel").textContent = selectedTaskFolderId ? ("📁 " + catName_(selectedTaskFolderId)) : "🏦 Raíz (sin carpeta)";
+  const wrap = document.getElementById("taskFolderChips");
+  if(selectedTaskFolderIds.length===0){
+    wrap.innerHTML = '<span class="muted">🏦 Raíz (sin carpeta)</span>';
+    return;
+  }
+  wrap.innerHTML = selectedTaskFolderIds.map(id=>`
+    <span class="badge" style="display:inline-flex;align-items:center;gap:6px;">📁 ${escapeHtml(catName_(id))}
+      <a href="javascript:void(0)" onclick="removeTaskFolder('${id}')" style="color:inherit;text-decoration:none;font-weight:700;">✕</a>
+    </span>`).join("");
 }
 
 document.getElementById("btnPickPlayFolder").onclick = () => {
@@ -2960,7 +2999,7 @@ document.getElementById("taskForm").onsubmit = async (e) => {
   if(playersMin!=null && playersMax!=null && playersMin > playersMax){
     [playersMin, playersMax] = [playersMax, playersMin];
   }
-  const categoryIds = selectedTaskFolderId ? [selectedTaskFolderId] : [];
+  const categoryIds = selectedTaskFolderIds.slice();
   const payload = {
     title: document.getElementById("taskTitle").value.trim(),
     categoryIds,
@@ -3004,7 +3043,7 @@ function resetTaskForm(){
   document.getElementById("cancelEdit").classList.add("hidden");
   document.getElementById("taskLevelFrom").value = AGE_LEVELS[0];
   document.getElementById("taskLevelTo").value = AGE_LEVELS[AGE_LEVELS.length-1];
-  selectedTaskFolderId = null;
+  selectedTaskFolderIds = [];
   renderTaskFolderLabel();
   tokens = []; frames = []; arrows = []; texts = []; shapes = []; paths = [];
   tokenSeq = 0; arrowSeq = 0; textSeq = 0; shapeSeq = 0; pathSeq = 0;
@@ -3019,7 +3058,7 @@ window.editTask = (id) => {
   if(!t) return;
   editingTaskId = id;
   document.getElementById("taskTitle").value = t.title || "";
-  selectedTaskFolderId = taskFolderId(t);
+  selectedTaskFolderIds = taskCategoryIds(t).slice();
   renderTaskFolderLabel();
   document.getElementById("taskPhase").value = t.phase || "principal";
   document.getElementById("taskDuration").value = t.duration || 15;
@@ -3108,15 +3147,14 @@ function renderTaskList(){
   const favOnly = document.getElementById("filterFavOnly").checked;
   const curId = taskCurrentFolder();
   let list = tasks.filter(t=>{
-    const folderId = taskFolderId(t);
     if(search){
       // con texto de búsqueda, se busca en todo el banco, no solo en la carpeta actual
     } else if(curId === "__FAV__"){
       if(!isTaskFavorite(t.id)) return false;
     } else if(curId === "__NONE__"){
-      if(folderId && folderExists_("tasks", folderId)) return false;
+      if(!taskHasNoValidFolder_(t)) return false;
     } else if(curId !== null){
-      if(folderId !== curId) return false;
+      if(!taskInFolder_(t, curId)) return false;
     } else {
       return false; // en la raíz, sin buscar, no se listan tareas sueltas (solo carpetas arriba)
     }
@@ -3305,7 +3343,7 @@ function renderSessionTaskBrowser(){
   }
   const includeIds = folderFilter ? new Set([folderFilter, ...folderDescendantIds_("tasks", folderFilter)]) : null;
   const list = tasks.filter(t=>{
-    if(includeIds && !includeIds.has(taskFolderId(t))) return false;
+    if(includeIds && !taskCategoryIds(t).some(id=>includeIds.has(id))) return false;
     if(searchFilter && !(t.title||"").toLowerCase().includes(searchFilter)) return false;
     if(phaseFilter && t.phase!==phaseFilter) return false;
     if(levelFilter && t.levelFrom && t.levelTo){
