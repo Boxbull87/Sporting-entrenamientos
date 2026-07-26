@@ -1175,7 +1175,14 @@ function folderColl_(section){
   return "playSessionFolders";
 }
 function folderChildren_(section, parentId){
-  return folderList_(section).filter(f=>(f.parentId||null)===(parentId||null));
+  const list = folderList_(section);
+  if(parentId===null || parentId===undefined){
+    // Raíz: además de las carpetas sin padre, mostramos aquí cualquier carpeta cuyo
+    // padre ya no exista (huérfana), para que nunca quede contenido inaccesible.
+    const ids = new Set(list.map(f=>f.id));
+    return list.filter(f=> !f.parentId || !ids.has(f.parentId));
+  }
+  return list.filter(f=>(f.parentId||null)===parentId);
 }
 function folderDescendantIds_(section, id){
   const ids = new Set();
@@ -1184,11 +1191,15 @@ function folderDescendantIds_(section, id){
   })(id);
   return ids;
 }
+function folderExists_(section, id){
+  return !!id && folderList_(section).some(f=>f.id===id);
+}
 let taskFolderSeedDone = false;
 async function ensureTaskFolderSeed(){
   if(taskFolderSeedDone) return;
   const missing = TASK_FOLDER_SEED.filter(seed => !categories.some(c=>c.id===seed.id));
   if(missing.length===0){ taskFolderSeedDone = true; return; }
+  if(!currentCoach || (currentCoach.role !== ROLE_GESTOR && currentCoach.role !== ROLE_EDITOR)) return; // solo un gestor/editor puede crearlas; los demás verán el contenido igualmente gracias al fallback de folderChildren_
   taskFolderSeedDone = true; // evita reintentos en cada snapshot mientras se están creando
   try{
     for(const seed of missing){
@@ -1459,7 +1470,7 @@ function renderTaskFolderList(){
   if(curId===null){
     const favIds = (currentCoach && Array.isArray(currentCoach.favoriteTaskIds)) ? currentCoach.favoriteTaskIds : [];
     const favCount = tasks.filter(t=>favIds.includes(t.id)).length;
-    const noneCount = tasks.filter(t=>!taskFolderId(t)).length;
+    const noneCount = tasks.filter(t=>!taskFolderId(t) || !folderExists_("tasks", taskFolderId(t))).length;
     html += `<div class="home-grid">`;
     html += `
     <button type="button" class="home-card fav-card" onclick="taskBrowserPath=['__FAV__']; renderTaskBank();">
@@ -1558,7 +1569,7 @@ function renderPlaySessionsFolderList(){
   document.getElementById("btnNewPlaySessionFolder").classList.toggle("hidden", curId==="__NONE__");
   let html = "";
   if(curId===null){
-    const noneCount = playSessions.filter(s=>!s.folderId).length;
+    const noneCount = playSessions.filter(s=>!s.folderId || !folderExists_("playSessions", s.folderId)).length;
     if(noneCount>0){
       html += `<div class="home-grid">
       <button type="button" class="home-card" onclick="playSessionBrowserPath=['__NONE__']; renderAbpSessionsBank();">
@@ -1627,7 +1638,7 @@ function renderAbpFolderList(){
   if(curId===null){
     const favIds = (currentCoach && Array.isArray(currentCoach.favoritePlayIds)) ? currentCoach.favoritePlayIds : [];
     const favCount = plays.filter(p=>favIds.includes(p.id)).length;
-    const noneCount = plays.filter(p=>!p.categoryId).length;
+    const noneCount = plays.filter(p=>!p.categoryId || !folderExists_("abp", p.categoryId)).length;
     html += `<div class="home-grid">`;
     html += `
     <button type="button" class="home-card fav-card" onclick="abpBrowserPath=['__FAV__']; renderAbpBank();">
@@ -3035,7 +3046,7 @@ function renderTaskList(){
     } else if(curId === "__FAV__"){
       if(!isTaskFavorite(t.id)) return false;
     } else if(curId === "__NONE__"){
-      if(folderId) return false;
+      if(folderId && folderExists_("tasks", folderId)) return false;
     } else if(curId !== null){
       if(folderId !== curId) return false;
     } else {
@@ -3997,7 +4008,7 @@ function renderPlayList(){
     } else if(curId === "__FAV__"){
       if(!isPlayFavorite(p.id)) return false;
     } else if(curId === "__NONE__"){
-      if(folderId) return false;
+      if(folderId && folderExists_("abp", folderId)) return false;
     } else if(curId !== null){
       if(folderId !== curId) return false;
     } else {
@@ -4216,7 +4227,7 @@ function renderSavedPlaySessions(){
     if(search){
       // con texto de búsqueda, se busca en todas las sesiones, no solo en la carpeta actual
     } else if(curId === "__NONE__"){
-      if(folderId) return false;
+      if(folderId && folderExists_("playSessions", folderId)) return false;
     } else if(curId !== null){
       if(folderId !== curId) return false;
     } else {
