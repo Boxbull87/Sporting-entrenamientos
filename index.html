@@ -1346,8 +1346,8 @@ function populateLevelSelects(){
   if(from){ from.innerHTML = levelOptionsHTML(); from.value = AGE_LEVELS[0]; }
   if(to){ to.innerHTML = levelOptionsHTML(); to.value = AGE_LEVELS[AGE_LEVELS.length-1]; }
   if(filt){ filt.innerHTML = '<option value="">Todas las categorías de edad</option>' + levelOptionsHTML(); }
-  if(pfrom){ pfrom.innerHTML = levelOptionsHTML(); pfrom.value = AGE_LEVELS[0]; }
-  if(pto){ pto.innerHTML = levelOptionsHTML(); pto.value = AGE_LEVELS[AGE_LEVELS.length-1]; }
+  if(pfrom){ pfrom.innerHTML = '<option value="">-- Sin elegir --</option>' + levelOptionsHTML(); pfrom.value = ""; }
+  if(pto){ pto.innerHTML = '<option value="">-- Sin elegir --</option>' + levelOptionsHTML(); pto.value = ""; }
 }
 populateLevelSelects();
 
@@ -4362,8 +4362,8 @@ function resetPlayForm(){
   document.getElementById("playFormTitle").textContent = "🎯 Nueva jugada";
   selectedPlayFolderIds = [];
   renderPlayFolderLabel();
-  document.getElementById("playLevelFrom").value = AGE_LEVELS[0];
-  document.getElementById("playLevelTo").value = AGE_LEVELS[AGE_LEVELS.length-1];
+  document.getElementById("playLevelFrom").value = "";
+  document.getElementById("playLevelTo").value = "";
   tokens = []; frames = []; arrows = []; texts = []; shapes = []; paths = [];
   tokenSeq = 0; arrowSeq = 0; textSeq = 0; shapeSeq = 0; pathSeq = 0;
   historyStack = []; selected = null; dragObj = null;
@@ -4379,8 +4379,8 @@ window.editPlay = (id) => {
   document.getElementById("playTitle").value = p.title || "";
   selectedPlayFolderIds = playCategoryIds(p).filter(id=>!isAbpCategoryFolderId_(id));
   renderPlayFolderLabel();
-  document.getElementById("playLevelFrom").value = p.levelFrom || AGE_LEVELS[0];
-  document.getElementById("playLevelTo").value = p.levelTo || AGE_LEVELS[AGE_LEVELS.length-1];
+  document.getElementById("playLevelFrom").value = p.levelFrom || "";
+  document.getElementById("playLevelTo").value = p.levelTo || "";
   document.getElementById("playVideoUrl").value = p.videoUrl || "";
   document.getElementById("playObservations").value = p.observations || "";
   frames = (p.animation && p.animation.frames) ? JSON.parse(JSON.stringify(p.animation.frames)) : [];
