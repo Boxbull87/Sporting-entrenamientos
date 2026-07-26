@@ -839,10 +839,19 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
           </div>
           <div class="row" style="margin-top:10px;">
             <div>
+              <label>Categoría de edad recomendada – Desde</label>
+              <select id="playLevelFrom"></select>
+            </div>
+            <div>
+              <label>Categoría de edad recomendada – Hasta</label>
+              <select id="playLevelTo"></select>
+            </div>
+            <div>
               <label>Enlace del vídeo (YouTube u otro)</label>
               <input type="url" id="playVideoUrl" placeholder="https://youtube.com/...">
             </div>
           </div>
+          <p class="muted" style="margin-top:-4px;">Esta jugada se archivará automáticamente en la carpeta "📁 Categorías" del Banco de ABP, dentro de cada categoría del rango elegido.</p>
           <label style="margin-top:10px;">Observaciones</label>
           <textarea id="playObservations" placeholder="Claves de la jugada, roles, variantes..."></textarea>
 
@@ -1260,6 +1269,69 @@ const ROLE_COACH = "entrenador";
 const AGE_LEVELS = ["Prebenjamín","Benjamín","Alevín","Infantil","Cadete","Juvenil","Senior"];
 const SESSION_BLOCKS = {calentamiento:"Calentamiento", principal:"Parte principal", vuelta:"Vuelta a la calma"};
 
+/* Carpeta fija "Categorías" dentro del Banco de ABP: una subcarpeta por cada
+   categoría de edad, para que las jugadas recomendadas para una categoría
+   aparezcan automáticamente ahí. Ids fijos para que la siembra sea idempotente. */
+const ABP_CATEGORY_ROOT_ID = "abp_categorias";
+const ABP_CATEGORY_ROOT_NAME = "Categorías";
+const ABP_CATEGORY_SEED = [
+  {id:"abp_cat_prebenjamin", name:"Prebenjamín"},
+  {id:"abp_cat_benjamin", name:"Benjamín"},
+  {id:"abp_cat_alevin", name:"Alevín"},
+  {id:"abp_cat_infantil", name:"Infantil"},
+  {id:"abp_cat_cadete", name:"Cadete"},
+  {id:"abp_cat_juvenil", name:"Juvenil"},
+  {id:"abp_cat_senior", name:"Senior"}
+];
+function abpCategoryFolderIdForLevel_(levelName){
+  const idx = AGE_LEVELS.indexOf(levelName);
+  return (idx>=0 && ABP_CATEGORY_SEED[idx]) ? ABP_CATEGORY_SEED[idx].id : null;
+}
+function abpCategoryFolderIdsForRange_(levelFrom, levelTo){
+  if(!levelFrom || !levelTo) return [];
+  let i0 = AGE_LEVELS.indexOf(levelFrom), i1 = AGE_LEVELS.indexOf(levelTo);
+  if(i0<0 || i1<0) return [];
+  if(i0>i1){ const tmp=i0; i0=i1; i1=tmp; }
+  return AGE_LEVELS.slice(i0, i1+1).map(abpCategoryFolderIdForLevel_).filter(Boolean);
+}
+function isAbpCategoryFolderId_(id){
+  return id===ABP_CATEGORY_ROOT_ID || ABP_CATEGORY_SEED.some(s=>s.id===id);
+}
+let abpCategorySeedDone = false;
+async function ensureAbpCategoryFolderSeed(){
+  if(abpCategorySeedDone) return;
+  const rootDoc = abpCategories.find(c=>c.id===ABP_CATEGORY_ROOT_ID);
+  const rootMissing = !rootDoc;
+  const rootBroken = rootDoc && rootDoc.parentId;
+  const missingChildren = ABP_CATEGORY_SEED.filter(seed => !abpCategories.some(c=>c.id===seed.id));
+  const brokenChildren = ABP_CATEGORY_SEED.filter(seed=>{
+    const c = abpCategories.find(x=>x.id===seed.id);
+    return c && c.parentId !== ABP_CATEGORY_ROOT_ID;
+  });
+  if(!rootMissing && !rootBroken && missingChildren.length===0 && brokenChildren.length===0){
+    abpCategorySeedDone = true; return;
+  }
+  if(!currentCoach || (currentCoach.role !== ROLE_GESTOR && currentCoach.role !== ROLE_EDITOR)) return;
+  abpCategorySeedDone = true;
+  try{
+    if(rootMissing){
+      await db.collection("abpCategories").doc(ABP_CATEGORY_ROOT_ID).set({
+        name: ABP_CATEGORY_ROOT_NAME, parentId: null, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, {merge:true});
+    } else if(rootBroken){
+      await db.collection("abpCategories").doc(ABP_CATEGORY_ROOT_ID).update({ parentId: null });
+    }
+    for(const seed of missingChildren){
+      await db.collection("abpCategories").doc(seed.id).set({
+        name: seed.name, parentId: ABP_CATEGORY_ROOT_ID, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, {merge:true});
+    }
+    for(const seed of brokenChildren){
+      await db.collection("abpCategories").doc(seed.id).update({ parentId: ABP_CATEGORY_ROOT_ID });
+    }
+  }catch(err){ abpCategorySeedDone = false; }
+}
+
 function levelOptionsHTML(){
   return AGE_LEVELS.map(l=>`<option value="${l}">${l}</option>`).join("");
 }
@@ -1267,9 +1339,13 @@ function populateLevelSelects(){
   const from = document.getElementById("taskLevelFrom");
   const to = document.getElementById("taskLevelTo");
   const filt = document.getElementById("sessionFilterLevel");
+  const pfrom = document.getElementById("playLevelFrom");
+  const pto = document.getElementById("playLevelTo");
   if(from){ from.innerHTML = levelOptionsHTML(); from.value = AGE_LEVELS[0]; }
   if(to){ to.innerHTML = levelOptionsHTML(); to.value = AGE_LEVELS[AGE_LEVELS.length-1]; }
   if(filt){ filt.innerHTML = '<option value="">Todas las categorías de edad</option>' + levelOptionsHTML(); }
+  if(pfrom){ pfrom.innerHTML = levelOptionsHTML(); pfrom.value = AGE_LEVELS[0]; }
+  if(pto){ pto.innerHTML = levelOptionsHTML(); pto.value = AGE_LEVELS[AGE_LEVELS.length-1]; }
 }
 populateLevelSelects();
 
@@ -1917,6 +1993,7 @@ function attachRealtimeListeners(){
 
   db.collection("abpCategories").orderBy("name").onSnapshot(snap=>{
     abpCategories = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    ensureAbpCategoryFolderSeed();
     renderAbpCategorySelects();
     if(document.getElementById("abpFolderList")) renderAbpFolderList();
     renderPlayFolderLabel();
@@ -2363,7 +2440,7 @@ function renderTaskFolderLabel(){
 }
 
 document.getElementById("btnPickPlayFolder").onclick = () => {
-  openFolderPicker("abp", null, "Añadir carpeta recomendada a la jugada", (id) => {
+  openFolderPicker("abp", new Set([ABP_CATEGORY_ROOT_ID]), "Añadir carpeta recomendada a la jugada", (id) => {
     if(id && !selectedPlayFolderIds.includes(id)) selectedPlayFolderIds.push(id);
     renderPlayFolderLabel();
   });
@@ -3238,6 +3315,10 @@ window.editTask = (id) => {
 
 window.deleteTask = async (id) => {
   const curId = taskCurrentFolder();
+  if(curId === "__FAV__"){
+    if(!confirm("¿Quitar esta tarea de tus favoritas? (no se borra, solo deja de estar en Favoritos)")) return;
+    return toggleFavoriteTask(id);
+  }
   const isRealFolder = curId && curId!=="__FAV__" && curId!=="__NONE__";
   if(isRealFolder){
     const t = tasks.find(x=>x.id===id);
@@ -4174,9 +4255,17 @@ document.getElementById("playForm").onsubmit = async (e) => {
   e.preventDefault();
   const msgEl = document.getElementById("playFormMsg");
   msgEl.innerHTML = "";
+  let levelFrom = document.getElementById("playLevelFrom").value || null;
+  let levelTo = document.getElementById("playLevelTo").value || null;
+  if(levelFrom && levelTo && AGE_LEVELS.indexOf(levelFrom) > AGE_LEVELS.indexOf(levelTo)){
+    [levelFrom, levelTo] = [levelTo, levelFrom];
+  }
+  const ageFolderIds = abpCategoryFolderIdsForRange_(levelFrom, levelTo);
+  const categoryIds = Array.from(new Set([...selectedPlayFolderIds, ...ageFolderIds]));
   const payload = {
     title: document.getElementById("playTitle").value.trim(),
-    categoryIds: selectedPlayFolderIds.slice(),
+    categoryIds,
+    levelFrom, levelTo,
     videoUrl: document.getElementById("playVideoUrl").value.trim(),
     observations: document.getElementById("playObservations").value.trim(),
     animation: { frames: frames },
@@ -4210,6 +4299,8 @@ function resetPlayForm(){
   document.getElementById("playFormTitle").textContent = "🎯 Nueva jugada";
   selectedPlayFolderIds = [];
   renderPlayFolderLabel();
+  document.getElementById("playLevelFrom").value = AGE_LEVELS[0];
+  document.getElementById("playLevelTo").value = AGE_LEVELS[AGE_LEVELS.length-1];
   tokens = []; frames = []; arrows = []; texts = []; shapes = []; paths = [];
   tokenSeq = 0; arrowSeq = 0; textSeq = 0; shapeSeq = 0; pathSeq = 0;
   historyStack = []; selected = null; dragObj = null;
@@ -4223,8 +4314,10 @@ window.editPlay = (id) => {
   if(!p) return;
   editingPlayId = id;
   document.getElementById("playTitle").value = p.title || "";
-  selectedPlayFolderIds = playCategoryIds(p).slice();
+  selectedPlayFolderIds = playCategoryIds(p).filter(id=>!isAbpCategoryFolderId_(id));
   renderPlayFolderLabel();
+  document.getElementById("playLevelFrom").value = p.levelFrom || AGE_LEVELS[0];
+  document.getElementById("playLevelTo").value = p.levelTo || AGE_LEVELS[AGE_LEVELS.length-1];
   document.getElementById("playVideoUrl").value = p.videoUrl || "";
   document.getElementById("playObservations").value = p.observations || "";
   frames = (p.animation && p.animation.frames) ? JSON.parse(JSON.stringify(p.animation.frames)) : [];
@@ -4252,6 +4345,10 @@ window.editPlay = (id) => {
 
 window.deletePlay = async (id) => {
   const inFav = abpBrowserPath.length>0 && abpBrowserPath[0]==="__FAV__";
+  if(inFav){
+    if(!confirm("¿Quitar esta jugada de tus favoritas? (no se borra, solo deja de estar en Favoritos)")) return;
+    return toggleFavoritePlay(id);
+  }
   const curId = abpCurrentFolder();
   const isRealFolder = curId && curId!=="__FAV__" && curId!=="__NONE__" && !inFav;
   if(isRealFolder){
