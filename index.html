@@ -1235,6 +1235,22 @@ function folderDescendantIds_(section, id){
 function folderExists_(section, id){
   return !!id && folderList_(section).some(f=>f.id===id);
 }
+function taskCountInFolderTree_(folderId){
+  const ids = new Set([folderId, ...folderDescendantIds_("tasks", folderId)]);
+  return tasks.filter(t=> taskCategoryIds(t).some(id=>ids.has(id))).length;
+}
+function playCountInFolderTree_(folderId){
+  const ids = new Set([folderId, ...folderDescendantIds_("abp", folderId)]);
+  return plays.filter(p=> playCategoryIds(p).some(id=>ids.has(id))).length;
+}
+function taskUnreadInFolderTree_(folderId){
+  const ids = new Set([folderId, ...folderDescendantIds_("tasks", folderId)]);
+  return tasks.some(t=> taskCategoryIds(t).some(id=>ids.has(id)) && isItemUnread("tasks", t));
+}
+function playUnreadInFolderTree_(folderId){
+  const ids = new Set([folderId, ...folderDescendantIds_("abp", folderId)]);
+  return plays.some(p=> playCategoryIds(p).some(id=>ids.has(id)) && isItemUnread("plays", p));
+}
 let taskFolderSeedDone = false;
 async function ensureTaskFolderSeed(){
   if(taskFolderSeedDone) return;
@@ -1624,9 +1640,9 @@ function renderTaskFolderList(){
     const folders = folderChildren_("tasks", curId).sort((a,b)=>(a.name||"").localeCompare(b.name||"","es"));
     if(folders.length){
       html += `<div class="home-grid" style="margin-top:10px;">` + folders.map(f=>{
-        const count = tasks.filter(t=>taskInFolder_(t, f.id)).length;
+        const count = taskCountInFolderTree_(f.id);
         const subCount = folderChildren_("tasks", f.id).length;
-        const hasUnread = tasks.some(t=> taskInFolder_(t, f.id) && isItemUnread("tasks", t));
+        const hasUnread = taskUnreadInFolderTree_(f.id);
         return `
         <div class="home-card folder-card">
           <button type="button" class="folder-card-main" onclick="taskBrowserPath=[...taskBrowserPath,'${f.id}']; renderTaskBank();">
@@ -1892,9 +1908,9 @@ function renderAbpFolderList(){
     const folders = folderChildren_("abp", curId).sort((a,b)=>(a.name||"").localeCompare(b.name||"","es"));
     if(folders.length){
       html += `<div class="home-grid" style="margin-top:10px;">` + folders.map(f=>{
-        const count = plays.filter(p=>playInFolder_(p, f.id)).length;
+        const count = playCountInFolderTree_(f.id);
         const subCount = folderChildren_("abp", f.id).length;
-        const hasUnread = plays.some(p=> playInFolder_(p, f.id) && isItemUnread("plays", p));
+        const hasUnread = playUnreadInFolderTree_(f.id);
         return `
         <div class="home-card folder-card">
           <button type="button" class="folder-card-main" onclick="abpBrowserPath=[...abpBrowserPath,'${f.id}']; renderAbpBank();">
