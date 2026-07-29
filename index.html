@@ -746,9 +746,10 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
 
         <h3 style="margin-top:14px;font-size:.9rem;">Añadir tareas</h3>
         <div class="filterbar">
-          <select id="sessionAddFolder"><option value="">Elige carpeta...</option></select>
+          <button type="button" class="btn ghost small" id="btnSessionFolderFilter">📁 Filtrar por carpetas</button>
           <input type="text" id="sessionAddSearch" placeholder="🔍 Buscar tarea por nombre...">
         </div>
+        <div id="sessionFolderChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
         <div class="filterbar" style="margin-top:6px;">
           <select id="sessionFilterPhase">
             <option value="">Todas las fases</option>
@@ -1222,6 +1223,19 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
     <h2 style="font-size:1.05rem;" id="folderPickerTitle">Elegir carpeta</h2>
     <div id="folderPickerList" style="margin-top:12px;max-height:52vh;overflow-y:auto;"></div>
     <button class="btn ghost" id="btnCloseFolderPicker" style="margin-top:14px;width:100%;">Cancelar</button>
+  </div>
+</div>
+
+<!-- ---------- Multi-folder picker modal (filtrar por varias carpetas a la vez) ---------- -->
+<div id="multiFolderPickerModal" class="modal-bg hidden">
+  <div class="modal">
+    <h2 style="font-size:1.05rem;" id="multiFolderPickerTitle">Filtrar por carpetas</h2>
+    <p class="muted" style="font-size:.8rem;margin-top:2px;">Se mostrará solo lo que esté en <b>todas</b> las carpetas marcadas.</p>
+    <div id="multiFolderPickerList" style="margin-top:12px;max-height:52vh;overflow-y:auto;"></div>
+    <div style="display:flex;gap:8px;margin-top:14px;">
+      <button class="btn ghost" id="btnClearMultiFolderPicker" style="flex:1;">Quitar filtro</button>
+      <button class="btn accent" id="btnApplyMultiFolderPicker" style="flex:1;">Aplicar</button>
+    </div>
   </div>
 </div>
 
@@ -2610,6 +2624,49 @@ window.chooseFolderPicker = (id) => {
 document.getElementById("btnCloseFolderPicker").onclick = () => {
   document.getElementById("folderPickerModal").classList.add("hidden");
   folderPickerCallback = null;
+};
+
+/* ---------- Selector de VARIAS carpetas a la vez (filtro por intersección) ---------- */
+let multiFolderPickerState = null; // {section, selected:Set, onApply}
+function openMultiFolderPicker(section, selectedIds, title, onApply){
+  multiFolderPickerState = {section, selected: new Set(selectedIds||[]), onApply};
+  document.getElementById("multiFolderPickerTitle").textContent = title || "Filtrar por carpetas";
+  const rows = [];
+  (function walk(pid, depth){
+    folderChildren_(section, pid).sort((a,b)=>(a.name||"").localeCompare(b.name||"","es")).forEach(f=>{
+      rows.push({id:f.id, name:f.name, depth});
+      walk(f.id, depth+1);
+    });
+  })(null, 0);
+  document.getElementById("multiFolderPickerList").innerHTML = rows.map(r=>`
+    <label style="display:flex;align-items:center;gap:8px;padding:7px ${10+r.depth*18}px 7px 10px;cursor:pointer;">
+      <input type="checkbox" data-folder-id="${r.id}" ${multiFolderPickerState.selected.has(r.id)?"checked":""} style="width:auto;">
+      <span>📁 ${escapeHtml(r.name)}</span>
+    </label>
+  `).join("") || '<p class="muted">No hay carpetas creadas todavía.</p>';
+  document.getElementById("multiFolderPickerModal").classList.remove("hidden");
+}
+document.getElementById("multiFolderPickerList").onchange = (e) => {
+  const cb = e.target.closest("input[type=checkbox]");
+  if(!cb || !multiFolderPickerState) return;
+  const id = cb.getAttribute("data-folder-id");
+  if(cb.checked) multiFolderPickerState.selected.add(id);
+  else multiFolderPickerState.selected.delete(id);
+};
+document.getElementById("btnClearMultiFolderPicker").onclick = () => {
+  if(!multiFolderPickerState) return;
+  const {onApply} = multiFolderPickerState;
+  document.getElementById("multiFolderPickerModal").classList.add("hidden");
+  multiFolderPickerState = null;
+  onApply([]);
+};
+document.getElementById("btnApplyMultiFolderPicker").onclick = () => {
+  if(!multiFolderPickerState) return;
+  const {selected, onApply} = multiFolderPickerState;
+  document.getElementById("multiFolderPickerModal").classList.add("hidden");
+  const ids = [...selected];
+  multiFolderPickerState = null;
+  onApply(ids);
 };
 
 /* ---------- "Mover a..." para una carpeta, tarea o jugada ---------- */
@@ -5187,10 +5244,32 @@ function renderTeamCompare(){
 let sessionBlocks = { calentamiento: [], principal: [], vuelta: [] };
 let editingSessionId = null;
 
+let sessionFilterFolderIds = []; // carpetas marcadas para filtrar tareas al crear una sesión (intersección)
 function updateSessionAddFolderOptions(){
-  document.getElementById("sessionAddFolder").innerHTML = folderSelectOptions_("tasks", "Elige carpeta...");
+  sessionFilterFolderIds = [];
+  renderSessionFolderChips();
 }
-document.getElementById("sessionAddFolder").onchange = renderSessionTaskBrowser;
+function renderSessionFolderChips(){
+  const wrap = document.getElementById("sessionFolderChips");
+  wrap.innerHTML = sessionFilterFolderIds.map(id=>{
+    const f = categories.find(c=>c.id===id);
+    return `<span class="badge" style="display:flex;align-items:center;gap:6px;">📁 ${escapeHtml(f?f.name:"?")}
+      <button type="button" onclick="removeSessionFolderChip('${id}')" style="background:none;border:none;color:inherit;cursor:pointer;font-size:1em;line-height:1;padding:0;">✕</button>
+    </span>`;
+  }).join("");
+}
+window.removeSessionFolderChip = (id) => {
+  sessionFilterFolderIds = sessionFilterFolderIds.filter(x=>x!==id);
+  renderSessionFolderChips();
+  renderSessionTaskBrowser();
+};
+document.getElementById("btnSessionFolderFilter").onclick = () => {
+  openMultiFolderPicker("tasks", sessionFilterFolderIds, "Filtrar tareas por carpetas", (ids) => {
+    sessionFilterFolderIds = ids;
+    renderSessionFolderChips();
+    renderSessionTaskBrowser();
+  });
+};
 document.getElementById("sessionAddSearch").oninput = renderSessionTaskBrowser;
 document.getElementById("sessionFilterPhase").onchange = () => {
   const phase = document.getElementById("sessionFilterPhase").value;
@@ -5202,19 +5281,24 @@ document.getElementById("sessionFilterPlayers").oninput = renderSessionTaskBrows
 document.getElementById("sessionFilterFavOnly").onchange = renderSessionTaskBrowser;
 function renderSessionTaskBrowser(){
   const wrap = document.getElementById("sessionTaskBrowser");
-  const folderFilter = document.getElementById("sessionAddFolder").value;
   const searchFilter = document.getElementById("sessionAddSearch").value.trim().toLowerCase();
   const phaseFilter = document.getElementById("sessionFilterPhase").value;
   const levelFilter = document.getElementById("sessionFilterLevel").value;
   const playersFilter = document.getElementById("sessionFilterPlayers").value ? Number(document.getElementById("sessionFilterPlayers").value) : null;
   const favOnly = document.getElementById("sessionFilterFavOnly").checked;
-  if(!folderFilter && !searchFilter && !favOnly){
-    wrap.innerHTML = '<p class="muted" style="padding:10px 0;">👆 Elige una carpeta o escribe un nombre para ver las tareas disponibles.</p>';
+  if(!sessionFilterFolderIds.length && !searchFilter && !favOnly){
+    wrap.innerHTML = '<p class="muted" style="padding:10px 0;">👆 Elige una o varias carpetas, o escribe un nombre, para ver las tareas disponibles.</p>';
     return;
   }
-  const includeIds = folderFilter ? new Set([folderFilter, ...folderDescendantIds_("tasks", folderFilter)]) : null;
+  // Cada carpeta seleccionada se expande a sí misma + sus subcarpetas.
+  // Una tarea solo pasa si toca AL MENOS una de esas ramas por CADA carpeta marcada (intersección).
+  const folderGroups = sessionFilterFolderIds.map(fid => new Set([fid, ...folderDescendantIds_("tasks", fid)]));
   const list = tasks.filter(t=>{
-    if(includeIds && !taskCategoryIds(t).some(id=>includeIds.has(id))) return false;
+    if(folderGroups.length){
+      const catIds = taskCategoryIds(t);
+      const matchesAll = folderGroups.every(group => catIds.some(id=>group.has(id)));
+      if(!matchesAll) return false;
+    }
     if(searchFilter && !(t.title||"").toLowerCase().includes(searchFilter)) return false;
     if(phaseFilter && t.phase!==phaseFilter) return false;
     if(levelFilter && t.levelFrom && t.levelTo){
@@ -5347,7 +5431,6 @@ function resetSessionForm(){
   document.getElementById("sessionObjectives").value = "";
   document.getElementById("sessionNotes").value = "";
   sessionBlocks = { calentamiento: [], principal: [], vuelta: [] };
-  document.getElementById("sessionAddFolder").value = "";
   document.getElementById("sessionAddSearch").value = "";
   updateSessionAddFolderOptions();
   renderSessionTaskList();
