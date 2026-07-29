@@ -4809,8 +4809,8 @@ document.getElementById("btnSaveMatchdayReport").onclick = async () => {
 };
 
 /* ---------- Exportar convocatoria en PDF ---------- */
-document.getElementById("btnExportConvocatoriaPDF").onclick = () => {
-  const m = matchdays.find(x=>x.id===statsMatchdayId);
+function exportMatchdayReportPDF(matchdayId){
+  const m = matchdays.find(x=>x.id===matchdayId);
   if(!m){ alert("No se ha encontrado la jornada."); return; }
   if(!window.jspdf){ alert("No se ha podido cargar el generador de PDF. Comprueba tu conexión e inténtalo de nuevo."); return; }
   const team = teams.find(t=>t.id===m.teamId);
@@ -4961,7 +4961,8 @@ document.getElementById("btnExportConvocatoriaPDF").onclick = () => {
 
   const safeName = `Informe_J${m.number}_${(m.rival||"rival").replace(/[^a-zA-Z0-9]+/g,"_")}`;
   doc.save(`${safeName}.pdf`);
-};
+}
+document.getElementById("btnExportConvocatoriaPDF").onclick = () => exportMatchdayReportPDF(statsMatchdayId);
 function hexToRgb_(hex){
   const h = hex.replace("#","");
   return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
@@ -4971,6 +4972,13 @@ function hexToRgb_(hex){
 document.getElementById("btnExportSummaryPDF").onclick = () => {
   if(!selectedTeamId){ alert("Elige primero un equipo."); return; }
   if(!window.jspdf){ alert("No se ha podido cargar el generador de PDF. Comprueba tu conexión e inténtalo de nuevo."); return; }
+  // Si estás viendo el resumen de UNA jornada concreta (no toda la temporada),
+  // descarga el mismo PDF que "Informe del partido" para esa jornada.
+  if(summaryMode === "matchday"){
+    if(!summarySelectedMatchdayId){ alert("Elige primero una jornada."); return; }
+    exportMatchdayReportPDF(summarySelectedMatchdayId);
+    return;
+  }
   const team = teams.find(t=>t.id===selectedTeamId);
   const sum = computeTeamSummary_(selectedTeamId, selectedSeason, summaryDifficultyFilter);
   const outfield = sum.stats.filter(s=>s.player.position!=="Portero").sort((a,b)=> b.goals-a.goals || b.played-a.played);
