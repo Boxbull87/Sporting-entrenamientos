@@ -288,11 +288,21 @@ canvas.court{
 }
 .frames-list{display:flex;gap:8px;overflow-x:auto;padding:6px 2px;}
 .frame-chip{
-  flex-shrink:0;width:104px;height:72px;border-radius:12px;border:4px solid var(--border);
-  background:var(--pitch-light);color:#fff;font-size:1.4rem;display:flex;align-items:center;justify-content:center;font-weight:700;
+  flex-shrink:0;width:104px;border-radius:12px;border:4px solid var(--border);
+  background:var(--pitch-light);color:#fff;display:flex;flex-direction:column;overflow:hidden;
 }
 .frame-chip.active{border-color:var(--accent);}
-.frame-chip .rm{position:relative;top:-28px;left:36px;background:var(--danger);color:#fff;border-radius:50%;width:28px;height:28px;font-size:1.2rem;line-height:28px;text-align:center;cursor:pointer;}
+.frame-chip .frame-num{
+  width:100%;padding:10px 0;font-size:1.4rem;font-weight:700;text-align:center;
+  background:none;border:none;color:inherit;cursor:pointer;
+}
+.frame-chip .frame-actions{display:flex;border-top:1px solid rgba(255,255,255,.15);}
+.frame-chip .rm{
+  flex:1;background:none;color:#fff;border:none;border-right:1px solid rgba(255,255,255,.15);
+  font-size:1rem;line-height:30px;height:30px;text-align:center;cursor:pointer;padding:0;
+}
+.frame-chip .rm:last-child{border-right:none;}
+.frame-chip .rm.danger{color:var(--danger);}
 
 /* sessions */
 .session-task{
@@ -655,6 +665,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
             <canvas id="courtCanvas" class="court" width="980" height="700"></canvas>
             <div class="board-toolbar">
               <button type="button" class="btn accent small" id="saveFrame">💾 Guardar fotograma</button>
+              <button type="button" class="btn ghost small hidden" id="updateFrameBtn">✏️ Actualizar fotograma</button>
               <button type="button" class="btn ghost small" id="playAnim">▶ Reproducir</button>
               <button type="button" class="btn ghost small" id="stopAnim">⏹ Detener</button>
               <button type="button" class="btn ghost small" id="expandEditorBoard">⛶ Ampliar</button>
@@ -1340,6 +1351,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
   <div id="fsCanvasAnchor"></div>
   <div id="fsBottomToolbar" class="fs-toolbar hidden">
     <button type="button" class="btn accent small" id="fsSaveFrame">💾 Guardar fotograma</button>
+    <button type="button" class="btn ghost small hidden" id="fsUpdateFrameBtn">✏️ Actualizar fotograma</button>
     <button type="button" class="btn ghost small" id="fsPlayAnim">▶ Reproducir</button>
     <button type="button" class="btn ghost small" id="fsStopAnim">⏹ Detener</button>
     <span class="muted" id="fsFrameCount">0 fotogramas</span>
@@ -3481,18 +3493,27 @@ function updateFrameCount(){
     seek.value = activeFrameIndex!=null ? activeFrameIndex : 0;
     seek.disabled = frames.length===0;
   }
+  const showUpdate = activeFrameIndex != null && frames[activeFrameIndex];
+  const upd = document.getElementById("updateFrameBtn");
+  if(upd) upd.classList.toggle("hidden", !showUpdate);
+  const fsUpd = document.getElementById("fsUpdateFrameBtn");
+  if(fsUpd) fsUpd.classList.toggle("hidden", !showUpdate);
+  const fsCount = document.getElementById("fsFrameCount");
+  if(fsCount) fsCount.textContent = frames.length + " fotogramas";
 }
 let activeFrameIndex = null; // qué fotograma está cargado ahora mismo en la pizarra
 function renderFramesList(){
   updateFrameCount();
   const wrap = document.getElementById("framesList");
   wrap.innerHTML = frames.map((f,i)=>`
-    <div class="frame-chip ${activeFrameIndex===i ? "active" : ""}" title="Toca para cargar el fotograma ${i+1} en la pizarra">
-      <span onclick="loadFrame(${i})" style="cursor:pointer;">${i+1}</span>
-      <span class="rm" title="Mover a la izquierda" onclick="event.stopPropagation(); moveFrame(${i},-1)" style="cursor:pointer;">◀</span>
-      <span class="rm" title="Mover a la derecha" onclick="event.stopPropagation(); moveFrame(${i},1)" style="cursor:pointer;">▶</span>
-      <span class="rm" title="Duplicar fotograma" onclick="event.stopPropagation(); duplicateFrame(${i})" style="cursor:pointer;">⧉</span>
-      <span class="rm" title="Eliminar fotograma" onclick="event.stopPropagation(); removeFrame(${i})">×</span>
+    <div class="frame-chip ${activeFrameIndex===i ? "active" : ""}">
+      <button type="button" class="frame-num" title="Toca para cargar el fotograma ${i+1} en la pizarra" onclick="loadFrame(${i})">${i+1}</button>
+      <div class="frame-actions">
+        <button type="button" class="rm" title="Mover a la izquierda" onclick="event.stopPropagation(); moveFrame(${i},-1)">◀</button>
+        <button type="button" class="rm" title="Mover a la derecha" onclick="event.stopPropagation(); moveFrame(${i},1)">▶</button>
+        <button type="button" class="rm" title="Duplicar fotograma" onclick="event.stopPropagation(); duplicateFrame(${i})">⧉</button>
+        <button type="button" class="rm danger" title="Eliminar fotograma" onclick="event.stopPropagation(); removeFrame(${i})">×</button>
+      </div>
     </div>`).join("");
 }
 window.loadFrame = (i) => {
@@ -3517,9 +3538,17 @@ window.loadFrame = (i) => {
 };
 window.removeFrame = (i) => {
   frames.splice(i,1);
-  if(activeFrameIndex === i) activeFrameIndex = null;
-  else if(activeFrameIndex !== null && activeFrameIndex > i) activeFrameIndex--;
   markBoardDirty();
+  if(activeFrameIndex === i){
+    if(frames.length === 0){
+      activeFrameIndex = null;
+      renderFramesList();
+    } else {
+      loadFrame(Math.min(i, frames.length-1));
+    }
+    return;
+  }
+  if(activeFrameIndex !== null && activeFrameIndex > i) activeFrameIndex--;
   renderFramesList();
 };
 window.moveFrame = (i, dir) => {
@@ -3579,10 +3608,26 @@ function saveCurrentFrame(){
   activeFrameIndex = frames.length - 1;
   markBoardDirty();
   renderFramesList();
-  const fsCount = document.getElementById("fsFrameCount");
-  if(fsCount) fsCount.textContent = frames.length + " fotogramas";
 }
 document.getElementById("fsSaveFrame").onclick = saveCurrentFrame;
+
+// Sobrescribe el fotograma actualmente cargado con la posición actual de la pizarra,
+// en vez de crear uno nuevo al final (eso lo sigue haciendo "Guardar fotograma").
+function updateCurrentFrame(){
+  if(activeFrameIndex == null || !frames[activeFrameIndex]) return;
+  if(tokens.length===0){ alert("Añade al menos un jugador antes de actualizar el fotograma."); return; }
+  frames[activeFrameIndex] = {
+    tokens: JSON.parse(JSON.stringify(tokens)),
+    arrows: JSON.parse(JSON.stringify(arrows)),
+    texts: JSON.parse(JSON.stringify(texts)),
+    shapes: JSON.parse(JSON.stringify(shapes)),
+    paths: JSON.parse(JSON.stringify(paths))
+  };
+  markBoardDirty();
+  renderFramesList();
+}
+document.getElementById("updateFrameBtn").onclick = updateCurrentFrame;
+document.getElementById("fsUpdateFrameBtn").onclick = updateCurrentFrame;
 
 function openBoardFullscreen(cvs, fsMode, viewFrameList){
   if(!cvs) return;
@@ -3596,7 +3641,7 @@ function openBoardFullscreen(cvs, fsMode, viewFrameList){
   document.getElementById("fsBottomToolbar").classList.toggle("hidden", !isEdit);
   document.getElementById("fsViewToolbar").classList.toggle("hidden", isEdit);
   if(isEdit){
-    document.getElementById("fsFrameCount").textContent = frames.length + " fotogramas";
+    updateFrameCount();
     redrawBoard();
   } else {
     fsViewFrameList = viewFrameList || [];
