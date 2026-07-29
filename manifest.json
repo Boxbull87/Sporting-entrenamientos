@@ -1,8 +1,8 @@
 {
   "name": "Sporting FS Almería - Entrenamientos",
   "short_name": "Sporting FS",
-  "start_url": "./index.html",
-  "scope": "./",
+  "start_url": ".",
+  "scope": ".",
   "display": "standalone",
   "background_color": "#0a0a0a",
   "theme_color": "#d81e2c",
@@ -20,7 +20,7 @@
       "purpose": "any"
     },
     {
-      "src": "icon-512.png",
+      "src": "icon-512-maskable.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

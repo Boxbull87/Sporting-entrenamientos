@@ -4,6 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sporting FS Almería · Tareas de Entrenamiento</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#d81e2c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sporting FS">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+
 
 <!-- ============================================================
   CONFIGURACIÓN DE FIREBASE
@@ -464,6 +474,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
     <button class="tab" data-tab="sessions">Sesiones</button>
     <button class="tab" data-tab="modelo">Modelo de juego</button>
     <button class="tab" data-tab="abp">ABP</button>
+    <button class="tab" data-tab="plantilla">👕 Plantilla</button>
     <button class="tab hidden" id="tabCoachesBtn" data-tab="coaches">Entrenadores</button>
     <button class="tab hidden" id="tabPapeleraBtn" data-tab="papelera">🗑️ Papelera</button>
   </div>
@@ -497,6 +508,11 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
           <span class="home-card-icon">🎯</span>
           <span class="home-card-label">ABP <span id="homeDotAbp" class="card-dot hidden"></span></span>
           <span class="home-card-desc">Jugadas a balón parado</span>
+        </button>
+        <button type="button" class="home-card" data-goto="plantilla">
+          <span class="home-card-icon">👕</span>
+          <span class="home-card-label">Plantilla</span>
+          <span class="home-card-desc">Jugadores, jornadas y estadísticas</span>
         </button>
         <button type="button" class="home-card hidden" id="homeCoachesBtn" data-goto="coaches">
           <span class="home-card-icon">👥</span>
@@ -968,6 +984,189 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
     </div>
 
     <!-- ---------- COACHES TAB (gestor only) ---------- -->
+    <div id="tab-plantilla" class="hidden">
+
+      <div id="plantillaHome">
+        <div class="card">
+          <h2 style="font-size:1.05rem;">👕 Tu equipo</h2>
+          <div class="row">
+            <select id="teamSelector" style="flex:1;"></select>
+            <select id="seasonSelector" style="max-width:140px;"></select>
+            <button type="button" class="btn ghost small" id="btnNewSeason" style="flex:0 0 auto;">🆕 Nueva temporada</button>
+            <button type="button" class="btn ghost small" id="btnRenameSeason" style="flex:0 0 auto;">✏️ Renombrar temporada</button>
+            <button type="button" class="btn danger small" id="btnDeleteSeason" style="flex:0 0 auto;">🗑️ Borrar temporada</button>
+          </div>
+        </div>
+        <div class="home-grid">
+          <button type="button" class="home-card" id="plantillaGoRoster">
+            <span class="home-card-icon">👥</span>
+            <span class="home-card-label">Plantilla de jugadores</span>
+            <span class="home-card-desc">Dorsal, nombre y posición</span>
+          </button>
+          <button type="button" class="home-card" id="plantillaGoMatchdays">
+            <span class="home-card-icon">🗓️</span>
+            <span class="home-card-label">Jornadas</span>
+            <span class="home-card-desc">Convocatorias, goles y tarjetas</span>
+          </button>
+          <button type="button" class="home-card" id="plantillaGoSummary">
+            <span class="home-card-icon">📊</span>
+            <span class="home-card-label">Resumen</span>
+            <span class="home-card-desc">Estadísticas automáticas</span>
+          </button>
+          <button type="button" class="home-card hidden" id="plantillaGoCompare">
+            <span class="home-card-icon">🆚</span>
+            <span class="home-card-label">Comparar equipos</span>
+            <span class="home-card-desc">Goles, tarjetas y participación</span>
+          </button>
+          <button type="button" class="home-card hidden" id="plantillaGoTeams">
+            <span class="home-card-icon">⚙️</span>
+            <span class="home-card-label">Equipos del club</span>
+            <span class="home-card-desc">Crear equipos y asignarlos</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="plantillaCompareView" class="hidden">
+        <button type="button" class="btn ghost small" id="plantillaCompareBack" style="margin-bottom:10px;">← Volver</button>
+        <div class="card">
+          <h2 style="font-size:1.05rem;">🆚 Comparar equipos</h2>
+          <p class="muted" style="margin-top:-6px;">Temporada seleccionada: se compara la misma temporada que tengas elegida arriba.</p>
+          <div id="teamCompareContent"></div>
+        </div>
+      </div>
+
+      <div id="plantillaRosterView" class="hidden">
+        <button type="button" class="btn ghost small" id="plantillaRosterBack" style="margin-bottom:10px;">← Volver</button>
+        <div class="card">
+          <h2 style="font-size:1.05rem;">👥 Plantilla de jugadores</h2>
+          <div id="playersMsg"></div>
+          <div id="playersList" style="margin-top:12px;"><div class="empty">Elige un equipo para ver su plantilla.</div></div>
+
+          <h3 style="margin-top:18px;font-size:.9rem;">Añadir jugador</h3>
+          <div class="row">
+            <input type="number" id="newPlayerDorsal" placeholder="Dorsal" style="max-width:100px;">
+            <input type="text" id="newPlayerName" placeholder="Nombre y apellidos" style="flex:1;">
+            <select id="newPlayerPosition" style="max-width:140px;">
+              <option value="Jugador">Jugador</option>
+              <option value="Portero">Portero</option>
+            </select>
+            <button class="btn accent" id="btnAddPlayer" style="flex:0 0 auto;">+ Añadir</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="plantillaPlayerView" class="hidden">
+        <button type="button" class="btn ghost small" id="plantillaPlayerBack" style="margin-bottom:10px;">← Volver a la plantilla</button>
+        <div class="card">
+          <h2 id="playerProfileTitle" style="font-size:1.05rem;"></h2>
+          <div id="playerProfileContent"></div>
+        </div>
+      </div>
+
+      <div id="plantillaMatchdaysView" class="hidden">
+        <button type="button" class="btn ghost small" id="plantillaMatchdaysBack" style="margin-bottom:10px;">← Volver</button>
+        <div class="card" id="matchdaysCard">
+          <h2 style="font-size:1.05rem;">🗓️ Jornadas</h2>
+
+          <div id="matchdaysListView">
+            <button class="btn accent small" id="btnNewMatchday">+ Nueva jornada</button>
+            <div id="matchdaysList" style="margin-top:10px;"><div class="empty">Elige un equipo arriba.</div></div>
+          </div>
+
+          <div id="matchdayFormView" class="hidden">
+            <button type="button" class="btn ghost small" id="btnMatchdayBack" style="margin-bottom:10px;">← Volver a jornadas</button>
+            <div class="row">
+              <div><label>Jornada nº</label><input type="number" id="mdNumber" min="1"></div>
+              <div><label>Fecha</label><input type="date" id="mdDate"></div>
+              <div><label>Rival</label><input type="text" id="mdRival"></div>
+            </div>
+            <div class="row" style="margin-top:8px;">
+              <div><label>Competición</label><input type="text" id="mdCompetition" placeholder="Liga, Copa..."></div>
+              <div><label>Condición</label>
+                <select id="mdHomeAway"><option value="Local">Local</option><option value="Visitante">Visitante</option></select>
+              </div>
+              <div><label>Goles a favor</label><input type="number" id="mdGoalsFor" min="0"></div>
+              <div><label>Goles en contra</label><input type="number" id="mdGoalsAgainst" min="0"></div>
+            </div>
+            <div class="row" style="margin-top:8px;">
+              <div style="flex:1;"><label>Enlace del partido grabado</label><input type="text" id="mdVideoUrl" placeholder="https://..."></div>
+            </div>
+            <button class="btn accent" id="btnSaveMatchday" style="margin-top:10px;">💾 Guardar jornada</button>
+            <div id="matchdayMsg"></div>
+          </div>
+
+          <div id="matchdayStatsView" class="hidden">
+            <button type="button" class="btn ghost small" id="btnStatsBack" style="margin-bottom:10px;">← Volver a jornadas</button>
+            <h3 id="matchdayStatsTitle" style="font-size:.95rem;"></h3>
+            <div id="matchdayVideoWrap" style="margin-bottom:8px;"></div>
+            <p class="muted" style="margin-top:-6px;">Goles/Encajados: para jugadores son goles marcados; para porteros, goles encajados.</p>
+            <div class="row" style="margin-bottom:8px;">
+              <button type="button" class="btn small ghost" id="btnMarkAllStarters">✅ Marcar todos Titular</button>
+              <button type="button" class="btn small ghost" id="btnMarkAllUncalled">🚫 Marcar todos No convocado</button>
+            </div>
+            <div id="matchdayStatsTable" style="overflow-x:auto;"></div>
+            <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+              <button class="btn accent" id="btnSaveMatchdayStats">💾 Guardar convocatoria</button>
+              <button class="btn ghost" id="btnExportConvocatoriaPDF">🖨️ Exportar convocatoria (PDF)</button>
+              <button class="btn danger" id="btnDeleteMatchday">🗑️ Eliminar jornada</button>
+            </div>
+            <div id="matchdayStatsMsg"></div>
+
+            <h3 style="margin-top:18px;font-size:.9rem;">🔗 Sesiones de entrenamiento de esa semana</h3>
+            <p class="muted" style="margin-top:-6px;">Marca las sesiones que preparasteis antes de este partido, para tener el enlace guardado.</p>
+            <div id="matchdaySessionsLink"></div>
+
+            <h3 style="margin-top:18px;font-size:.9rem;">📋 Informe del partido</h3>
+            <p class="muted" style="margin-top:-6px;">Dificultad del rival:</p>
+            <div id="matchdayDifficultyPicker" style="margin-bottom:10px;display:flex;flex-wrap:wrap;"></div>
+            <label style="font-size:.85rem;font-weight:600;">Informe / texto libre</label>
+            <textarea id="mdReportText" rows="5" style="width:100%;margin-bottom:10px;" placeholder="Escribe aquí lo que quieras sobre el partido..."></textarea>
+            <label style="font-size:.85rem;font-weight:600;">Observaciones</label>
+            <textarea id="mdReportObservations" rows="3" style="width:100%;margin-bottom:10px;" placeholder="Observaciones adicionales..."></textarea>
+            <label style="font-size:.85rem;font-weight:600;">Notas de jugadores</label>
+            <div id="matchdayPlayerNotes" style="margin-bottom:10px;"></div>
+            <button class="btn accent" id="btnSaveMatchdayReport">💾 Guardar informe</button>
+            <div id="matchdayReportMsg"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <div id="plantillaSummaryView" class="hidden">
+        <button type="button" class="btn ghost small" id="plantillaSummaryBack" style="margin-bottom:10px;">← Volver</button>
+        <div class="card" id="teamSummaryCard">
+          <h2 style="font-size:1.05rem;">📊 Resumen</h2>
+          <p class="muted" style="margin-top:-6px;">Se calcula solo, a partir de todas las jornadas guardadas de este equipo.</p>
+          <div class="row" style="margin-bottom:10px;">
+            <button type="button" class="btn small" id="summaryModeSeasonBtn">📅 Temporada completa</button>
+            <button type="button" class="btn small ghost" id="summaryModeMatchdayBtn">🗓️ Por jornada</button>
+            <select id="summaryMatchdaySelect" class="hidden" style="flex:1;min-width:160px;"></select>
+          </div>
+          <p class="muted" style="margin:-4px 0 4px 0;font-size:.8rem;">Filtrar por dificultad del rival:</p>
+          <div id="summaryDifficultyFilterRow" style="margin-bottom:10px;display:flex;flex-wrap:wrap;"></div>
+          <div id="teamSummaryContent"><div class="empty">Elige un equipo arriba.</div></div>
+          <div class="row" style="margin-top:12px;">
+            <button type="button" class="btn ghost small" id="btnExportSummaryPDF">🖨️ Exportar PDF</button>
+            <button type="button" class="btn ghost small" id="btnExportSummaryExcel">📊 Exportar Excel</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="plantillaTeamsView" class="hidden">
+        <button type="button" class="btn ghost small" id="plantillaTeamsBack" style="margin-bottom:10px;">← Volver</button>
+        <div class="card" id="teamManagePanel">
+          <h2 style="font-size:1.05rem;">⚙️ Equipos del club</h2>
+          <p class="muted">Crea aquí los equipos (p. ej. "Alevín A", "Cadete B"). Luego asigna a cada entrenador su(s) equipo(s) desde la pestaña "Entrenadores".</p>
+          <div class="row">
+            <input type="text" id="newTeamName" placeholder="Nombre del equipo">
+            <button class="btn accent" id="btnNewTeam" style="flex:0 0 auto;">+ Crear equipo</button>
+          </div>
+          <div id="teamManageList" style="margin-top:12px;"></div>
+        </div>
+      </div>
+
+    </div>
+
     <div id="tab-coaches" class="hidden">
       <div class="card">
         <h2 style="font-size:1.05rem;">👥 Entrenadores del club</h2>
@@ -1075,6 +1274,13 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
   </div>
 </div>
 
+<div id="viewSessionModal" class="modal-bg hidden">
+  <div class="modal">
+    <div id="viewSessionContent"></div>
+    <button class="btn ghost" id="btnCloseViewSessionModal" style="margin-top:14px;width:100%;">Cerrar</button>
+  </div>
+</div>
+
 <!-- ---------- Board fullscreen overlay (más grande / apaisado en móvil) ---------- -->
 <div id="boardFullscreen" class="board-fullscreen hidden">
   <button class="btn small ghost" id="closeFullscreenBoard">✕ Cerrar</button>
@@ -1134,60 +1340,16 @@ firebase.initializeApp(FIREBASE_CONFIG);
 document.querySelectorAll(".crest-img").forEach(img => img.src = CREST_DATA_URI);
 
 /* ============================================================
-   ICONO DEL ESCUDO PARA FAVICON / ACCESO DIRECTO (PC y móvil)
+   SERVICE WORKER
+   Necesario para que Chrome/Android ofrezcan "Instalar app" de
+   verdad (icono correcto, sin el círculo blanco que añaden los
+   launchers a los simples "acceso directo" de una página web).
+   El favicon, apple-touch-icon, manifest.json y theme-color ya
+   están declarados de forma ESTÁTICA en el <head> del documento.
 ============================================================= */
-(function setupAppIcons(){
-  // Favicon en la pestaña del navegador (PC y Android)
-  const favicon = document.createElement("link");
-  favicon.rel = "icon";
-  favicon.type = "image/png";
-  favicon.href = CREST_DATA_URI;
-  document.head.appendChild(favicon);
-
-  // Icono al añadir a pantalla de inicio en iOS/Safari
-  const appleIcon = document.createElement("link");
-  appleIcon.rel = "apple-touch-icon";
-  appleIcon.href = CREST_DATA_URI;
-  document.head.appendChild(appleIcon);
-
-  const appleTitle = document.createElement("meta");
-  appleTitle.name = "apple-mobile-web-app-title";
-  appleTitle.content = "Sporting FS";
-  document.head.appendChild(appleTitle);
-
-  const appleCapable = document.createElement("meta");
-  appleCapable.name = "apple-mobile-web-app-capable";
-  appleCapable.content = "yes";
-  document.head.appendChild(appleCapable);
-
-  const themeColor = document.createElement("meta");
-  themeColor.name = "theme-color";
-  themeColor.content = "#d81e2c";
-  document.head.appendChild(themeColor);
-
-  // Manifest para "Instalar app" en PC (Chrome/Edge) y "Añadir a pantalla de inicio" en Android.
-  // Se usa el archivo real manifest.json (debe subirse junto a este index.html).
-  // Si por lo que sea no está disponible, se genera uno equivalente al vuelo como alternativa.
-  const manifestLink = document.createElement("link");
-  manifestLink.rel = "manifest";
-  manifestLink.href = "manifest.json";
-  manifestLink.onerror = () => {
-    const manifest = {
-      name: "Sporting FS Almería - Entrenamientos",
-      short_name: "Sporting FS",
-      start_url: location.pathname,
-      display: "standalone",
-      background_color: "#0a0a0a",
-      theme_color: "#d81e2c",
-      icons: [
-        { src: CREST_DATA_URI, sizes: "192x192", type: "image/png" },
-        { src: CREST_DATA_URI, sizes: "512x512", type: "image/png" }
-      ]
-    };
-    manifestLink.href = URL.createObjectURL(new Blob([JSON.stringify(manifest)], {type:"application/json"}));
-  };
-  document.head.appendChild(manifestLink);
-})();
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
 const auth = firebase.auth();
 const db = firebase.firestore();
 db.settings({ experimentalForceLongPolling: true, useFetchStreams: false });
@@ -1285,6 +1447,13 @@ let playSessionFolders = [];   // carpetas de Sesiones de ABP creadas
 let plays = [];
 let playSessions = [];
 let gameModelFiles = [];
+let teams = [];
+let players = [];
+let selectedTeamId = null;
+let selectedSeason = null;
+let matchdays = [];
+let editingMatchdayId = null;
+let statsMatchdayId = null;
 let trashTasks = [];
 let trashSessions = [];
 let trashPlays = [];
@@ -1519,6 +1688,8 @@ function initAppUI(){
   document.getElementById("playEditorPanel").classList.toggle("hidden", !canEditContent);
   document.getElementById("btnNewAbpFolder").classList.toggle("hidden", !canEditContent);
   document.getElementById("modeloUploadPanel").classList.toggle("hidden", !canEditContent);
+  document.getElementById("plantillaGoTeams").classList.toggle("hidden", !canEditContent);
+  updateCompareCardVisibility();
   document.getElementById("tabCoachesBtn").classList.toggle("hidden", !isGestor);
   document.getElementById("homeCoachesBtn").classList.toggle("hidden", !isGestor);
   document.getElementById("tabPapeleraBtn").classList.toggle("hidden", !isGestor);
@@ -1555,7 +1726,7 @@ document.querySelectorAll(".tab").forEach(btn=>{
   btn.onclick = () => {
     document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));
     btn.classList.add("active");
-    ["home","tasks","sessions","modelo","abp","coaches","papelera"].forEach(t=>{
+    ["home","tasks","sessions","modelo","abp","plantilla","coaches","papelera"].forEach(t=>{
       document.getElementById("tab-"+t).classList.toggle("hidden", t!==btn.dataset.tab);
     });
     placeBoardWrapFor(btn.dataset.tab);
@@ -1563,6 +1734,7 @@ document.querySelectorAll(".tab").forEach(btn=>{
     if(btn.dataset.tab === "abp") showAbpView("home");
     if(btn.dataset.tab === "sessions") showSessionsView("home");
     if(btn.dataset.tab === "modelo") markSectionSeen("gameModelFiles");
+    if(btn.dataset.tab === "plantilla") { showPlantillaView("home"); renderTeamSelector(); }
     window.scrollTo({top:0, behavior:"smooth"});
   };
 });
@@ -2125,6 +2297,30 @@ function attachRealtimeListeners(){
     renderModeloList();
     renderNotifications();
   }, err => showSyncError_("modelo de juego", err));
+
+  db.collection("teams").orderBy("name").onSnapshot(snap=>{
+    teams = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    renderTeamManageList();
+    renderTeamSelector();
+    renderCoachList();
+    updateCompareCardVisibility();
+  }, err => showSyncError_("equipos", err));
+
+  db.collection("players").orderBy("dorsal").onSnapshot(snap=>{
+    players = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    renderPlayersList();
+    renderTeamSummary();
+  }, err => showSyncError_("plantilla de jugadores", err));
+
+  db.collection("matchdays").orderBy("number").onSnapshot(snap=>{
+    matchdays = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    stampLegacyMatchdaySeasons_();
+    renderMatchdaysList();
+    renderTeamSummary();
+    if(statsMatchdayId && !document.getElementById("matchdayStatsView").classList.contains("hidden")){
+      renderMatchdayStatsTable();
+    }
+  }, err => showSyncError_("jornadas", err));
 }
 
 /* ============================================================
@@ -3865,11 +4061,14 @@ function renderCoachList(){
   if(coaches.length===0){ wrap.innerHTML = '<div class="empty">👥 No hay entrenadores.</div>'; return; }
   wrap.innerHTML = coaches.map(c=>{
     const isMe = c.id === currentUser.uid;
+    const cTeamIds = Array.isArray(c.teamIds) ? c.teamIds : [];
+    const teamNames = cTeamIds.map(teamName_).filter(Boolean);
     return `
     <div class="coach-row">
       <div class="coach-info">
         <div class="name">${escapeHtml(c.name)} ${isMe ? '<span class="muted">(tú)</span>':''}</div>
         <div class="muted">${escapeHtml(c.email||"")}</div>
+        <div class="muted">👕 ${teamNames.length ? escapeHtml(teamNames.join(", ")) : "Sin equipo asignado"}</div>
       </div>
       <div class="coach-controls">
         ${c.active ? '<span class="badge">Activo</span>' : '<span class="badge outline">Pendiente</span>'}
@@ -3878,6 +4077,7 @@ function renderCoachList(){
           <option value="${ROLE_EDITOR}" ${c.role===ROLE_EDITOR?"selected":""}>Editor (tareas, sin gestión de entrenadores)</option>
           <option value="${ROLE_GESTOR}" ${c.role===ROLE_GESTOR?"selected":""}>Gestor</option>
         </select>
+        <button type="button" class="btn ghost small" onclick="openTeamAssignPrompt('${c.id}')">👕 Asignar equipo(s)</button>
         ${c.active
           ? `<button class="btn small danger" ${isMe?"disabled":""} onclick="setCoachActive('${c.id}', false)">Dar de baja</button>`
           : `<button class="btn small accent" onclick="setCoachActive('${c.id}', true)">Activar</button>`}
@@ -3885,6 +4085,22 @@ function renderCoachList(){
     </div>`;
   }).join("");
 }
+window.openTeamAssignPrompt = async (coachId) => {
+  if(teams.length===0){ alert('Todavía no hay equipos creados. Créalos primero en la pestaña "Plantilla".'); return; }
+  const c = coaches.find(x=>x.id===coachId);
+  if(!c) return;
+  const current = new Set(Array.isArray(c.teamIds) ? c.teamIds : []);
+  const list = teams.map((t,i)=>`${i+1}. ${t.name}${current.has(t.id)?" (ya asignado)":""}`).join("\n");
+  const input = prompt(
+    `Equipos de ${c.name}:\n${list}\n\nEscribe los números separados por comas (por ejemplo: 1,3) para dejar asignados justo esos equipos.\nDeja vacío para no asignar ninguno.`,
+    Array.from(current).map(id=>teams.findIndex(t=>t.id===id)+1).filter(n=>n>0).join(",")
+  );
+  if(input===null) return;
+  const indices = input.split(",").map(s=>parseInt(s.trim(),10)).filter(n=>!isNaN(n) && n>=1 && n<=teams.length);
+  const teamIds = indices.map(i=>teams[i-1].id);
+  try{ await db.collection("coaches").doc(coachId).update({teamIds}); }
+  catch(err){ alert("No se ha podido guardar: " + err.message); }
+};
 window.changeCoachRole = async (id, role) => {
   await db.collection("coaches").doc(id).update({role});
 };
@@ -3892,6 +4108,1078 @@ window.setCoachActive = async (id, active) => {
   if(!active && !confirm("¿Dar de baja a este entrenador? Perderá el acceso al panel.")) return;
   await db.collection("coaches").doc(id).update({active});
 };
+
+/* ============================================================
+   EQUIPOS Y PLANTILLA DE JUGADORES
+============================================================= */
+function teamName_(id){ const t = teams.find(x=>x.id===id); return t ? t.name : ""; }
+let seasonStampAttempted = new Set();
+async function stampLegacyMatchdaySeasons_(){
+  const pending = matchdays.filter(m=>!m.season && !seasonStampAttempted.has(m.id));
+  for(const m of pending){
+    seasonStampAttempted.add(m.id);
+    const team = teams.find(t=>t.id===m.teamId);
+    const season = (team && team.currentSeason) || defaultSeasonLabel_();
+    try{ await db.collection("matchdays").doc(m.id).update({season}); }
+    catch(err){ seasonStampAttempted.delete(m.id); }
+  }
+}
+function defaultSeasonLabel_(){
+  const now = new Date();
+  const y = now.getFullYear();
+  const mth = now.getMonth()+1; // 1-12
+  return mth>=7 ? `${y}/${String((y+1)%100).padStart(2,"0")}` : `${y-1}/${String(y%100).padStart(2,"0")}`;
+}
+function matchdaySeason_(m){
+  return m.season || defaultSeasonLabel_();
+}
+function teamSeasonsList_(teamId){
+  const team = teams.find(t=>t.id===teamId);
+  const set = new Set();
+  matchdays.filter(m=>m.teamId===teamId).forEach(m=> set.add(matchdaySeason_(m)));
+  if(team && team.currentSeason) set.add(team.currentSeason);
+  if(set.size===0) set.add(defaultSeasonLabel_());
+  return Array.from(set).sort().reverse();
+}
+function renderSeasonSelector(){
+  const sel = document.getElementById("seasonSelector");
+  if(!sel) return;
+  if(!selectedTeamId){ sel.innerHTML = ""; selectedSeason = null; return; }
+  const seasons = teamSeasonsList_(selectedTeamId);
+  const prev = selectedSeason;
+  sel.innerHTML = seasons.map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
+  if(prev && seasons.includes(prev)) sel.value = prev;
+  selectedSeason = sel.value || seasons[0];
+}
+document.getElementById("seasonSelector").onchange = (e) => {
+  selectedSeason = e.target.value;
+  renderMatchdaysList();
+  renderTeamSummary();
+};
+document.getElementById("btnNewSeason").onclick = async () => {
+  if(!selectedTeamId){ alert("Elige primero un equipo arriba."); return; }
+  const label = prompt('Nombre de la nueva temporada (ej. "2026/27"):\n\nLas jornadas ya guardadas se quedan archivadas en su temporada; a partir de ahora, las jornadas nuevas se guardarán en esta.', defaultSeasonLabel_());
+  if(!label || !label.trim()) return;
+  try{
+    await db.collection("teams").doc(selectedTeamId).update({currentSeason: label.trim()});
+    selectedSeason = label.trim();
+    renderSeasonSelector();
+    renderMatchdaysList();
+    renderTeamSummary();
+  }catch(err){ alert("No se ha podido crear la temporada: " + err.message); }
+};
+document.getElementById("btnRenameSeason").onclick = async () => {
+  if(!selectedTeamId || !selectedSeason){ alert("Elige un equipo y una temporada primero."); return; }
+  const label = prompt(`Nuevo nombre para la temporada "${selectedSeason}":`, selectedSeason);
+  if(!label || !label.trim() || label.trim()===selectedSeason) return;
+  const newLabel = label.trim();
+  try{
+    const affected = matchdays.filter(m=>m.teamId===selectedTeamId && matchdaySeason_(m)===selectedSeason);
+    await Promise.all(affected.map(m=>db.collection("matchdays").doc(m.id).update({season:newLabel})));
+    const team = teams.find(t=>t.id===selectedTeamId);
+    if(team && team.currentSeason===selectedSeason){
+      await db.collection("teams").doc(selectedTeamId).update({currentSeason:newLabel});
+    }
+    selectedSeason = newLabel;
+    renderSeasonSelector();
+    renderMatchdaysList();
+    renderTeamSummary();
+  }catch(err){ alert("No se ha podido renombrar la temporada: " + err.message); }
+};
+document.getElementById("btnDeleteSeason").onclick = async () => {
+  if(!selectedTeamId || !selectedSeason){ alert("Elige un equipo y una temporada primero."); return; }
+  const affected = matchdays.filter(m=>m.teamId===selectedTeamId && matchdaySeason_(m)===selectedSeason);
+  const msg = affected.length>0
+    ? `¿Eliminar la temporada "${selectedSeason}" completa? Se borrarán sus ${affected.length} jornada(s) y todas sus convocatorias. Esta acción no se puede deshacer.`
+    : `¿Eliminar la temporada "${selectedSeason}"? No tiene jornadas guardadas.`;
+  if(!confirm(msg)) return;
+  try{
+    await Promise.all(affected.map(m=>db.collection("matchdays").doc(m.id).delete()));
+    const team = teams.find(t=>t.id===selectedTeamId);
+    if(team && team.currentSeason===selectedSeason){
+      const remaining = teamSeasonsList_(selectedTeamId).filter(s=>s!==selectedSeason);
+      const nextSeason = remaining[0] || defaultSeasonLabel_();
+      await db.collection("teams").doc(selectedTeamId).update({currentSeason: nextSeason});
+    }
+    selectedSeason = null;
+    renderSeasonSelector();
+    renderMatchdaysList();
+    renderTeamSummary();
+  }catch(err){ alert("No se ha podido borrar la temporada: " + err.message); }
+};
+function coachVisibleTeams_(){
+  if(!currentCoach) return [];
+  const canEditContent = currentCoach.role === ROLE_GESTOR || currentCoach.role === ROLE_EDITOR;
+  if(canEditContent) return teams; // gestor/editor ven todos los equipos
+  const ids = Array.isArray(currentCoach.teamIds) ? currentCoach.teamIds : [];
+  return teams.filter(t=>ids.includes(t.id));
+}
+function updateCompareCardVisibility(){
+  const btn = document.getElementById("plantillaGoCompare");
+  if(!btn) return;
+  btn.classList.toggle("hidden", coachVisibleTeams_().length < 2);
+}
+
+/* ---------- Navegación de la pestaña Plantilla (menú principal + subsecciones) ---------- */
+function showPlantillaView(view){
+  document.getElementById("plantillaHome").classList.toggle("hidden", view!=="home");
+  document.getElementById("plantillaRosterView").classList.toggle("hidden", view!=="roster");
+  document.getElementById("plantillaPlayerView").classList.toggle("hidden", view!=="player");
+  document.getElementById("plantillaMatchdaysView").classList.toggle("hidden", view!=="matchdays");
+  document.getElementById("plantillaSummaryView").classList.toggle("hidden", view!=="summary");
+  document.getElementById("plantillaTeamsView").classList.toggle("hidden", view!=="teams");
+  document.getElementById("plantillaCompareView").classList.toggle("hidden", view!=="compare");
+}
+document.getElementById("plantillaGoRoster").onclick = () => { showPlantillaView("roster"); renderPlayersList(); };
+document.getElementById("plantillaGoMatchdays").onclick = () => { showPlantillaView("matchdays"); showMatchdaySub("list"); renderMatchdaysList(); };
+document.getElementById("plantillaGoSummary").onclick = () => { showPlantillaView("summary"); renderTeamSummary(); };
+document.getElementById("plantillaGoTeams").onclick = () => { showPlantillaView("teams"); renderTeamManageList(); };
+document.getElementById("plantillaGoCompare").onclick = () => { showPlantillaView("compare"); renderTeamCompare(); };
+document.getElementById("plantillaRosterBack").onclick = () => showPlantillaView("home");
+document.getElementById("plantillaMatchdaysBack").onclick = () => showPlantillaView("home");
+document.getElementById("plantillaSummaryBack").onclick = () => showPlantillaView("home");
+document.getElementById("plantillaTeamsBack").onclick = () => showPlantillaView("home");
+document.getElementById("plantillaCompareBack").onclick = () => showPlantillaView("home");
+
+function renderTeamManageList(){
+  const wrap = document.getElementById("teamManageList");
+  if(!wrap) return;
+  if(teams.length===0){ wrap.innerHTML = '<p class="muted">Todavía no hay equipos creados.</p>'; return; }
+  wrap.innerHTML = teams.map(t=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);">
+      <span>${escapeHtml(t.name)}</span>
+      <div style="display:flex;gap:6px;">
+        <button class="btn ghost small" onclick="renameTeam('${t.id}')">✏️ Renombrar</button>
+        <button class="btn danger small" onclick="deleteTeam('${t.id}')">🗑️ Eliminar</button>
+      </div>
+    </div>`).join("");
+}
+document.getElementById("btnNewTeam").onclick = async () => {
+  const input = document.getElementById("newTeamName");
+  const name = input.value.trim();
+  if(!name) return;
+  try{
+    await db.collection("teams").add({name, currentSeason: defaultSeasonLabel_(), createdBy: currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp()});
+    input.value = "";
+  }catch(err){ alert("No se ha podido crear el equipo: " + err.message); }
+};
+window.renameTeam = async (id) => {
+  const t = teams.find(x=>x.id===id);
+  if(!t) return;
+  const name = prompt("Nuevo nombre del equipo:", t.name);
+  if(!name || !name.trim()) return;
+  try{ await db.collection("teams").doc(id).update({name: name.trim()}); }
+  catch(err){ alert("No se ha podido renombrar: " + err.message); }
+};
+window.deleteTeam = async (id) => {
+  const t = teams.find(x=>x.id===id);
+  if(!t) return;
+  const teamPlayers = players.filter(p=>p.teamId===id);
+  const msg = teamPlayers.length>0
+    ? `Este equipo tiene ${teamPlayers.length} jugador(es) en su plantilla, que también se eliminarán. ¿Eliminar "${t.name}"?`
+    : `¿Eliminar el equipo "${t.name}"?`;
+  if(!confirm(msg)) return;
+  try{
+    await Promise.all(teamPlayers.map(p=>db.collection("players").doc(p.id).delete()));
+    await db.collection("teams").doc(id).delete();
+  }catch(err){ alert("No se ha podido eliminar: " + err.message); }
+};
+
+function renderTeamSelector(){
+  const sel = document.getElementById("teamSelector");
+  if(!sel) return;
+  const visible = coachVisibleTeams_();
+  const prev = selectedTeamId;
+  if(visible.length===0){
+    sel.innerHTML = '<option value="">Sin equipos asignados</option>';
+    selectedTeamId = null;
+    renderPlayersList();
+    showMatchdaySub("list");
+    renderSeasonSelector();
+    renderMatchdaysList();
+    renderTeamSummary();
+    return;
+  }
+  sel.innerHTML = visible.map(t=>`<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("");
+  if(prev && visible.some(t=>t.id===prev)) sel.value = prev;
+  selectedTeamId = sel.value || visible[0].id;
+  renderPlayersList();
+  showMatchdaySub("list");
+  renderSeasonSelector();
+  renderMatchdaysList();
+  renderTeamSummary();
+}
+document.getElementById("teamSelector").onchange = (e) => {
+  selectedTeamId = e.target.value || null;
+  selectedSeason = null;
+  renderPlayersList();
+  showMatchdaySub("list");
+  renderSeasonSelector();
+  renderMatchdaysList();
+  renderTeamSummary();
+};
+
+function renderPlayersList(){
+  const wrap = document.getElementById("playersList");
+  if(!wrap) return;
+  if(!selectedTeamId){
+    wrap.innerHTML = '<div class="empty">👕 No tienes ningún equipo asignado todavía. Pídele a un gestor que te lo asigne desde la pestaña "Entrenadores".</div>';
+    return;
+  }
+  const list = players.filter(p=>p.teamId===selectedTeamId).sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
+  if(list.length===0){ wrap.innerHTML = '<div class="empty">Todavía no hay jugadores en este equipo.</div>'; return; }
+  wrap.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
+        <th style="padding:6px;">Dorsal</th><th style="padding:6px;">Nombre y apellidos</th><th style="padding:6px;">Posición</th><th></th>
+      </tr></thead>
+      <tbody>
+      ${list.map(p=>`
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:6px;">${p.dorsal!=null ? p.dorsal : "-"}</td>
+          <td style="padding:6px;">${escapeHtml(p.name)}</td>
+          <td style="padding:6px;">${escapeHtml(p.position||"")}</td>
+          <td style="padding:6px;text-align:right;white-space:nowrap;">
+            <button class="btn ghost small" onclick="openPlayerProfile('${p.id}')">📊</button>
+            <button class="btn ghost small" onclick="editPlayer('${p.id}')">✏️</button>
+            <button class="btn danger small" onclick="deletePlayer('${p.id}')">🗑️</button>
+          </td>
+        </tr>`).join("")}
+      </tbody>
+    </table>`;
+}
+document.getElementById("btnAddPlayer").onclick = async () => {
+  const msgEl = document.getElementById("playersMsg");
+  msgEl.innerHTML = "";
+  if(!selectedTeamId){ msgEl.innerHTML = '<p class="error-msg">Elige primero un equipo.</p>'; return; }
+  const dorsalVal = document.getElementById("newPlayerDorsal").value;
+  const name = document.getElementById("newPlayerName").value.trim();
+  const position = document.getElementById("newPlayerPosition").value;
+  if(!name){ msgEl.innerHTML = '<p class="error-msg">Ponle un nombre al jugador.</p>'; return; }
+  try{
+    await db.collection("players").add({
+      teamId: selectedTeamId,
+      dorsal: dorsalVal ? Number(dorsalVal) : null,
+      name, position,
+      createdBy: currentUser.uid,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    document.getElementById("newPlayerDorsal").value = "";
+    document.getElementById("newPlayerName").value = "";
+  }catch(err){ msgEl.innerHTML = '<p class="error-msg">Error al guardar: '+err.message+'</p>'; }
+};
+window.editPlayer = async (id) => {
+  const p = players.find(x=>x.id===id);
+  if(!p) return;
+  const name = prompt("Nombre y apellidos:", p.name || "");
+  if(name===null) return;
+  const dorsalStr = prompt("Dorsal:", p.dorsal!=null ? String(p.dorsal) : "");
+  if(dorsalStr===null) return;
+  const posInput = prompt('Posición ("Jugador" o "Portero"):', p.position || "Jugador");
+  if(posInput===null) return;
+  const position = posInput.trim().toLowerCase().startsWith("port") ? "Portero" : "Jugador";
+  try{
+    await db.collection("players").doc(id).update({
+      name: name.trim() || p.name,
+      dorsal: dorsalStr.trim() ? Number(dorsalStr.trim()) : null,
+      position
+    });
+  }catch(err){ alert("No se ha podido guardar: " + err.message); }
+};
+window.deletePlayer = async (id) => {
+  if(!confirm("¿Eliminar este jugador de la plantilla?")) return;
+  try{ await db.collection("players").doc(id).delete(); }
+  catch(err){ alert("No se ha podido eliminar: " + err.message); }
+};
+
+/* ---------- Jornadas ---------- */
+function showMatchdaySub(view){
+  document.getElementById("matchdaysListView").classList.toggle("hidden", view!=="list");
+  document.getElementById("matchdayFormView").classList.toggle("hidden", view!=="form");
+  document.getElementById("matchdayStatsView").classList.toggle("hidden", view!=="stats");
+}
+function renderMatchdaysList(){
+  const wrap = document.getElementById("matchdaysList");
+  if(!wrap) return;
+  if(!selectedTeamId){ wrap.innerHTML = '<div class="empty">Elige un equipo arriba.</div>'; return; }
+  const team = teams.find(t=>t.id===selectedTeamId);
+  const list = matchdays.filter(m=>m.teamId===selectedTeamId && matchdaySeason_(m, team)===selectedSeason).sort((a,b)=>(a.number||0)-(b.number||0));
+  if(list.length===0){ wrap.innerHTML = '<div class="empty">Todavía no hay jornadas en esta temporada para este equipo.</div>'; return; }
+  wrap.innerHTML = `<table style="width:100%;border-collapse:collapse;">
+    <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
+      <th style="padding:6px;">J.</th><th style="padding:6px;">Fecha</th><th style="padding:6px;">Rival</th><th style="padding:6px;">Comp.</th><th style="padding:6px;">Resultado</th><th></th>
+    </tr></thead>
+    <tbody>
+    ${list.map(m=>{
+      const diff = matchDifficultyInfo_(m.difficulty);
+      return `
+      <tr style="border-bottom:1px solid var(--border);cursor:pointer;" onclick="openMatchdayStats('${m.id}')">
+        <td style="padding:6px;">${diff?`<span title="${diff.label}" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${diff.bg};border:1px solid ${diff.border};margin-right:4px;"></span>`:""}${m.number}</td>
+        <td style="padding:6px;">${escapeHtml(m.date||"-")}</td>
+        <td style="padding:6px;">${escapeHtml(m.rival||"-")}${m.homeAway?` (${m.homeAway==="Local"?"L":"V"})`:""}${m.videoUrl?" 🎥":""}</td>
+        <td style="padding:6px;">${escapeHtml(m.competition||"-")}</td>
+        <td style="padding:6px;">${m.goalsFor!=null && m.goalsAgainst!=null ? (m.goalsFor+"-"+m.goalsAgainst) : "-"}</td>
+        <td style="padding:6px;text-align:right;white-space:nowrap;">
+          <button type="button" class="btn ghost small" onclick="event.stopPropagation(); editMatchdayInfo('${m.id}')">✏️</button>
+          <button type="button" class="btn danger small" onclick="event.stopPropagation(); quickDeleteMatchday('${m.id}')">🗑️</button>
+        </td>
+      </tr>`;}).join("")}
+    </tbody>
+  </table>`;
+}
+document.getElementById("btnNewMatchday").onclick = () => {
+  if(!selectedTeamId){ alert("Elige primero un equipo arriba."); return; }
+  editingMatchdayId = null;
+  const teamMds = matchdays.filter(m=>m.teamId===selectedTeamId);
+  const nextNum = teamMds.length ? Math.max(...teamMds.map(m=>m.number||0))+1 : 1;
+  document.getElementById("mdNumber").value = nextNum;
+  document.getElementById("mdDate").value = "";
+  document.getElementById("mdRival").value = "";
+  document.getElementById("mdCompetition").value = "Liga";
+  document.getElementById("mdHomeAway").value = "Local";
+  document.getElementById("mdGoalsFor").value = "";
+  document.getElementById("mdGoalsAgainst").value = "";
+  document.getElementById("mdVideoUrl").value = "";
+  document.getElementById("matchdayMsg").innerHTML = "";
+  showMatchdaySub("form");
+};
+window.editMatchdayInfo = (id) => {
+  const m = matchdays.find(x=>x.id===id);
+  if(!m) return;
+  editingMatchdayId = id;
+  document.getElementById("mdNumber").value = m.number || "";
+  document.getElementById("mdDate").value = m.date || "";
+  document.getElementById("mdRival").value = m.rival || "";
+  document.getElementById("mdCompetition").value = m.competition || "";
+  document.getElementById("mdHomeAway").value = m.homeAway || "Local";
+  document.getElementById("mdGoalsFor").value = m.goalsFor!=null ? m.goalsFor : "";
+  document.getElementById("mdGoalsAgainst").value = m.goalsAgainst!=null ? m.goalsAgainst : "";
+  document.getElementById("mdVideoUrl").value = m.videoUrl || "";
+  document.getElementById("matchdayMsg").innerHTML = "";
+  showMatchdaySub("form");
+};
+window.quickDeleteMatchday = async (id) => {
+  const m = matchdays.find(x=>x.id===id);
+  if(!m) return;
+  if(!confirm(`¿Eliminar la jornada ${m.number} (vs ${m.rival||"?"}) y todos sus datos de convocatoria?`)) return;
+  try{ await db.collection("matchdays").doc(id).delete(); }
+  catch(err){ alert("No se ha podido eliminar: " + err.message); }
+};
+document.getElementById("btnMatchdayBack").onclick = () => showMatchdaySub("list");
+document.getElementById("btnSaveMatchday").onclick = async () => {
+  const msgEl = document.getElementById("matchdayMsg");
+  msgEl.innerHTML = "";
+  const number = Number(document.getElementById("mdNumber").value);
+  if(!number){ msgEl.innerHTML = '<p class="error-msg">Pon un número de jornada.</p>'; return; }
+  const payload = {
+    teamId: selectedTeamId,
+    number,
+    date: document.getElementById("mdDate").value || null,
+    rival: document.getElementById("mdRival").value.trim(),
+    competition: document.getElementById("mdCompetition").value.trim(),
+    homeAway: document.getElementById("mdHomeAway").value,
+    goalsFor: document.getElementById("mdGoalsFor").value!=="" ? Number(document.getElementById("mdGoalsFor").value) : null,
+    goalsAgainst: document.getElementById("mdGoalsAgainst").value!=="" ? Number(document.getElementById("mdGoalsAgainst").value) : null,
+    videoUrl: document.getElementById("mdVideoUrl").value.trim()
+  };
+  try{
+    if(editingMatchdayId){
+      await db.collection("matchdays").doc(editingMatchdayId).update(payload);
+    } else {
+      const team = teams.find(t=>t.id===selectedTeamId);
+      payload.season = (team && team.currentSeason) || defaultSeasonLabel_();
+      payload.playerStats = [];
+      payload.createdBy = currentUser.uid;
+      payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection("matchdays").add(payload);
+    }
+    showMatchdaySub("list");
+  }catch(err){
+    msgEl.innerHTML = '<p class="error-msg">Error al guardar: '+err.message+'</p>';
+  }
+};
+
+window.openMatchdayStats = (id) => {
+  statsMatchdayId = id;
+  renderMatchdayStatsTable();
+  renderMatchdaySessionsLink();
+  renderMatchdayReport();
+  document.getElementById("matchdayStatsMsg").innerHTML = "";
+  showMatchdaySub("stats");
+};
+function renderMatchdayStatsTable(){
+  const m = matchdays.find(x=>x.id===statsMatchdayId);
+  const wrap = document.getElementById("matchdayStatsTable");
+  if(!m){ wrap.innerHTML = ""; document.getElementById("matchdayVideoWrap").innerHTML = ""; return; }
+  document.getElementById("matchdayStatsTitle").textContent =
+    `Jornada ${m.number} — vs ${m.rival||"?"} (${m.goalsFor!=null?m.goalsFor:"-"}-${m.goalsAgainst!=null?m.goalsAgainst:"-"})`;
+  document.getElementById("matchdayVideoWrap").innerHTML = m.videoUrl ? videoEmbedHtml(m.videoUrl) : "";
+  const roster = players.filter(p=>p.teamId===m.teamId).sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
+  if(roster.length===0){ wrap.innerHTML = '<p class="muted">Este equipo todavía no tiene jugadores en la plantilla.</p>'; return; }
+  const statsMap = {};
+  (m.playerStats||[]).forEach(s=>{ statsMap[s.playerId] = s; });
+  wrap.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:.85rem;min-width:520px;">
+    <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
+      <th style="padding:4px;">Jugador</th><th style="padding:4px;">Estado</th><th style="padding:4px;">Motivo</th><th style="padding:4px;">Goles / Encajados</th><th style="padding:4px;">🟨</th><th style="padding:4px;">🟥</th>
+    </tr></thead>
+    <tbody>
+    ${roster.map(p=>{
+      const s = statsMap[p.id] || {};
+      const isGk = p.position === "Portero";
+      const goalsShown = isGk ? s.goalsConceded : s.goals;
+      return `
+      <tr data-player-id="${p.id}" data-is-gk="${isGk?"1":"0"}" style="border-bottom:1px solid var(--border);">
+        <td style="padding:4px;white-space:nowrap;">${p.dorsal!=null?escapeHtml(String(p.dorsal))+". ":""}${escapeHtml(p.name)}${isGk?" 🧤":""}</td>
+        <td style="padding:4px;">
+          <select class="md-status">
+            <option value="Titular" ${s.status==="Titular"?"selected":""}>Titular</option>
+            <option value="Suplente" ${s.status==="Suplente"?"selected":""}>Suplente</option>
+            <option value="No convocado" ${(!s.status||s.status==="No convocado")?"selected":""}>No convocado</option>
+          </select>
+        </td>
+        <td style="padding:4px;"><input type="text" class="md-reason" value="${escapeHtml(s.reason||"")}" placeholder="Motivo" style="width:110px;"></td>
+        <td style="padding:4px;"><input type="number" min="0" class="md-goals" value="${goalsShown!=null?goalsShown:""}" style="width:60px;"></td>
+        <td style="padding:4px;"><input type="number" min="0" max="2" class="md-yellow" value="${s.yellow!=null?s.yellow:""}" style="width:48px;"></td>
+        <td style="padding:4px;"><input type="number" min="0" max="1" class="md-red" value="${s.red!=null?s.red:""}" style="width:48px;"></td>
+      </tr>`;
+    }).join("")}
+    </tbody>
+  </table>`;
+}
+document.getElementById("btnStatsBack").onclick = () => showMatchdaySub("list");
+document.getElementById("btnMarkAllStarters").onclick = () => {
+  document.querySelectorAll("#matchdayStatsTable .md-status").forEach(sel=> sel.value = "Titular");
+};
+document.getElementById("btnMarkAllUncalled").onclick = () => {
+  document.querySelectorAll("#matchdayStatsTable .md-status").forEach(sel=> sel.value = "No convocado");
+};
+document.getElementById("btnSaveMatchdayStats").onclick = async () => {
+  const msgEl = document.getElementById("matchdayStatsMsg");
+  if(!statsMatchdayId) return;
+  const rows = document.querySelectorAll("#matchdayStatsTable tr[data-player-id]");
+  const playerStats = [];
+  rows.forEach(row=>{
+    const playerId = row.dataset.playerId;
+    const isGk = row.dataset.isGk === "1";
+    const status = row.querySelector(".md-status").value;
+    const reason = row.querySelector(".md-reason").value.trim();
+    const goalsVal = row.querySelector(".md-goals").value;
+    const yellowVal = row.querySelector(".md-yellow").value;
+    const redVal = row.querySelector(".md-red").value;
+    const entry = {
+      playerId, status,
+      reason: status==="No convocado" ? reason : "",
+      yellow: yellowVal!=="" ? Number(yellowVal) : 0,
+      red: redVal!=="" ? Number(redVal) : 0
+    };
+    if(isGk) entry.goalsConceded = goalsVal!=="" ? Number(goalsVal) : null;
+    else entry.goals = goalsVal!=="" ? Number(goalsVal) : 0;
+    playerStats.push(entry);
+  });
+  try{
+    await db.collection("matchdays").doc(statsMatchdayId).update({playerStats});
+    msgEl.innerHTML = '<p class="ok-msg">Convocatoria guardada.</p>';
+  }catch(err){
+    msgEl.innerHTML = '<p class="error-msg">Error al guardar: '+err.message+'</p>';
+  }
+};
+document.getElementById("btnDeleteMatchday").onclick = async () => {
+  if(!statsMatchdayId) return;
+  if(!confirm("¿Eliminar esta jornada y todos sus datos de convocatoria?")) return;
+  try{
+    await db.collection("matchdays").doc(statsMatchdayId).delete();
+    showMatchdaySub("list");
+  }catch(err){ alert("No se ha podido eliminar: " + err.message); }
+};
+
+/* ---------- Vincular jornada con sesiones de entrenamiento ---------- */
+function renderMatchdaySessionsLink(){
+  const wrap = document.getElementById("matchdaySessionsLink");
+  if(!wrap) return;
+  const m = matchdays.find(x=>x.id===statsMatchdayId);
+  if(!m){ wrap.innerHTML = ""; return; }
+  const linked = new Set(m.linkedSessionIds || []);
+  let candidates = sessions.slice();
+  if(m.date){
+    const matchDate = new Date(m.date);
+    if(!isNaN(matchDate)){
+      candidates = sessions.filter(s=>{
+        if(!s.date) return false;
+        const sd = new Date(s.date);
+        if(isNaN(sd)) return false;
+        const diffDays = (matchDate - sd) / (1000*60*60*24);
+        return diffDays >= 0 && diffDays <= 10; // sesiones de los ~10 días previos al partido
+      });
+    }
+  }
+  candidates = candidates.sort((a,b)=> new Date(b.date||0) - new Date(a.date||0)).slice(0, 30);
+  // Aseguramos que las ya vinculadas salgan aunque estén fuera del rango de fechas
+  sessions.forEach(s=>{ if(linked.has(s.id) && !candidates.some(c=>c.id===s.id)) candidates.push(s); });
+  if(candidates.length===0){ wrap.innerHTML = '<p class="muted">No hay sesiones de entrenamiento cerca de la fecha de este partido.</p>'; return; }
+  wrap.innerHTML = candidates.map(s=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:4px 0;">
+      <label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer;">
+        <input type="checkbox" class="md-session-link" value="${s.id}" ${linked.has(s.id)?"checked":""}>
+        <span>${escapeHtml(s.date||"")} — ${escapeHtml(s.name||"(sin título)")}</span>
+      </label>
+      <button type="button" class="btn ghost small" onclick="viewLinkedSession('${s.id}')">👁️ Ver</button>
+    </div>`).join("") +
+    `<button type="button" class="btn ghost small" id="btnSaveMatchdaySessions" style="margin-top:8px;">💾 Guardar sesiones vinculadas</button>`;
+  document.getElementById("btnSaveMatchdaySessions").onclick = async () => {
+    const ids = Array.from(document.querySelectorAll(".md-session-link:checked")).map(el=>el.value);
+    try{ await db.collection("matchdays").doc(statsMatchdayId).update({linkedSessionIds: ids}); }
+    catch(err){ alert("No se ha podido guardar: " + err.message); }
+  };
+}
+
+/* ---------- Informe del partido ---------- */
+const MATCH_DIFFICULTY_LEVELS = [
+  {id:"blanco",   label:"Muy fácil", bg:"#ffffff", fg:"#1a1a1a", border:"#c9c9c9"},
+  {id:"verde",    label:"Fácil",     bg:"#27ae60", fg:"#ffffff", border:"#27ae60"},
+  {id:"amarillo", label:"Medio",     bg:"#f2c94c", fg:"#1a1a1a", border:"#f2c94c"},
+  {id:"rojo",     label:"Difícil",   bg:"#eb5757", fg:"#ffffff", border:"#eb5757"},
+  {id:"negro",    label:"Muy difícil", bg:"#1a1a1a", fg:"#ffffff", border:"#1a1a1a"}
+];
+function matchDifficultyInfo_(id){ return MATCH_DIFFICULTY_LEVELS.find(d=>d.id===id) || null; }
+let selectedMatchDifficulty = null;
+function renderMatchdayDifficultyPicker(){
+  const wrap = document.getElementById("matchdayDifficultyPicker");
+  if(!wrap) return;
+  wrap.style.display = "flex"; wrap.style.gap = "5px"; wrap.style.flexWrap = "nowrap";
+  wrap.innerHTML = MATCH_DIFFICULTY_LEVELS.map(d=>`
+    <button type="button" data-diff="${d.id}" title="${d.label}"
+      style="width:24px;height:24px;border-radius:50%;flex:0 0 auto;background:${d.bg};border:1.5px solid ${selectedMatchDifficulty===d.id?"var(--accent)":d.border};box-shadow:${selectedMatchDifficulty===d.id?"0 0 0 1.5px var(--accent)":"none"};cursor:pointer;padding:0;"></button>`).join("");
+  wrap.querySelectorAll("[data-diff]").forEach(btn=>{
+    btn.onclick = () => { selectedMatchDifficulty = btn.dataset.diff; renderMatchdayDifficultyPicker(); };
+  });
+}
+function renderMatchdayReport(){
+  const m = matchdays.find(x=>x.id===statsMatchdayId);
+  if(!m) return;
+  selectedMatchDifficulty = m.difficulty || null;
+  renderMatchdayDifficultyPicker();
+  document.getElementById("mdReportText").value = m.reportText || "";
+  document.getElementById("mdReportObservations").value = m.reportObservations || "";
+  const roster = players.filter(p=>p.teamId===m.teamId).sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
+  const notes = m.playerNotes || {};
+  const ratings = m.playerRatings || {};
+  const wrap = document.getElementById("matchdayPlayerNotes");
+  if(roster.length===0){ wrap.innerHTML = '<p class="muted">Este equipo todavía no tiene jugadores en la plantilla.</p>'; return; }
+  wrap.innerHTML = roster.map(p=>`
+    <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:6px;">
+      <div style="flex:1;">
+        <label style="font-size:.8rem;color:var(--muted-fg,#666);">${p.dorsal!=null?escapeHtml(String(p.dorsal))+". ":""}${escapeHtml(p.name)}</label>
+        <input type="text" class="md-player-note" data-player-id="${p.id}" value="${escapeHtml(notes[p.id]||"")}" placeholder="Nota sobre este jugador en el partido..." style="width:100%;">
+      </div>
+      <div style="width:70px;">
+        <label style="font-size:.8rem;color:var(--muted-fg,#666);">Puntuación</label>
+        <input type="number" class="md-player-rating" data-player-id="${p.id}" min="0" max="10" step="0.5" value="${ratings[p.id]!=null?ratings[p.id]:""}" placeholder="0-10" style="width:100%;">
+      </div>
+    </div>`).join("");
+  document.getElementById("matchdayReportMsg").innerHTML = "";
+}
+document.getElementById("btnSaveMatchdayReport").onclick = async () => {
+  if(!statsMatchdayId) return;
+  const msgEl = document.getElementById("matchdayReportMsg");
+  const playerNotes = {};
+  document.querySelectorAll(".md-player-note").forEach(inp=>{
+    const val = inp.value.trim();
+    if(val) playerNotes[inp.dataset.playerId] = val;
+  });
+  const playerRatings = {};
+  document.querySelectorAll(".md-player-rating").forEach(inp=>{
+    const val = inp.value.trim();
+    if(val!=="" && !isNaN(Number(val))) playerRatings[inp.dataset.playerId] = Number(val);
+  });
+  try{
+    await db.collection("matchdays").doc(statsMatchdayId).update({
+      difficulty: selectedMatchDifficulty || null,
+      reportText: document.getElementById("mdReportText").value.trim(),
+      reportObservations: document.getElementById("mdReportObservations").value.trim(),
+      playerNotes,
+      playerRatings
+    });
+    msgEl.innerHTML = '<p class="ok-msg">Informe guardado.</p>';
+  }catch(err){
+    msgEl.innerHTML = '<p class="error-msg">Error al guardar: '+err.message+'</p>';
+  }
+};
+
+/* ---------- Exportar convocatoria en PDF ---------- */
+document.getElementById("btnExportConvocatoriaPDF").onclick = () => {
+  const m = matchdays.find(x=>x.id===statsMatchdayId);
+  if(!m){ alert("No se ha encontrado la jornada."); return; }
+  if(!window.jspdf){ alert("No se ha podido cargar el generador de PDF. Comprueba tu conexión e inténtalo de nuevo."); return; }
+  const team = teams.find(t=>t.id===m.teamId);
+  const roster = players.filter(p=>p.teamId===m.teamId).sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
+  const statsMap = {};
+  (m.playerStats||[]).forEach(s=>{ statsMap[s.playerId] = s; });
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({unit:"mm", format:"a4"});
+  const pageW = doc.internal.pageSize.getWidth();
+  const margin = 14;
+  const RED = [216,30,44];
+  let y = 0;
+
+  doc.setFillColor(RED[0],RED[1],RED[2]);
+  doc.rect(0,0,pageW,20,'F');
+  const cy = 10, r = 7, cx = margin + r;
+  doc.setFillColor(255,255,255);
+  doc.circle(cx,cy,r,'F');
+  try{ doc.addImage(CREST_DATA_URI,'PNG', cx-r+0.8, cy-r+0.8, (r-0.8)*2, (r-0.8)*2); }catch(e){}
+  doc.setFont("helvetica","bold"); doc.setFontSize(14);
+  doc.setTextColor(255,255,255);
+  doc.text("CONVOCATORIA", cx+r+6, cy+1.6);
+  y = 28;
+
+  doc.setTextColor(20,20,20);
+  doc.setFont("helvetica","bold"); doc.setFontSize(12);
+  doc.text(`${team ? team.name : ""} — Jornada ${m.number}`, margin, y); y += 6;
+  doc.setFont("helvetica","normal"); doc.setFontSize(10);
+  doc.text(`vs ${m.rival||"?"}  ·  ${m.date||"-"}  ·  ${m.homeAway||"-"}  ·  ${m.competition||"-"}`, margin, y); y += 10;
+
+  doc.setFont("helvetica","bold"); doc.setFontSize(9.5);
+  doc.setFillColor(RED[0],RED[1],RED[2]);
+  doc.setTextColor(255,255,255);
+  doc.rect(margin, y, pageW-margin*2, 7, 'F');
+  doc.text("DORSAL", margin+3, y+5);
+  doc.text("JUGADOR", margin+30, y+5);
+  doc.text("ESTADO", pageW-margin-55, y+5);
+  doc.text("MOTIVO", pageW-margin-25, y+5);
+  y += 7;
+
+  doc.setTextColor(20,20,20);
+  roster.forEach((p,i)=>{
+    const s = statsMap[p.id] || {};
+    const rowH = 7;
+    if(y + rowH > doc.internal.pageSize.getHeight() - margin){ doc.addPage(); y = margin; }
+    doc.setDrawColor(220,220,220); doc.setLineWidth(0.2);
+    doc.rect(margin, y, pageW-margin*2, rowH);
+    doc.setFont("helvetica","normal"); doc.setFontSize(9.5);
+    doc.text(String(p.dorsal!=null?p.dorsal:"-"), margin+3, y+4.8);
+    doc.text(`${p.name}${p.position==="Portero"?" (P)":""}`, margin+30, y+4.8);
+    doc.text(s.status || "No convocado", pageW-margin-55, y+4.8);
+    doc.text(s.reason || "", pageW-margin-25, y+4.8);
+    y += rowH;
+  });
+
+  const safeName = `Convocatoria_J${m.number}_${(m.rival||"rival").replace(/[^a-zA-Z0-9]+/g,"_")}`;
+  doc.save(`${safeName}.pdf`);
+};
+
+/* ---------- Exportar resumen de temporada ---------- */
+document.getElementById("btnExportSummaryPDF").onclick = () => {
+  if(!selectedTeamId){ alert("Elige primero un equipo."); return; }
+  if(!window.jspdf){ alert("No se ha podido cargar el generador de PDF. Comprueba tu conexión e inténtalo de nuevo."); return; }
+  const team = teams.find(t=>t.id===selectedTeamId);
+  const sum = computeTeamSummary_(selectedTeamId, selectedSeason, summaryDifficultyFilter);
+  const outfield = sum.stats.filter(s=>s.player.position!=="Portero").sort((a,b)=> b.goals-a.goals || b.played-a.played);
+  const gks = sum.stats.filter(s=>s.player.position==="Portero").sort((a,b)=> b.cleanSheets-a.cleanSheets || a.goalsConceded-b.goalsConceded);
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({unit:"mm", format:"a4"});
+  const pageW = doc.internal.pageSize.getWidth();
+  const margin = 14;
+  const RED = [216,30,44];
+  let y = 0;
+
+  doc.setFillColor(RED[0],RED[1],RED[2]);
+  doc.rect(0,0,pageW,20,'F');
+  const cy = 10, r = 7, cx = margin + r;
+  doc.setFillColor(255,255,255);
+  doc.circle(cx,cy,r,'F');
+  try{ doc.addImage(CREST_DATA_URI,'PNG', cx-r+0.8, cy-r+0.8, (r-0.8)*2, (r-0.8)*2); }catch(e){}
+  doc.setFont("helvetica","bold"); doc.setFontSize(14);
+  doc.setTextColor(255,255,255);
+  doc.text("RESUMEN DE TEMPORADA", cx+r+6, cy+1.6);
+  y = 28;
+
+  doc.setTextColor(20,20,20);
+  doc.setFont("helvetica","bold"); doc.setFontSize(12);
+  doc.text(`${team ? team.name : ""} — Temporada ${selectedSeason||"-"}`, margin, y); y += 6;
+  doc.setFont("helvetica","normal"); doc.setFontSize(10);
+  doc.text(`Jornadas jugadas: ${sum.played}  ·  Goles a favor: ${sum.goalsFor}  ·  Goles en contra: ${sum.goalsAgainst}`, margin, y); y += 10;
+
+  function drawSimpleTable(headers, rows){
+    const colW = (pageW-margin*2)/headers.length;
+    if(y + 7 > doc.internal.pageSize.getHeight() - margin){ doc.addPage(); y = margin; }
+    doc.setFillColor(RED[0],RED[1],RED[2]); doc.setTextColor(255,255,255);
+    doc.setFont("helvetica","bold"); doc.setFontSize(8.5);
+    headers.forEach((h,i)=>{
+      doc.rect(margin+i*colW, y, colW, 6, 'F');
+      doc.text(h, margin+i*colW+2, y+4.2);
+    });
+    y += 6;
+    doc.setTextColor(20,20,20); doc.setFont("helvetica","normal"); doc.setFontSize(8.5);
+    rows.forEach(row=>{
+      if(y + 6 > doc.internal.pageSize.getHeight() - margin){ doc.addPage(); y = margin; }
+      row.forEach((val,i)=>{
+        doc.setDrawColor(220,220,220); doc.setLineWidth(0.2);
+        doc.rect(margin+i*colW, y, colW, 6);
+        doc.text(String(val), margin+i*colW+2, y+4.2);
+      });
+      y += 6;
+    });
+    y += 6;
+  }
+
+  doc.setFont("helvetica","bold"); doc.setFontSize(10.5);
+  doc.text("Jugadores", margin, y); y += 3;
+  drawSimpleTable(
+    ["Jugador","PJ","Titular","Suplente","Convoc.","Goles","Am.","Roj.","Nota"],
+    outfield.map(s=>[`${s.player.dorsal!=null?s.player.dorsal+". ":""}${s.player.name}`, s.played, s.starts, s.subs, s.called, s.goals, s.yellow, s.red, s.avgRating!=null?s.avgRating.toFixed(1):"-"])
+  );
+
+  doc.setFont("helvetica","bold"); doc.setFontSize(10.5);
+  doc.text("Porteros", margin, y); y += 3;
+  drawSimpleTable(
+    ["Portero","PJ","Encajados","Porterías a 0","Am.","Roj.","Nota"],
+    gks.map(s=>[`${s.player.dorsal!=null?s.player.dorsal+". ":""}${s.player.name}`, s.gkMatches, s.goalsConceded, s.cleanSheets, s.yellow, s.red, s.avgRating!=null?s.avgRating.toFixed(1):"-"])
+  );
+
+  doc.save(`Resumen_${(team?team.name:"equipo").replace(/[^a-zA-Z0-9]+/g,"_")}.pdf`);
+};
+
+document.getElementById("btnExportSummaryExcel").onclick = () => {
+  if(!selectedTeamId){ alert("Elige primero un equipo."); return; }
+  if(!window.XLSX){ alert("No se ha podido cargar el generador de Excel. Comprueba tu conexión e inténtalo de nuevo."); return; }
+  const team = teams.find(t=>t.id===selectedTeamId);
+  const sum = computeTeamSummary_(selectedTeamId, selectedSeason, summaryDifficultyFilter);
+  const outfield = sum.stats.filter(s=>s.player.position!=="Portero").sort((a,b)=> b.goals-a.goals || b.played-a.played);
+  const gks = sum.stats.filter(s=>s.player.position==="Portero").sort((a,b)=> b.cleanSheets-a.cleanSheets || a.goalsConceded-b.goalsConceded);
+
+  const outHeader = ["Dorsal","Jugador","PJ","Titular","Suplente","Convocatorias","Goles","Amarillas","Rojas","Nota media"];
+  const outRows = outfield.map(s=>[s.player.dorsal!=null?s.player.dorsal:"", s.player.name, s.played, s.starts, s.subs, s.called, s.goals, s.yellow, s.red, s.avgRating!=null?Number(s.avgRating.toFixed(1)):""]);
+  const wsOut = XLSX.utils.aoa_to_sheet([outHeader, ...outRows]);
+  wsOut["!cols"] = [{wch:8},{wch:26},{wch:6},{wch:8},{wch:9},{wch:12},{wch:8},{wch:10},{wch:8},{wch:10}];
+
+  const gkHeader = ["Dorsal","Portero","PJ","Encajados","Porterías a cero","Amarillas","Rojas","Nota media"];
+  const gkRows = gks.map(s=>[s.player.dorsal!=null?s.player.dorsal:"", s.player.name, s.gkMatches, s.goalsConceded, s.cleanSheets, s.yellow, s.red, s.avgRating!=null?Number(s.avgRating.toFixed(1)):""]);
+  const wsGk = XLSX.utils.aoa_to_sheet([gkHeader, ...gkRows]);
+  wsGk["!cols"] = [{wch:8},{wch:26},{wch:6},{wch:12},{wch:16},{wch:10},{wch:8},{wch:10}];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, wsOut, "Jugadores");
+  XLSX.utils.book_append_sheet(wb, wsGk, "Porteros");
+  XLSX.writeFile(wb, `Resumen_${(team?team.name:"equipo").replace(/[^a-zA-Z0-9]+/g,"_")}.xlsx`);
+};
+
+/* ---------- Resumen automático ---------- */
+function computeTeamSummary_(teamId, season, difficultyFilter){
+  const roster = players.filter(p=>p.teamId===teamId);
+  const team = teams.find(t=>t.id===teamId);
+  const teamMds = matchdays.filter(m=>m.teamId===teamId && (!season || matchdaySeason_(m, team)===season) && (!difficultyFilter || m.difficulty===difficultyFilter));
+  const stats = {};
+  roster.forEach(p=>{
+    stats[p.id] = {
+      player: p, played:0, starts:0, subs:0, called:0,
+      goals:0, yellow:0, red:0, goalsConceded:0, cleanSheets:0, gkMatches:0,
+      ratingSum:0, ratingCount:0
+    };
+  });
+  let goalsFor = 0, goalsAgainst = 0, played = 0;
+  teamMds.forEach(m=>{
+    if(m.goalsFor!=null) goalsFor += m.goalsFor;
+    if(m.goalsAgainst!=null) goalsAgainst += m.goalsAgainst;
+    if(Array.isArray(m.playerStats) && m.playerStats.length) played++;
+    (m.playerStats||[]).forEach(s=>{
+      const st = stats[s.playerId];
+      if(!st) return; // jugador ya no está en la plantilla actual
+      if(s.status==="Titular"){ st.starts++; st.played++; st.called++; }
+      else if(s.status==="Suplente"){ st.subs++; st.played++; st.called++; }
+      st.goals += s.goals||0;
+      st.yellow += s.yellow||0;
+      st.red += s.red||0;
+      if(st.player.position==="Portero" && (s.status==="Titular"||s.status==="Suplente")){
+        st.gkMatches++;
+        st.goalsConceded += (s.goalsConceded!=null ? s.goalsConceded : 0);
+        if(s.goalsConceded===0) st.cleanSheets++;
+      }
+    });
+    Object.entries(m.playerRatings||{}).forEach(([playerId, rating])=>{
+      const st = stats[playerId];
+      if(!st || rating==null || isNaN(rating)) return;
+      st.ratingSum += Number(rating);
+      st.ratingCount++;
+    });
+  });
+  const statsArr = Object.values(stats).map(st=>({...st, avgRating: st.ratingCount>0 ? (st.ratingSum/st.ratingCount) : null}));
+  return {roster, teamMds, played, goalsFor, goalsAgainst, stats: statsArr};
+}
+let summaryMode = "season"; // "season" | "matchday"
+let summarySelectedMatchdayId = null;
+let summaryDifficultyFilter = null; // null = todas
+document.getElementById("summaryModeSeasonBtn").onclick = () => {
+  summaryMode = "season";
+  document.getElementById("summaryModeSeasonBtn").classList.remove("ghost");
+  document.getElementById("summaryModeMatchdayBtn").classList.add("ghost");
+  document.getElementById("summaryMatchdaySelect").classList.add("hidden");
+  renderTeamSummary();
+};
+document.getElementById("summaryModeMatchdayBtn").onclick = () => {
+  summaryMode = "matchday";
+  document.getElementById("summaryModeMatchdayBtn").classList.remove("ghost");
+  document.getElementById("summaryModeSeasonBtn").classList.add("ghost");
+  document.getElementById("summaryMatchdaySelect").classList.remove("hidden");
+  renderTeamSummary();
+};
+document.getElementById("summaryMatchdaySelect").onchange = (e) => {
+  summarySelectedMatchdayId = e.target.value || null;
+  renderTeamSummary();
+};
+function renderSummaryDifficultyFilter(){
+  const wrap = document.getElementById("summaryDifficultyFilterRow");
+  if(!wrap) return;
+  wrap.style.display = "flex"; wrap.style.gap = "5px"; wrap.style.flexWrap = "nowrap"; wrap.style.alignItems = "center";
+  const allSelected = !summaryDifficultyFilter;
+  wrap.innerHTML = `<button type="button" data-diff-filter="" title="Todas"
+      style="width:24px;height:24px;border-radius:50%;flex:0 0 auto;background:#e5e5e5;border:1.5px solid ${allSelected?"var(--accent)":"var(--border)"};box-shadow:${allSelected?"0 0 0 1.5px var(--accent)":"none"};cursor:pointer;padding:0;font-size:.7rem;line-height:1;">✕</button>` +
+    MATCH_DIFFICULTY_LEVELS.map(d=>`
+    <button type="button" data-diff-filter="${d.id}" title="${d.label}"
+      style="width:24px;height:24px;border-radius:50%;flex:0 0 auto;background:${d.bg};border:1.5px solid ${summaryDifficultyFilter===d.id?"var(--accent)":d.border};box-shadow:${summaryDifficultyFilter===d.id?"0 0 0 1.5px var(--accent)":"none"};cursor:pointer;padding:0;"></button>`).join("");
+  wrap.querySelectorAll("[data-diff-filter]").forEach(btn=>{
+    btn.onclick = () => {
+      summaryDifficultyFilter = btn.dataset.diffFilter || null;
+      summarySelectedMatchdayId = null;
+      renderSummaryDifficultyFilter();
+      renderTeamSummary();
+    };
+  });
+}
+function renderTeamSummary(){
+  const wrap = document.getElementById("teamSummaryContent");
+  const mdSel = document.getElementById("summaryMatchdaySelect");
+  if(!wrap) return;
+  renderSummaryDifficultyFilter();
+  if(!selectedTeamId){ wrap.innerHTML = '<div class="empty">Elige un equipo arriba.</div>'; mdSel.innerHTML = ""; return; }
+  const team = teams.find(t=>t.id===selectedTeamId);
+  const teamMds = matchdays.filter(m=>m.teamId===selectedTeamId && matchdaySeason_(m, team)===selectedSeason && (!summaryDifficultyFilter || m.difficulty===summaryDifficultyFilter)).sort((a,b)=>(a.number||0)-(b.number||0));
+  const prevSel = summarySelectedMatchdayId;
+  mdSel.innerHTML = teamMds.length
+    ? teamMds.map(m=>`<option value="${m.id}">Jornada ${m.number} — vs ${escapeHtml(m.rival||"?")}</option>`).join("")
+    : '<option value="">Sin jornadas</option>';
+  if(prevSel && teamMds.some(m=>m.id===prevSel)) mdSel.value = prevSel;
+  summarySelectedMatchdayId = mdSel.value || (teamMds[0] ? teamMds[0].id : null);
+
+  if(teamMds.length===0){ wrap.innerHTML = '<div class="empty">No hay jornadas que coincidan con este filtro en esta temporada.</div>'; return; }
+
+  if(summaryMode==="matchday") renderMatchdaySummary_(wrap);
+  else renderSeasonSummary_(wrap);
+}
+function renderSeasonSummary_(wrap){
+  const sum = computeTeamSummary_(selectedTeamId, selectedSeason, summaryDifficultyFilter);
+  const outfield = sum.stats.filter(s=>s.player.position!=="Portero").sort((a,b)=> b.goals-a.goals || b.played-a.played);
+  const gks = sum.stats.filter(s=>s.player.position==="Portero").sort((a,b)=> b.cleanSheets-a.cleanSheets || a.goalsConceded-b.goalsConceded);
+  wrap.innerHTML = `
+    <p class="muted" style="margin-top:-6px;">Temporada: ${escapeHtml(selectedSeason||"-")}</p>
+    <div class="row" style="margin-bottom:12px;">
+      <div class="badge outline" style="padding:8px 12px;">🗓️ Jornadas jugadas: ${sum.played}</div>
+      <div class="badge outline" style="padding:8px 12px;">⚽ Goles a favor: ${sum.goalsFor}</div>
+      <div class="badge outline" style="padding:8px 12px;">🥅 Goles en contra: ${sum.goalsAgainst}</div>
+    </div>
+    <h3 style="font-size:.9rem;">Jugadores</h3>
+    <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:.85rem;min-width:480px;">
+      <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
+        <th style="padding:5px;">Jugador</th><th style="padding:5px;">PJ</th><th style="padding:5px;">Titular</th><th style="padding:5px;">Suplente</th><th style="padding:5px;">Convoc.</th><th style="padding:5px;">⚽</th><th style="padding:5px;">🟨</th><th style="padding:5px;">🟥</th><th style="padding:5px;">⭐ Nota media</th>
+      </tr></thead>
+      <tbody>
+      ${outfield.length ? outfield.map(s=>`
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:5px;">${s.player.dorsal!=null?escapeHtml(String(s.player.dorsal))+". ":""}${escapeHtml(s.player.name)}</td>
+          <td style="padding:5px;">${s.played}</td>
+          <td style="padding:5px;">${s.starts}</td>
+          <td style="padding:5px;">${s.subs}</td>
+          <td style="padding:5px;">${s.called}</td>
+          <td style="padding:5px;">${s.goals}</td>
+          <td style="padding:5px;">${s.yellow}</td>
+          <td style="padding:5px;">${s.red}</td>
+          <td style="padding:5px;">${s.avgRating!=null ? s.avgRating.toFixed(1) : "-"}</td>
+        </tr>`).join("") : `<tr><td colspan="9" style="padding:5px;" class="muted">Sin jugadores de campo en la plantilla.</td></tr>`}
+      </tbody>
+    </table>
+    </div>
+    <h3 style="margin-top:14px;font-size:.9rem;">Porteros</h3>
+    <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:.85rem;min-width:420px;">
+      <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
+        <th style="padding:5px;">Portero</th><th style="padding:5px;">PJ</th><th style="padding:5px;">Encajados</th><th style="padding:5px;">Porterías a cero</th><th style="padding:5px;">🟨</th><th style="padding:5px;">🟥</th><th style="padding:5px;">⭐ Nota media</th>
+      </tr></thead>
+      <tbody>
+      ${gks.length ? gks.map(s=>`
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:5px;">${s.player.dorsal!=null?escapeHtml(String(s.player.dorsal))+". ":""}${escapeHtml(s.player.name)}</td>
+          <td style="padding:5px;">${s.gkMatches}</td>
+          <td style="padding:5px;">${s.goalsConceded}</td>
+          <td style="padding:5px;">${s.cleanSheets}</td>
+          <td style="padding:5px;">${s.yellow}</td>
+          <td style="padding:5px;">${s.red}</td>
+          <td style="padding:5px;">${s.avgRating!=null ? s.avgRating.toFixed(1) : "-"}</td>
+        </tr>`).join("") : `<tr><td colspan="7" style="padding:5px;" class="muted">Sin porteros en la plantilla.</td></tr>`}
+      </tbody>
+    </table>
+    </div>`;
+}
+function renderMatchdaySummary_(wrap){
+  const m = matchdays.find(x=>x.id===summarySelectedMatchdayId);
+  if(!m){ wrap.innerHTML = '<div class="empty">Elige una jornada.</div>'; return; }
+  const roster = players.filter(p=>p.teamId===selectedTeamId).sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
+  const statsMap = {};
+  (m.playerStats||[]).forEach(s=>{ statsMap[s.playerId] = s; });
+  const linkedIds = m.linkedSessionIds || [];
+  const linkedSessions = linkedIds.map(id=>sessions.find(s=>s.id===id)).filter(Boolean);
+  const diff = matchDifficultyInfo_(m.difficulty);
+  const notes = m.playerNotes || {};
+  const ratings = m.playerRatings || {};
+  wrap.innerHTML = `
+    <div class="row" style="margin-bottom:12px;">
+      <div class="badge outline" style="padding:8px 12px;">🗓️ Jornada ${m.number}${m.date?` · ${escapeHtml(m.date)}`:""}</div>
+      <div class="badge outline" style="padding:8px 12px;">🆚 ${escapeHtml(m.rival||"?")} (${m.homeAway||"-"})</div>
+      <div class="badge outline" style="padding:8px 12px;">🏆 ${escapeHtml(m.competition||"-")}</div>
+      <div class="badge outline" style="padding:8px 12px;">${m.goalsFor!=null&&m.goalsAgainst!=null ? `⚽ ${m.goalsFor}-${m.goalsAgainst}` : "Sin resultado"}</div>
+      ${diff ? `<div class="badge outline" title="${diff.label}" style="padding:8px 10px;display:flex;align-items:center;gap:0;"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:${diff.bg};border:1px solid ${diff.border};"></span></div>` : ""}
+    </div>
+    <button type="button" class="btn ghost small" onclick="goToMatchdayReport('${m.id}')" style="margin-bottom:12px;">📋 Ir al informe del partido</button>
+    ${m.videoUrl ? `<div style="margin-bottom:12px;">${videoEmbedHtml(m.videoUrl)}</div>` : ""}
+    ${linkedSessions.length ? `
+      <h3 style="font-size:.9rem;">🔗 Sesiones de entrenamiento de esa semana</h3>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+        ${linkedSessions.map(s=>`<button type="button" class="btn ghost small" onclick="viewLinkedSession('${s.id}')">📋 ${escapeHtml(s.date||"")} — ${escapeHtml(s.name||"(sin título)")}</button>`).join("")}
+      </div>` : ""}
+    <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:.85rem;min-width:480px;">
+      <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
+        <th style="padding:5px;">Jugador</th><th style="padding:5px;">Estado</th><th style="padding:5px;">Motivo</th><th style="padding:5px;">Goles / Enc.</th><th style="padding:5px;">🟨</th><th style="padding:5px;">🟥</th><th style="padding:5px;">⭐ Nota</th>
+      </tr></thead>
+      <tbody>
+      ${roster.length ? roster.map(p=>{
+        const s = statsMap[p.id] || {};
+        const isGk = p.position==="Portero";
+        const goalsShown = isGk ? s.goalsConceded : s.goals;
+        return `
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:5px;">${p.dorsal!=null?escapeHtml(String(p.dorsal))+". ":""}${escapeHtml(p.name)}${isGk?" 🧤":""}</td>
+          <td style="padding:5px;">${escapeHtml(s.status||"No convocado")}</td>
+          <td style="padding:5px;">${escapeHtml(s.reason||"")}</td>
+          <td style="padding:5px;">${goalsShown!=null?goalsShown:"-"}</td>
+          <td style="padding:5px;">${s.yellow||0}</td>
+          <td style="padding:5px;">${s.red||0}</td>
+          <td style="padding:5px;">${ratings[p.id]!=null?ratings[p.id]:"-"}</td>
+        </tr>`;
+      }).join("") : `<tr><td colspan="7" style="padding:5px;" class="muted">Este equipo todavía no tiene jugadores en la plantilla.</td></tr>`}
+      </tbody>
+    </table>
+    </div>
+    ${(m.reportText || m.reportObservations || Object.keys(notes).length) ? `
+      <h3 style="margin-top:14px;font-size:.9rem;">📋 Informe del partido</h3>
+      ${m.reportText ? `<p style="white-space:pre-wrap;font-size:.85rem;">${escapeHtml(m.reportText)}</p>` : ""}
+      ${m.reportObservations ? `<p class="muted" style="white-space:pre-wrap;font-size:.85rem;"><strong>Observaciones:</strong> ${escapeHtml(m.reportObservations)}</p>` : ""}
+      ${Object.keys(notes).length ? `
+        <h4 style="font-size:.85rem;margin:8px 0 2px 0;">Notas de jugadores</h4>
+        <ul style="margin:0 0 0 18px;padding:0;font-size:.85rem;">
+          ${roster.filter(p=>notes[p.id]).map(p=>`<li><strong>${escapeHtml(p.name)}:</strong> ${escapeHtml(notes[p.id])}</li>`).join("")}
+        </ul>` : ""}
+    ` : ""}`;
+}
+window.goToMatchdayReport = (id) => {
+  showPlantillaView("matchdays");
+  openMatchdayStats(id);
+};
+
+/* ---------- Ficha individual de jugador ---------- */
+document.getElementById("plantillaPlayerBack").onclick = () => showPlantillaView("roster");
+window.openPlayerProfile = (id) => {
+  const p = players.find(x=>x.id===id);
+  if(!p) return;
+  document.getElementById("playerProfileTitle").textContent =
+    `${p.dorsal!=null ? p.dorsal+". " : ""}${p.name}${p.position==="Portero" ? " 🧤" : ""}`;
+  const wrap = document.getElementById("playerProfileContent");
+  const team = teams.find(t=>t.id===p.teamId);
+  const teamMds = matchdays.filter(m=>m.teamId===p.teamId && matchdaySeason_(m, team)===selectedSeason).sort((a,b)=>(a.number||0)-(b.number||0));
+  const isGk = p.position === "Portero";
+  let played=0, starts=0, subs=0, called=0, goals=0, yellow=0, red=0, goalsConceded=0, cleanSheets=0, gkMatches=0;
+  const rows = teamMds.map(m=>{
+    const s = (m.playerStats||[]).find(x=>x.playerId===id) || {status:"No convocado"};
+    if(s.status==="Titular"){ starts++; played++; called++; }
+    else if(s.status==="Suplente"){ subs++; played++; called++; }
+    goals += s.goals||0; yellow += s.yellow||0; red += s.red||0;
+    if(isGk && (s.status==="Titular"||s.status==="Suplente")){
+      gkMatches++;
+      goalsConceded += (s.goalsConceded!=null ? s.goalsConceded : 0);
+      if(s.goalsConceded===0) cleanSheets++;
+    }
+    return {m, s};
+  });
+  wrap.innerHTML = `
+    <p class="muted" style="margin-top:-6px;">Temporada: ${escapeHtml(selectedSeason||"-")}</p>
+    <div class="row" style="margin-bottom:12px;">
+      <div class="badge outline" style="padding:8px 12px;">🗓️ Partidos jugados: ${played}</div>
+      <div class="badge outline" style="padding:8px 12px;">🟢 Titular: ${starts}</div>
+      <div class="badge outline" style="padding:8px 12px;">🔵 Suplente: ${subs}</div>
+      ${isGk
+        ? `<div class="badge outline" style="padding:8px 12px;">🥅 Encajados: ${goalsConceded}</div><div class="badge outline" style="padding:8px 12px;">🧤 Porterías a cero: ${cleanSheets}</div>`
+        : `<div class="badge outline" style="padding:8px 12px;">⚽ Goles: ${goals}</div>`}
+      <div class="badge outline" style="padding:8px 12px;">🟨 ${yellow}</div>
+      <div class="badge outline" style="padding:8px 12px;">🟥 ${red}</div>
+    </div>
+    <h3 style="font-size:.9rem;">Jornada a jornada</h3>
+    <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:.85rem;min-width:420px;">
+      <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
+        <th style="padding:5px;">J.</th><th style="padding:5px;">Rival</th><th style="padding:5px;">Estado</th><th style="padding:5px;">${isGk?"Encajados":"Goles"}</th><th style="padding:5px;">🟨</th><th style="padding:5px;">🟥</th>
+      </tr></thead>
+      <tbody>
+      ${rows.length ? rows.map(r=>`
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:5px;">${r.m.number}</td>
+          <td style="padding:5px;">${escapeHtml(r.m.rival||"-")}</td>
+          <td style="padding:5px;">${escapeHtml(r.s.status||"No convocado")}</td>
+          <td style="padding:5px;">${isGk ? (r.s.goalsConceded!=null?r.s.goalsConceded:"-") : (r.s.goals||0)}</td>
+          <td style="padding:5px;">${r.s.yellow||0}</td>
+          <td style="padding:5px;">${r.s.red||0}</td>
+        </tr>`).join("") : `<tr><td colspan="6" style="padding:5px;" class="muted">Todavía no hay jornadas para este equipo.</td></tr>`}
+      </tbody>
+    </table>
+    </div>`;
+  showPlantillaView("player");
+};
+
+/* ---------- Comparar equipos ---------- */
+function renderTeamCompare(){
+  const wrap = document.getElementById("teamCompareContent");
+  if(!wrap) return;
+  const visible = coachVisibleTeams_();
+  if(visible.length<2){ wrap.innerHTML = '<div class="empty">Necesitas al menos 2 equipos para comparar.</div>'; return; }
+  const rows = visible.map(t=>{
+    const sum = computeTeamSummary_(t.id, selectedSeason);
+    const topScorer = sum.stats.filter(s=>s.player.position!=="Portero").sort((a,b)=>b.goals-a.goals)[0];
+    const totalYellow = sum.stats.reduce((a,s)=>a+s.yellow,0);
+    const totalRed = sum.stats.reduce((a,s)=>a+s.red,0);
+    const totalCalled = sum.stats.reduce((a,s)=>a+s.called,0);
+    return {team:t, sum, topScorer, totalYellow, totalRed, totalCalled};
+  });
+  wrap.innerHTML = `
+    <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:.85rem;min-width:520px;">
+      <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
+        <th style="padding:6px;">Equipo</th><th style="padding:6px;">Jornadas</th><th style="padding:6px;">GF</th><th style="padding:6px;">GC</th><th style="padding:6px;">🟨</th><th style="padding:6px;">🟥</th><th style="padding:6px;">Convoc. totales</th><th style="padding:6px;">Máx. goleador</th>
+      </tr></thead>
+      <tbody>
+      ${rows.map(r=>`
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:6px;">${escapeHtml(r.team.name)}</td>
+          <td style="padding:6px;">${r.sum.played}</td>
+          <td style="padding:6px;">${r.sum.goalsFor}</td>
+          <td style="padding:6px;">${r.sum.goalsAgainst}</td>
+          <td style="padding:6px;">${r.totalYellow}</td>
+          <td style="padding:6px;">${r.totalRed}</td>
+          <td style="padding:6px;">${r.totalCalled}</td>
+          <td style="padding:6px;">${r.topScorer && r.topScorer.goals>0 ? escapeHtml(r.topScorer.player.name)+" ("+r.topScorer.goals+")" : "-"}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>
+    </div>
+    <p class="muted" style="margin-top:10px;">Se compara la temporada seleccionada (${escapeHtml(selectedSeason||"-")}) de cada equipo. Si un equipo no tiene esa temporada creada, saldrá a 0.</p>`;
+}
 
 /* ============================================================
    SESSIONS
@@ -4095,6 +5383,16 @@ window.editSession = (id) => {
   document.querySelector('.tab[data-tab="sessions"]').click();
   showSessionsView("new");
   document.getElementById("sessionEditorPanel").scrollIntoView({behavior:"smooth"});
+};
+
+window.viewLinkedSession = (id) => {
+  const s = sessions.find(x=>x.id===id);
+  if(!s){ alert("Esta sesión ya no existe (puede que se haya borrado)."); return; }
+  document.getElementById("viewSessionContent").innerHTML = sessionCardHtml(s);
+  document.getElementById("viewSessionModal").classList.remove("hidden");
+};
+document.getElementById("btnCloseViewSessionModal").onclick = () => {
+  document.getElementById("viewSessionModal").classList.add("hidden");
 };
 
 function sessionCardHtml(s){
@@ -5188,7 +6486,7 @@ window.purgePlaySession = async (id) => {
 /* ============================================================
    COPIA DE SEGURIDAD COMPLETA (exportar / restaurar)
 ============================================================= */
-const BACKUP_COLLECTIONS = ["tasks","sessions","categories","coaches","abpCategories","plays","playSessions","playSessionFolders","gameModelFiles"];
+const BACKUP_COLLECTIONS = ["tasks","sessions","categories","coaches","abpCategories","plays","playSessions","playSessionFolders","gameModelFiles","teams","players","matchdays"];
 
 document.getElementById("btnExportBackup").onclick = async () => {
   const msgEl = document.getElementById("backupExportMsg");
@@ -5331,6 +6629,18 @@ service cloud.firestore {
       allow read: if isActive();
       allow create: if isEditor();
       allow update, delete: if isEditor();
+    }
+    match /teams/{teamId} {
+      allow read: if isActive();
+      allow write: if isEditor();
+    }
+    match /players/{playerId} {
+      allow read: if isActive();
+      allow write: if isActive();
+    }
+    match /matchdays/{matchdayId} {
+      allow read: if isActive();
+      allow write: if isActive();
     }
   }
 }
