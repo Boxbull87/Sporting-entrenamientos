@@ -1119,7 +1119,8 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
             <div id="matchdayStatsTable" style="overflow-x:auto;"></div>
             <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
               <button class="btn accent" id="btnSaveMatchdayStats">💾 Guardar convocatoria</button>
-              <button class="btn ghost" id="btnExportConvocatoriaPDF">🖨️ Exportar convocatoria (PDF)</button>
+              <button class="btn ghost" id="btnExportConvocatoriaPDF">🖨️ Exportar informe del partido (PDF)</button>
+              <p class="muted" style="margin:2px 0 0;font-size:.78rem;">Incluye convocatoria, informe, notas de jugadores y las sesiones marcadas como vinculadas abajo.</p>
               <button class="btn danger" id="btnDeleteMatchday">🗑️ Eliminar jornada</button>
             </div>
             <div id="matchdayStatsMsg"></div>
@@ -4819,9 +4820,53 @@ document.getElementById("btnExportConvocatoriaPDF").onclick = () => {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({unit:"mm", format:"a4"});
   const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
   const margin = 14;
   const RED = [216,30,44];
+  const LABEL_BG = [236,236,236];
+  const BORDER = [50,50,50];
+  const TEXT = [20,20,20];
   let y = 0;
+
+  function ensureSpace(h){
+    if(y + h > pageH - margin){ doc.addPage(); y = margin; }
+  }
+  // Recorta un texto (con "…") para que no se salga del ancho disponible de su columna.
+  function fitText(text, maxW){
+    text = String(text||"");
+    if(doc.getTextWidth(text) <= maxW) return text;
+    let t = text;
+    while(t.length>1 && doc.getTextWidth(t+"…") > maxW){ t = t.slice(0,-1); }
+    return t + "…";
+  }
+  function sectionBar(text){
+    ensureSpace(9);
+    doc.setFillColor(RED[0],RED[1],RED[2]);
+    doc.rect(margin, y, pageW-margin*2, 7, 'F');
+    doc.setFont("helvetica","bold"); doc.setFontSize(9.5);
+    doc.setTextColor(255,255,255);
+    doc.text(text.toUpperCase(), margin+3, y+5);
+    y += 7;
+  }
+  function fullBox(label, value){
+    if(!value) return;
+    const fullW = pageW-margin*2;
+    ensureSpace(6);
+    doc.setFillColor(LABEL_BG[0],LABEL_BG[1],LABEL_BG[2]);
+    doc.rect(margin, y, fullW, 6, 'F');
+    doc.setDrawColor(BORDER[0],BORDER[1],BORDER[2]); doc.setLineWidth(0.25);
+    doc.rect(margin, y, fullW, 6);
+    doc.setFont("helvetica","bold"); doc.setFontSize(9.5); doc.setTextColor(TEXT[0],TEXT[1],TEXT[2]);
+    doc.text(label, margin+2.5, y+4.3);
+    y += 6;
+    doc.setFont("helvetica","normal");
+    const lines = doc.splitTextToSize(String(value), fullW-5);
+    const boxH = Math.max(7, lines.length*4.6+3);
+    ensureSpace(boxH);
+    doc.rect(margin, y, fullW, boxH);
+    doc.text(lines, margin+2.5, y+5);
+    y += boxH;
+  }
 
   doc.setFillColor(RED[0],RED[1],RED[2]);
   doc.rect(0,0,pageW,20,'F');
@@ -4831,7 +4876,7 @@ document.getElementById("btnExportConvocatoriaPDF").onclick = () => {
   try{ doc.addImage(CREST_DATA_URI,'PNG', cx-r+0.8, cy-r+0.8, (r-0.8)*2, (r-0.8)*2); }catch(e){}
   doc.setFont("helvetica","bold"); doc.setFontSize(14);
   doc.setTextColor(255,255,255);
-  doc.text("CONVOCATORIA", cx+r+6, cy+1.6);
+  doc.text("INFORME DEL PARTIDO", cx+r+6, cy+1.6);
   y = 28;
 
   doc.setTextColor(20,20,20);
@@ -4840,34 +4885,87 @@ document.getElementById("btnExportConvocatoriaPDF").onclick = () => {
   doc.setFont("helvetica","normal"); doc.setFontSize(10);
   doc.text(`vs ${m.rival||"?"}  ·  ${m.date||"-"}  ·  ${m.homeAway||"-"}  ·  ${m.competition||"-"}`, margin, y); y += 10;
 
+  // ---- Tabla de convocatoria ----
+  const dorsalX = margin+3, jugadorX = margin+30, estadoX = pageW-margin-55, motivoX = pageW-margin-25;
+  const jugadorMaxW = estadoX - jugadorX - 3; // ancho disponible antes de pisar la columna ESTADO
+
+  ensureSpace(7);
   doc.setFont("helvetica","bold"); doc.setFontSize(9.5);
   doc.setFillColor(RED[0],RED[1],RED[2]);
   doc.setTextColor(255,255,255);
   doc.rect(margin, y, pageW-margin*2, 7, 'F');
-  doc.text("DORSAL", margin+3, y+5);
-  doc.text("JUGADOR", margin+30, y+5);
-  doc.text("ESTADO", pageW-margin-55, y+5);
-  doc.text("MOTIVO", pageW-margin-25, y+5);
+  doc.text("DORSAL", dorsalX, y+5);
+  doc.text("JUGADOR", jugadorX, y+5);
+  doc.text("ESTADO", estadoX, y+5);
+  doc.text("MOTIVO", motivoX, y+5);
   y += 7;
 
   doc.setTextColor(20,20,20);
   roster.forEach((p,i)=>{
     const s = statsMap[p.id] || {};
     const rowH = 7;
-    if(y + rowH > doc.internal.pageSize.getHeight() - margin){ doc.addPage(); y = margin; }
+    ensureSpace(rowH);
     doc.setDrawColor(220,220,220); doc.setLineWidth(0.2);
     doc.rect(margin, y, pageW-margin*2, rowH);
     doc.setFont("helvetica","normal"); doc.setFontSize(9.5);
-    doc.text(String(p.dorsal!=null?p.dorsal:"-"), margin+3, y+4.8);
-    doc.text(`${p.name}${p.position==="Portero"?" (P)":""}`, margin+30, y+4.8);
-    doc.text(s.status || "No convocado", pageW-margin-55, y+4.8);
-    doc.text(s.reason || "", pageW-margin-25, y+4.8);
+    doc.text(String(p.dorsal!=null?p.dorsal:"-"), dorsalX, y+4.8);
+    doc.text(fitText(`${p.name}${p.position==="Portero"?" (P)":""}`, jugadorMaxW), jugadorX, y+4.8);
+    doc.text(s.status || "No convocado", estadoX, y+4.8);
+    doc.text(s.reason || "", motivoX, y+4.8);
     y += rowH;
   });
+  y += 6;
 
-  const safeName = `Convocatoria_J${m.number}_${(m.rival||"rival").replace(/[^a-zA-Z0-9]+/g,"_")}`;
+  // ---- Informe del partido (dificultad, texto, observaciones, notas de jugadores) ----
+  const diff = matchDifficultyInfo_(m.difficulty);
+  if(diff){
+    ensureSpace(7);
+    doc.setFillColor(...hexToRgb_(diff.bg));
+    doc.circle(margin+3, y+2.3, 3, 'F');
+    doc.setDrawColor(150,150,150); doc.setLineWidth(0.2); doc.circle(margin+3, y+2.3, 3);
+    doc.setFont("helvetica","bold"); doc.setFontSize(9.5); doc.setTextColor(TEXT[0],TEXT[1],TEXT[2]);
+    doc.text(`Dificultad del rival: ${diff.label}`, margin+9, y+3.6);
+    y += 9;
+  }
+  fullBox("Informe", m.reportText || "");
+  fullBox("Observaciones", m.reportObservations || "");
+
+  const notesRows = roster
+    .map(p=>({p, note: (m.playerNotes||{})[p.id] || "", rating: (m.playerRatings||{})[p.id]}))
+    .filter(r => r.note || r.rating!=null);
+  if(notesRows.length){
+    y += 2;
+    sectionBar("Notas de jugadores");
+    const nameW = 45, ratingW = 20, noteW = pageW-margin*2-nameW-ratingW;
+    notesRows.forEach(r=>{
+      doc.setFont("helvetica","normal"); doc.setFontSize(9);
+      const noteLines = doc.splitTextToSize(r.note || "", noteW-4);
+      const rowH = Math.max(6.5, noteLines.length*4.2+2.4);
+      ensureSpace(rowH);
+      doc.setDrawColor(220,220,220); doc.setLineWidth(0.2);
+      doc.rect(margin, y, nameW, rowH);
+      doc.rect(margin+nameW, y, noteW, rowH);
+      doc.rect(margin+nameW+noteW, y, ratingW, rowH);
+      doc.setFont("helvetica","bold");
+      doc.text(fitText(`${r.p.dorsal!=null?r.p.dorsal+". ":""}${r.p.name}`, nameW-4), margin+2, y+4.5);
+      doc.setFont("helvetica","normal");
+      doc.text(noteLines, margin+nameW+2, y+4.5);
+      doc.text(r.rating!=null ? String(r.rating) : "-", margin+nameW+noteW+2, y+4.5);
+      y += rowH;
+    });
+  }
+
+  // ---- Sesiones de entrenamiento vinculadas a esta jornada ----
+  const linkedSessions = (m.linkedSessionIds||[]).map(id=>sessions.find(x=>x.id===id)).filter(Boolean);
+  linkedSessions.forEach(s => renderSessionIntoDoc(doc, s, {newPageFirst:true}));
+
+  const safeName = `Informe_J${m.number}_${(m.rival||"rival").replace(/[^a-zA-Z0-9]+/g,"_")}`;
   doc.save(`${safeName}.pdf`);
 };
+function hexToRgb_(hex){
+  const h = hex.replace("#","");
+  return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
+}
 
 /* ---------- Exportar resumen de temporada ---------- */
 document.getElementById("btnExportSummaryPDF").onclick = () => {
@@ -5641,12 +5739,12 @@ function renderFrameToImage(frame){
   return off.toDataURL("image/png");
 }
 
-window.exportSessionPDF = function(sessionId){
-  const s = sessions.find(x=>x.id===sessionId);
-  if(!s) return;
-  if(!window.jspdf){ alert("No se ha podido cargar el generador de PDF. Comprueba tu conexión e inténtalo de nuevo."); return; }
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({unit:"mm", format:"a4"});
+// Dibuja el contenido completo de una sesión (banner, detalles, bloques y tareas)
+// dentro de un documento jsPDF ya existente. Se usa tanto para el PDF individual
+// de la sesión como para incrustarla dentro de otro PDF (p.ej. el informe de partido).
+// opts.newPageFirst = true → empieza en una página nueva (para cuando ya hay contenido previo en el doc).
+function renderSessionIntoDoc(doc, s, opts){
+  opts = opts || {};
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
   const margin = 12;
@@ -5676,6 +5774,7 @@ window.exportSessionPDF = function(sessionId){
   function ensureSpace(h){
     if(y + h > pageH - margin){ newPage(); }
   }
+  if(opts.newPageFirst) doc.addPage();
   drawBanner();
 
   function sectionBar(text){
@@ -5848,7 +5947,15 @@ window.exportSessionPDF = function(sessionId){
       renderTaskPDF(t, i);
     });
   }
+}
 
+window.exportSessionPDF = function(sessionId){
+  const s = sessions.find(x=>x.id===sessionId);
+  if(!s) return;
+  if(!window.jspdf){ alert("No se ha podido cargar el generador de PDF. Comprueba tu conexión e inténtalo de nuevo."); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({unit:"mm", format:"a4"});
+  renderSessionIntoDoc(doc, s, {newPageFirst:false});
   const safeName = (s.name || "sesion").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^\w\-]+/g,"_");
   doc.save(`${safeName}.pdf`);
 };
