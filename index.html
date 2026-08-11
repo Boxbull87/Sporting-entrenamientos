@@ -636,6 +636,8 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
               <button type="button" class="btn small" id="addPlayerD"><span class="swatch" style="background:#f2c94c;"></span>+ Amarillo</button>
               <button type="button" class="btn small ghost" id="addBall"><span class="swatch" style="background:#fff;border:1px solid #333;"></span>+ Balón</button>
               <button type="button" class="btn small ghost" id="addCone"><span class="swatch" style="background:#ff7a30;"></span>+ Cono</button>
+              <button type="button" class="btn small ghost" id="addWeight">🏋️ + Pesa</button>
+              <button type="button" class="btn small ghost" id="addRunner">🏃 + Corredor</button>
             </div>
             <div class="board-toolbar">
               <button type="button" class="btn small ghost" id="addGoalkeeperA"><span class="swatch" style="background:#2f80ed;"></span>+ Portero azul</button>
@@ -756,6 +758,11 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
         <textarea id="sessionObjectives" placeholder="- Objetivo 1&#10;- Objetivo 2&#10;- Objetivo 3"></textarea>
         <label style="margin-top:10px;">Notas</label>
         <textarea id="sessionNotes" placeholder="Observaciones para el equipo técnico..."></textarea>
+
+        <h3 style="margin-top:14px;font-size:.9rem;">🎯 Sesiones de ABP vinculadas</h3>
+        <p class="muted" style="font-size:.78rem;margin-top:-4px;">Puedes enlazar jugadas a balón parado ya creadas para trabajarlas en esta sesión.</p>
+        <button type="button" class="btn ghost small" id="btnLinkPlaySessions">+ Vincular sesión de ABP</button>
+        <div id="sessionPlayLinkChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
 
         <h3 style="margin-top:14px;font-size:.9rem;">Añadir tareas</h3>
         <div class="filterbar">
@@ -1312,6 +1319,19 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
 </div>
 
 <!-- ---------- Observaciones posteriores de una sesión (rápido, sin abrir el editor completo) ---------- -->
+<!-- ---------- Vincular sesiones de ABP a una sesión de entrenamiento ---------- -->
+<div id="linkPlaySessionsModal" class="modal-bg hidden">
+  <div class="modal">
+    <h2 style="font-size:1.05rem;">🎯 Vincular sesión de ABP</h2>
+    <input type="text" id="linkPlaySessionsSearch" placeholder="🔍 Buscar por nombre..." style="margin-top:10px;">
+    <div id="linkPlaySessionsList" style="margin-top:10px;max-height:48vh;overflow-y:auto;"></div>
+    <div style="display:flex;gap:8px;margin-top:14px;">
+      <button class="btn ghost" id="btnCloseLinkPlaySessions" style="flex:1;">Cancelar</button>
+      <button class="btn accent" id="btnApplyLinkPlaySessions" style="flex:1;">Aplicar</button>
+    </div>
+  </div>
+</div>
+
 <div id="sessionObsModal" class="modal-bg hidden">
   <div class="modal">
     <h2 style="font-size:1.05rem;">📝 Observaciones de la sesión</h2>
@@ -1335,6 +1355,8 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
       <button type="button" class="btn small" id="fsAddPlayerD"><span class="swatch" style="background:#f2c94c;"></span>+ Amarillo</button>
       <button type="button" class="btn small ghost" id="fsAddBall"><span class="swatch" style="background:#fff;border:1px solid #333;"></span>+ Balón</button>
       <button type="button" class="btn small ghost" id="fsAddCone"><span class="swatch" style="background:#ff7a30;"></span>+ Cono</button>
+      <button type="button" class="btn small ghost" id="fsAddWeight">🏋️ + Pesa</button>
+      <button type="button" class="btn small ghost" id="fsAddRunner">🏃 + Corredor</button>
     </div>
     <div class="board-toolbar">
       <button type="button" class="btn small ghost" id="fsAddGoalkeeperA"><span class="swatch" style="background:#2f80ed;"></span>+ Portero azul</button>
@@ -2933,6 +2955,7 @@ function tokenRadius(type){
   if(type==="ball") return 15;
   if(type==="cone") return 16;
   if(type==="goal") return 30;
+  if(type==="weight"||type==="runner") return 16;
   return 20; // jugadores y porteros
 }
 function tokenHitRadius(t){
@@ -3011,6 +3034,13 @@ function drawTokensOn(cx,cvs,list){
     }
     if(t.type==="goal"){
       drawGoalOn(cx, x, y, t.dir || "down", scl);
+      return;
+    }
+    if(t.type==="weight" || t.type==="runner"){
+      const r = tokenRadius(t.type)*scl;
+      cx.font = Math.round(r*1.8)+"px sans-serif";
+      cx.textAlign = "center"; cx.textBaseline = "middle";
+      cx.fillText(t.type==="weight" ? "🏋️" : "🏃", x, y);
       return;
     }
     if(t.type==="ball"){
@@ -3156,8 +3186,8 @@ function addToken(type){
   const sameTeam = tokens.filter(t=>t.type===type).length;
   const isPlayerLike = ["A","B","C","D","GA","GB","GC","GD"].includes(type);
   const id = "t"+tokenSeq;
-  const startX = {A:0.15,B:0.85,C:0.35,D:0.65,GA:0.4,GB:0.4,GC:0.6,GD:0.6,cone:0.5,goal:0.5,ball:0.5}[type];
-  const startY = type==="cone" ? (0.2 + (sameTeam%5)*0.15)
+  const startX = {A:0.15,B:0.85,C:0.35,D:0.65,GA:0.4,GB:0.4,GC:0.6,GD:0.6,cone:0.5,goal:0.5,ball:0.5,weight:0.5,runner:0.5}[type];
+  const startY = (type==="cone"||type==="weight"||type==="runner") ? (0.2 + (sameTeam%5)*0.15)
     : (type==="GA"||type==="GC") ? 0.06
     : (type==="GB"||type==="GD") ? 0.94
     : type==="goal" ? 0.05
@@ -3184,6 +3214,8 @@ wire2("addPlayerC","fsAddPlayerC", ()=>addToken("C"));
 wire2("addPlayerD","fsAddPlayerD", ()=>addToken("D"));
 wire2("addBall","fsAddBall", ()=>addToken("ball"));
 wire2("addCone","fsAddCone", ()=>addToken("cone"));
+wire2("addWeight","fsAddWeight", ()=>addToken("weight"));
+wire2("addRunner","fsAddRunner", ()=>addToken("runner"));
 wire2("addGoalkeeperA","fsAddGoalkeeperA", ()=>addToken("GA"));
 wire2("addGoalkeeperB","fsAddGoalkeeperB", ()=>addToken("GB"));
 wire2("addGoalkeeperC","fsAddGoalkeeperC", ()=>addToken("GC"));
@@ -3446,7 +3478,7 @@ function setTokenLabel(){
   const t = tokens.find(o=>o.id===selected.id);
   if(!t) return;
   if(["GA","GB","GC","GD"].includes(t.type)){ alert("Los porteros se muestran siempre con 'P'."); return; }
-  if(t.type==="ball" || t.type==="cone" || t.type==="goal"){ alert("Este elemento no lleva dorsal."); return; }
+  if(t.type==="ball" || t.type==="cone" || t.type==="goal" || t.type==="weight" || t.type==="runner"){ alert("Este elemento no lleva dorsal."); return; }
   const val = prompt("Dorsal o etiqueta corta para esta ficha (2-3 caracteres):", String(t.num!=null ? t.num : ""));
   if(val===null) return;
   pushUndoSnapshot();
@@ -3502,6 +3534,59 @@ canvas.addEventListener("touchmove", e=>{
 }, {passive:false});
 canvas.addEventListener("touchend", ()=> { boardPointerUp(); dragIsTouch = false; });
 canvas.addEventListener("touchcancel", ()=> { boardPointerUp(); dragIsTouch = false; });
+
+let sessionLinkedPlayIds = []; // sesiones de ABP vinculadas a la sesión de entrenamiento que se está creando/editando
+function renderSessionPlayLinkChips(){
+  const wrap = document.getElementById("sessionPlayLinkChips");
+  wrap.innerHTML = sessionLinkedPlayIds.map(id=>{
+    const s = playSessions.find(x=>x.id===id);
+    return `<span class="badge" style="display:flex;align-items:center;gap:6px;">🎯 ${escapeHtml(s?s.name:"(eliminada)")}
+      <button type="button" onclick="removeSessionPlayLinkChip('${id}')" style="background:none;border:none;color:inherit;cursor:pointer;font-size:1em;line-height:1;padding:0;">✕</button>
+    </span>`;
+  }).join("");
+}
+window.removeSessionPlayLinkChip = (id) => {
+  sessionLinkedPlayIds = sessionLinkedPlayIds.filter(x=>x!==id);
+  renderSessionPlayLinkChips();
+};
+function renderLinkPlaySessionsList(){
+  const search = document.getElementById("linkPlaySessionsSearch").value.trim().toLowerCase();
+  const list = playSessions
+    .filter(s=>!search || (s.name||"").toLowerCase().includes(search))
+    .sort((a,b)=> new Date(b.date||0) - new Date(a.date||0));
+  const wrap = document.getElementById("linkPlaySessionsList");
+  if(list.length===0){ wrap.innerHTML = '<p class="muted">No hay sesiones de ABP que coincidan.</p>'; return; }
+  wrap.innerHTML = list.map(s=>`
+    <label style="display:flex;align-items:center;gap:8px;padding:7px 4px;cursor:pointer;border-bottom:1px solid var(--border);">
+      <input type="checkbox" class="link-play-session-cb" value="${s.id}" ${sessionLinkedPlayIds.includes(s.id)?"checked":""} style="width:auto;">
+      <span>🎯 ${escapeHtml(s.name)} <span class="muted">${s.date?`· ${escapeHtml(s.date)}`:""} · ${(s.plays||[]).length} jugada${(s.plays||[]).length===1?"":"s"}</span></span>
+    </label>`).join("");
+}
+document.getElementById("btnLinkPlaySessions").onclick = () => {
+  document.getElementById("linkPlaySessionsSearch").value = "";
+  renderLinkPlaySessionsList();
+  document.getElementById("linkPlaySessionsModal").classList.remove("hidden");
+};
+document.getElementById("linkPlaySessionsSearch").oninput = renderLinkPlaySessionsList;
+document.getElementById("btnCloseLinkPlaySessions").onclick = () => {
+  document.getElementById("linkPlaySessionsModal").classList.add("hidden");
+};
+document.getElementById("btnApplyLinkPlaySessions").onclick = () => {
+  sessionLinkedPlayIds = Array.from(document.querySelectorAll(".link-play-session-cb:checked")).map(el=>el.value);
+  renderSessionPlayLinkChips();
+  document.getElementById("linkPlaySessionsModal").classList.add("hidden");
+};
+window.viewLinkedPlaySession = (id) => {
+  const s = playSessions.find(x=>x.id===id);
+  if(!s){ alert("Esta sesión de ABP ya no existe (puede que se haya borrado)."); return; }
+  const itemsHtml = (s.plays||[]).map((item,i)=>`<li><strong>${i+1}. ${escapeHtml(item.title)}</strong>${item.categoryName?` <span class="muted">· ${escapeHtml(item.categoryName)}</span>`:""}${item.observations?`<br><span class="muted">${escapeHtml(item.observations)}</span>`:""}</li>`).join("");
+  document.getElementById("viewSessionContent").innerHTML = `
+    <h3 style="font-size:.95rem;">🎯 ${escapeHtml(s.name)}</h3>
+    <p class="muted">${escapeHtml(s.date||"")}</p>
+    ${s.notes ? `<p style="white-space:pre-wrap;font-size:.85rem;">${escapeHtml(s.notes)}</p>` : ""}
+    <ol style="margin:8px 0 0 18px;padding:0;font-size:.88rem;">${itemsHtml || '<li class="muted">(sin jugadas)</li>'}</ol>`;
+  document.getElementById("viewSessionModal").classList.remove("hidden");
+};
 
 document.getElementById("saveFrame").onclick = () => saveCurrentFrame();
 function updateFrameCount(){
@@ -5603,6 +5688,7 @@ document.getElementById("btnSaveSession").onclick = async () => {
     date: document.getElementById("sessionDate").value || null,
     objectives: document.getElementById("sessionObjectives").value.trim(),
     notes: document.getElementById("sessionNotes").value.trim(),
+    linkedPlaySessionIds: [...sessionLinkedPlayIds],
     taskIds: flatIds,
     blocks: {
       calentamiento: [...sessionBlocks.calentamiento],
@@ -5636,6 +5722,8 @@ function resetSessionForm(){
   document.getElementById("sessionNotes").value = "";
   sessionBlocks = { calentamiento: [], principal: [], vuelta: [] };
   document.getElementById("sessionAddSearch").value = "";
+  sessionLinkedPlayIds = [];
+  renderSessionPlayLinkChips();
   updateSessionAddFolderOptions();
   renderSessionTaskList();
   renderSessionTaskBrowser();
@@ -5654,6 +5742,8 @@ window.editSession = (id) => {
   document.getElementById("sessionTeamId").value = s.teamId || "";
   document.getElementById("sessionObjectives").value = s.objectives || "";
   document.getElementById("sessionNotes").value = s.notes || "";
+  sessionLinkedPlayIds = [...(s.linkedPlaySessionIds||[])];
+  renderSessionPlayLinkChips();
   if(s.blocks){
     sessionBlocks = {
       calentamiento: [...(s.blocks.calentamiento||[])],
@@ -5738,6 +5828,10 @@ function sessionCardHtml(s){
     ${s.objectives ? `<p style="font-size:.85rem;white-space:pre-wrap;"><strong>Objetivos:</strong><br>${escapeHtml(s.objectives)}</p>` : ""}
     ${s.notes ? `<p class="muted" style="font-size:.85rem;">${escapeHtml(s.notes)}</p>` : ""}
     ${s.postObservations ? `<p style="font-size:.85rem;white-space:pre-wrap;background:#faf8f5;border:1px solid var(--border);border-radius:8px;padding:6px 8px;margin-top:6px;"><strong>📝 Observaciones:</strong><br>${escapeHtml(s.postObservations)}</p>` : ""}
+    ${(s.linkedPlaySessionIds||[]).length ? `<div style="margin-top:6px;">${(s.linkedPlaySessionIds||[]).map(id=>{
+      const ps = playSessions.find(x=>x.id===id);
+      return `<button type="button" class="btn ghost small" style="margin:2px 4px 0 0;" onclick="viewLinkedPlaySession('${id}')">🎯 ${escapeHtml(ps?ps.name:"(sesión eliminada)")}</button>`;
+    }).join("")}</div>` : ""}
     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
       <button class="btn ghost small" onclick="exportSessionPDF('${s.id}')">📄 Exportar a PDF</button>
       ${canManage ? `<button class="btn ghost small" onclick="openSessionObservations('${s.id}')">📝 Observaciones</button>` : ""}
