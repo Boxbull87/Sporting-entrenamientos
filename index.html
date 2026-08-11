@@ -3579,7 +3579,7 @@ document.getElementById("btnApplyLinkPlaySessions").onclick = () => {
 window.viewLinkedPlaySession = (id) => {
   const s = playSessions.find(x=>x.id===id);
   if(!s){ alert("Esta sesión de ABP ya no existe (puede que se haya borrado)."); return; }
-  const itemsHtml = (s.plays||[]).map((item,i)=>`<li><strong>${i+1}. ${escapeHtml(item.title)}</strong>${item.categoryName?` <span class="muted">· ${escapeHtml(item.categoryName)}</span>`:""}${item.observations?`<br><span class="muted">${escapeHtml(item.observations)}</span>`:""}</li>`).join("");
+  const itemsHtml = (s.plays||[]).map((item,i)=>`<li><strong>${i+1}. ${escapeHtml(item.title)}</strong>${item.categoryName?` <span class="muted">· ${escapeHtml(item.categoryName)}</span>`:""} <a href="javascript:void(0)" onclick="viewSessionPlayItem('${s.id}',${i})" style="color:var(--accent);font-weight:600;text-decoration:none;">👁️ Ver</a>${item.observations?`<br><span class="muted">${escapeHtml(item.observations)}</span>`:""}</li>`).join("");
   document.getElementById("viewSessionContent").innerHTML = `
     <h3 style="font-size:.95rem;">🎯 ${escapeHtml(s.name)}</h3>
     <p class="muted">${escapeHtml(s.date||"")}</p>
@@ -5866,22 +5866,40 @@ function renderSavedSessions(){
   const coachNames = Object.keys(groups).sort((a,b)=>a.localeCompare(b,'es'));
   wrap.innerHTML = coachNames.map((name, idx)=>{
     const list = groups[name];
-    const monthGroups = {};
+    const teamGroups = {};
     list.forEach(s=>{
-      const mk = sessionMonthKey(s);
-      if(!monthGroups[mk]) monthGroups[mk] = [];
-      monthGroups[mk].push(s);
+      const team = s.teamId ? teams.find(t=>t.id===s.teamId) : null;
+      const tk = team ? team.name : "Sin equipo";
+      if(!teamGroups[tk]) teamGroups[tk] = [];
+      teamGroups[tk].push(s);
     });
-    const monthKeys = Object.keys(monthGroups).sort((a,b)=> b.localeCompare(a));
-    const monthsHtml = monthKeys.map((mk, mIdx)=>{
-      const mlist = monthGroups[mk].slice().sort((a,b)=> (a.date||"").localeCompare(b.date||""));
-      const cardsHtml = mlist.map(sessionCardHtml).join("");
+    const teamNames = Object.keys(teamGroups).sort((a,b)=>a.localeCompare(b,'es'));
+    const teamsHtml = teamNames.map(tk=>{
+      const tlist = teamGroups[tk];
+      const monthGroups = {};
+      tlist.forEach(s=>{
+        const mk = sessionMonthKey(s);
+        if(!monthGroups[mk]) monthGroups[mk] = [];
+        monthGroups[mk].push(s);
+      });
+      const monthKeys = Object.keys(monthGroups).sort((a,b)=> b.localeCompare(a));
+      const monthsHtml = monthKeys.map((mk, mIdx)=>{
+        const mlist = monthGroups[mk].slice().sort((a,b)=> (a.date||"").localeCompare(b.date||""));
+        const cardsHtml = mlist.map(sessionCardHtml).join("");
+        return `
+        <details class="month-group" style="margin:8px 0 0 4px;">
+          <summary style="cursor:pointer;font-weight:600;font-size:.85rem;padding:8px 10px;background:#faf8f5;border:1px solid var(--border);border-radius:8px;">
+            🗓️ ${sessionMonthLabel(mk)} <span class="muted" style="font-weight:400;">(${mlist.length} sesión${mlist.length===1?"":"es"})</span>
+          </summary>
+          <div style="margin-top:8px;">${cardsHtml}</div>
+        </details>`;
+      }).join("");
       return `
-      <details class="month-group" style="margin:8px 0 0 4px;">
-        <summary style="cursor:pointer;font-weight:600;font-size:.85rem;padding:8px 10px;background:#faf8f5;border:1px solid var(--border);border-radius:8px;">
-          🗓️ ${sessionMonthLabel(mk)} <span class="muted" style="font-weight:400;">(${mlist.length} sesión${mlist.length===1?"":"es"})</span>
+      <details class="team-group" style="margin:8px 0 0 4px;">
+        <summary style="cursor:pointer;font-weight:600;padding:9px 11px;background:#f2f6f4;border:1px solid var(--border);border-radius:8px;">
+          👕 ${escapeHtml(tk)} <span class="muted" style="font-weight:400;">(${tlist.length} sesión${tlist.length===1?"":"es"})</span>
         </summary>
-        <div style="margin-top:8px;">${cardsHtml}</div>
+        <div style="margin-top:8px;">${monthsHtml}</div>
       </details>`;
     }).join("");
     return `
@@ -5889,7 +5907,7 @@ function renderSavedSessions(){
       <summary style="cursor:pointer;font-weight:700;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);">
         ${escapeHtml(name)} <span class="muted" style="font-weight:400;">(${list.length} sesión${list.length===1?"":"es"})</span>
       </summary>
-      <div style="margin-top:8px;">${monthsHtml}</div>
+      <div style="margin-top:8px;">${teamsHtml}</div>
     </details>`;
   }).join("");
 }
@@ -6426,6 +6444,24 @@ window.viewPlay = (id) => {
   renderBoardViewer(document.getElementById("viewPlayBoardWrap"), (p.animation && p.animation.frames) || []);
   document.getElementById("viewPlayModal").classList.remove("hidden");
 };
+// Ver una jugada tal y como quedó guardada DENTRO de una sesión de ABP (usa la copia
+// que se guardó en ese momento: título, vídeo, observaciones y animación de pizarra),
+// sin depender de que la jugada original siga existiendo en el catálogo.
+window.viewSessionPlayItem = (sessionId, index) => {
+  closeBoardFullscreen();
+  document.getElementById("viewSessionModal").classList.add("hidden");
+  const s = playSessions.find(x=>x.id===sessionId);
+  const item = s && (s.plays||[])[index];
+  if(!item) return;
+  document.getElementById("viewPlayTitle").textContent = item.title || "";
+  document.getElementById("viewPlayMeta").innerHTML = item.categoryName
+    ? item.categoryName.split(",").map(n=>n.trim()).filter(Boolean).map(n=>`<span class="badge">${escapeHtml(n)}</span>`).join("")
+    : "";
+  document.getElementById("viewPlayVideoWrap").innerHTML = videoEmbedHtml(item.videoUrl);
+  document.getElementById("viewPlayDesc").innerHTML = item.observations ? escapeHtml(item.observations) : '<span class="muted">Sin observaciones.</span>';
+  renderBoardViewer(document.getElementById("viewPlayBoardWrap"), (item.animation && item.animation.frames) || []);
+  document.getElementById("viewPlayModal").classList.remove("hidden");
+};
 document.getElementById("btnCloseViewPlayModal").onclick = () => {
   animRunning = false; if(animReq) cancelAnimationFrame(animReq);
   closeBoardFullscreen();
@@ -6694,7 +6730,7 @@ function renderSavedPlaySessions(){
   wrap.innerHTML = list.map(s=>{
     const canManage = currentCoach && (currentCoach.role===ROLE_GESTOR || s.createdBy===currentUser.uid);
     const publicUrl = location.origin + location.pathname + "#public=" + s.id;
-    const itemsHtml = (s.plays||[]).map(item=>`<li>${escapeHtml(item.title)}${item.categoryName?` <span class="muted">· ${escapeHtml(item.categoryName)}</span>`:""}</li>`).join("");
+    const itemsHtml = (s.plays||[]).map((item,i)=>`<li>${escapeHtml(item.title)}${item.categoryName?` <span class="muted">· ${escapeHtml(item.categoryName)}</span>`:""} <a href="javascript:void(0)" onclick="viewSessionPlayItem('${s.id}',${i})" style="color:var(--accent);font-weight:600;text-decoration:none;">👁️ Ver</a></li>`).join("");
     const unread = isItemUnread("playSessions", s);
     return `
     <div class="card" style="margin-bottom:10px;">
