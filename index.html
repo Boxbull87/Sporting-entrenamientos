@@ -5780,9 +5780,57 @@ function resetSessionForm(){
 }
 document.getElementById("cancelSessionEdit").onclick = () => { resetSessionForm(); document.getElementById("sessionMsg").innerHTML = ""; };
 
+// Un entrenador con quien se ha compartido la sesión (pero que no la creó, ni es gestor)
+// quiere editarla del todo. Para que sus cambios no afecten a la sesión original ni a los
+// demás entrenadores con quien está compartida, se le crea una COPIA independiente, propia
+// suya, solo para sus equipos — a partir de ahí son dos sesiones distintas de verdad.
+window.forkAndEditSession = async (id) => {
+  const s = sessions.find(x=>x.id===id);
+  if(!s) return;
+  const myTeamIds = (Array.isArray(currentCoach.teamIds) ? currentCoach.teamIds : []);
+  const sTeamIds = Array.isArray(s.teamIds) && s.teamIds.length ? s.teamIds : (s.teamId ? [s.teamId] : []);
+  const mineTeamIds = sTeamIds.filter(tid => myTeamIds.includes(tid));
+  if(mineTeamIds.length===0){ alert("Esta sesión no está compartida con ninguno de tus equipos."); return; }
+  if(!confirm("Vas a crear tu propia copia de esta sesión para tu equipo. A partir de ahora será independiente: lo que cambies aquí no afectará a la sesión original ni a otros entrenadores. ¿Continuar?")) return;
+  try{
+    const myObs = (s.postObservationsByCoach && s.postObservationsByCoach[currentUser.uid]) || null;
+    const forkPayload = {
+      name: s.name || "",
+      teamIds: mineTeamIds,
+      date: s.date || null,
+      objectives: s.objectives || "",
+      notes: s.notes || "",
+      linkedPlaySessionIds: [...(s.linkedPlaySessionIds||[])],
+      taskIds: [...(s.taskIds||[])],
+      blocks: s.blocks ? {
+        calentamiento: [...(s.blocks.calentamiento||[])],
+        principal: [...(s.blocks.principal||[])],
+        vuelta: [...(s.blocks.vuelta||[])]
+      } : null,
+      postObservationsByCoach: myObs ? {[currentUser.uid]: myObs} : {},
+      createdBy: currentUser.uid,
+      createdByName: currentCoach.name || "",
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      forkedFrom: s.id
+    };
+    const newDoc = await db.collection("sessions").add(forkPayload);
+    // El equipo (o equipos) de este entrenador se retira de la sesión original: a partir de
+    // ahora su copia es la que manda para su equipo, y la original sigue igual para los demás.
+    const remaining = sTeamIds.filter(tid => !mineTeamIds.includes(tid));
+    await db.collection("sessions").doc(s.id).update({teamIds: remaining});
+    // Se pinta el editor directamente con los datos que ya tenemos, sin esperar a que
+    // llegue el snapshot de Firestore con el nuevo documento (evita una carrera de tiempos).
+    populateSessionEditor(newDoc.id, forkPayload);
+    document.getElementById("sessionMsg").innerHTML = '<p class="ok-msg">Se ha creado tu propia copia de esta sesión. Los cambios que hagas y guardes aquí ya no afectarán a la original.</p>';
+  }catch(err){ alert("No se ha podido crear tu copia de la sesión: " + err.message); }
+};
+
 window.editSession = (id) => {
   const s = sessions.find(x=>x.id===id);
   if(!s) return;
+  populateSessionEditor(id, s);
+};
+function populateSessionEditor(id, s){
   editingSessionId = id;
   document.getElementById("sessionName").value = s.name || "";
   document.getElementById("sessionDate").value = s.date || "";
@@ -5810,7 +5858,7 @@ window.editSession = (id) => {
   document.querySelector('.tab[data-tab="sessions"]').click();
   showSessionsView("new");
   document.getElementById("sessionEditorPanel").scrollIntoView({behavior:"smooth"});
-};
+}
 
 window.viewLinkedSession = (id) => {
   const s = sessions.find(x=>x.id===id);
@@ -5827,7 +5875,10 @@ window.openSessionObservations = (id) => {
   const s = sessions.find(x=>x.id===id);
   if(!s) return;
   sessionObsTargetId = id;
-  document.getElementById("sessionObsText").value = s.postObservations || "";
+  const mine = (s.postObservationsByCoach && s.postObservationsByCoach[currentUser.uid])
+    ? s.postObservationsByCoach[currentUser.uid].text
+    : (s.createdBy===currentUser.uid ? (s.postObservations || "") : ""); // compat con sesiones antiguas
+  document.getElementById("sessionObsText").value = mine || "";
   document.getElementById("sessionObsModal").classList.remove("hidden");
 };
 document.getElementById("btnCloseSessionObsModal").onclick = () => {
@@ -5838,7 +5889,15 @@ document.getElementById("btnSaveSessionObs").onclick = async () => {
   if(!sessionObsTargetId) return;
   const text = document.getElementById("sessionObsText").value.trim();
   try{
-    await db.collection("sessions").doc(sessionObsTargetId).update({postObservations: text});
+    // Solo se toca la entrada de ESTE entrenador dentro del mapa de observaciones,
+    // así no se cambia ni se pisa lo que haya escrito otro entrenador con quien se comparte la sesión.
+    await db.collection("sessions").doc(sessionObsTargetId).update({
+      [`postObservationsByCoach.${currentUser.uid}`]: {
+        text,
+        coachName: (currentCoach && currentCoach.name) || "",
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }
+    });
     document.getElementById("sessionObsModal").classList.add("hidden");
     sessionObsTargetId = null;
   }catch(err){ alert("No se han podido guardar las observaciones: " + err.message); }
@@ -5864,6 +5923,17 @@ function sessionCardHtml(s){
   const canManage = currentCoach && (currentCoach.role===ROLE_GESTOR || s.createdBy===currentUser.uid);
   const unread = isItemUnread("sessions", s);
   const sTeams = sessionTeams_(s);
+  // Un entrenador con el que se ha compartido la sesión (alguno de sus equipos está entre
+  // los de la sesión) puede añadir sus propias observaciones, aunque no la haya creado él
+  // ni pueda editar/borrar la sesión entera.
+  const sharedWithMe = currentCoach && Array.isArray(currentCoach.teamIds) && sTeams.some(t=>currentCoach.teamIds.includes(t.id));
+  const canAddObs = canManage || sharedWithMe;
+  const obsEntries = [];
+  if(s.postObservationsByCoach){
+    Object.values(s.postObservationsByCoach).forEach(o=>{ if(o && o.text) obsEntries.push(o); });
+  } else if(s.postObservations){
+    obsEntries.push({text: s.postObservations, coachName: s.createdByName || ""}); // compat sesiones antiguas
+  }
   return `
   <div class="card" style="margin-bottom:10px;">
     <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -5875,15 +5945,16 @@ function sessionCardHtml(s){
     <p class="muted" style="font-size:.78rem;margin-top:-2px;">Toca una tarea para ver sus notas y la pizarra táctica.</p>
     ${s.objectives ? `<p style="font-size:.85rem;white-space:pre-wrap;"><strong>Objetivos:</strong><br>${escapeHtml(s.objectives)}</p>` : ""}
     ${s.notes ? `<p class="muted" style="font-size:.85rem;">${escapeHtml(s.notes)}</p>` : ""}
-    ${s.postObservations ? `<p style="font-size:.85rem;white-space:pre-wrap;background:#faf8f5;border:1px solid var(--border);border-radius:8px;padding:6px 8px;margin-top:6px;"><strong>📝 Observaciones:</strong><br>${escapeHtml(s.postObservations)}</p>` : ""}
+    ${obsEntries.map(o=>`<p style="font-size:.85rem;white-space:pre-wrap;background:#faf8f5;border:1px solid var(--border);border-radius:8px;padding:6px 8px;margin-top:6px;"><strong>📝 Observaciones${o.coachName?` (${escapeHtml(o.coachName)})`:""}:</strong><br>${escapeHtml(o.text)}</p>`).join("")}
     ${(s.linkedPlaySessionIds||[]).length ? `<div style="margin-top:6px;">${(s.linkedPlaySessionIds||[]).map(id=>{
       const ps = playSessions.find(x=>x.id===id);
       return `<button type="button" class="btn ghost small" style="margin:2px 4px 0 0;" onclick="viewLinkedPlaySession('${id}')">🎯 ${escapeHtml(ps?ps.name:"(sesión eliminada)")}</button>`;
     }).join("")}</div>` : ""}
     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
       <button class="btn ghost small" onclick="exportSessionPDF('${s.id}')">📄 Exportar a PDF</button>
-      ${canManage ? `<button class="btn ghost small" onclick="openSessionObservations('${s.id}')">📝 Observaciones</button>` : ""}
+      ${canAddObs ? `<button class="btn ghost small" onclick="openSessionObservations('${s.id}')">📝 Observaciones</button>` : ""}
       ${canManage ? `<button class="btn ghost small" onclick="editSession('${s.id}')">✏️ Editar sesión</button>` : ""}
+      ${(!canManage && sharedWithMe) ? `<button class="btn ghost small" onclick="forkAndEditSession('${s.id}')">✏️ Editar sesión</button>` : ""}
       ${canManage ? `<button class="btn danger small" onclick="deleteSession('${s.id}')">🗑 Borrar sesión</button>` : ""}
     </div>
   </div>`;
@@ -7177,7 +7248,19 @@ service cloud.firestore {
     match /sessions/{sessionId} {
       allow read: if isActive();
       allow create: if isActive();
-      allow update, delete: if isActive() && (resource.data.createdBy == request.auth.uid || isGestor());
+      allow update: if isActive() && (
+        resource.data.createdBy == request.auth.uid || isGestor()
+        // Un entrenador con quien se ha compartido la sesión (uno de sus equipos está
+        // entre los teamIds de la sesión) solo puede: 1) tocar su propia entrada dentro de
+        // "postObservationsByCoach", o 2) quitar su(s) equipo(s) de "teamIds" al crear su
+        // propia copia independiente (desdoblar la sesión). No puede cambiar nada más.
+        || (
+          myCoach().data.teamIds is list && resource.data.teamIds is list
+          && resource.data.teamIds.hasAny(myCoach().data.teamIds)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['postObservationsByCoach','teamIds'])
+        )
+      );
+      allow delete: if isActive() && (resource.data.createdBy == request.auth.uid || isGestor());
     }
     match /abpCategories/{catId} {
       allow read: if isActive();
