@@ -5911,9 +5911,22 @@ function renderSavedSessions(){
   if(sessions.length===0){ wrap.innerHTML = '<div class="empty">🗓️ Todavía no se han guardado sesiones.</div>'; return; }
   const groups = {};
   sessions.forEach(s=>{
-    const key = s.createdByName || "Sin entrenador";
-    if(!groups[key]) groups[key] = [];
-    groups[key].push(s);
+    const teamIds = Array.isArray(s.teamIds) && s.teamIds.length ? s.teamIds : (s.teamId ? [s.teamId] : []);
+    // La sesión va a la sección de CADA entrenador que tenga asignado alguno de los
+    // equipos de la sesión (independientemente de quién la haya creado). Si ninguno de
+    // esos equipos tiene entrenador asignado (o la sesión no tiene equipo), se deja bajo
+    // quien la creó para no perderla de vista.
+    const coachNamesForSession = new Set();
+    teamIds.forEach(tid=>{
+      coaches.forEach(c=>{
+        if(Array.isArray(c.teamIds) && c.teamIds.includes(tid)) coachNamesForSession.add(c.name || "Entrenador sin nombre");
+      });
+    });
+    if(coachNamesForSession.size===0) coachNamesForSession.add(s.createdByName || "Sin entrenador");
+    coachNamesForSession.forEach(key=>{
+      if(!groups[key]) groups[key] = [];
+      groups[key].push(s);
+    });
   });
   const coachNames = Object.keys(groups).sort((a,b)=>a.localeCompare(b,'es'));
   wrap.innerHTML = coachNames.map((name, idx)=>{
