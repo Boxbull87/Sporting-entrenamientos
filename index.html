@@ -752,8 +752,10 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
             <input type="date" id="sessionDate">
           </div>
         </div>
-        <label style="margin-top:10px;">Equipo</label>
-        <select id="sessionTeamId"><option value="">Elige equipo...</option></select>
+        <label style="margin-top:10px;">Equipos</label>
+        <p class="muted" style="font-size:.78rem;margin-top:-4px;">Puedes elegir varios equipos, incluso de otros entrenadores, para compartir esta misma sesión con ellos.</p>
+        <button type="button" class="btn ghost small" id="btnSessionTeams">+ Añadir equipo</button>
+        <div id="sessionTeamChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
         <label style="margin-top:10px;">Objetivos de la sesión</label>
         <textarea id="sessionObjectives" placeholder="- Objetivo 1&#10;- Objetivo 2&#10;- Objetivo 3"></textarea>
         <label style="margin-top:10px;">Notas</label>
@@ -1319,6 +1321,19 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
 </div>
 
 <!-- ---------- Observaciones posteriores de una sesión (rápido, sin abrir el editor completo) ---------- -->
+<!-- ---------- Elegir equipos de una sesión (todos los equipos, para poder compartir) ---------- -->
+<div id="sessionTeamsModal" class="modal-bg hidden">
+  <div class="modal">
+    <h2 style="font-size:1.05rem;">👕 Equipos de esta sesión</h2>
+    <p class="muted" style="font-size:.8rem;margin-top:2px;">Marca todos los equipos con los que quieras compartir esta sesión.</p>
+    <div id="sessionTeamsList" style="margin-top:10px;max-height:48vh;overflow-y:auto;"></div>
+    <div style="display:flex;gap:8px;margin-top:14px;">
+      <button class="btn ghost" id="btnCloseSessionTeams" style="flex:1;">Cancelar</button>
+      <button class="btn accent" id="btnApplySessionTeams" style="flex:1;">Aplicar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ---------- Vincular sesiones de ABP a una sesión de entrenamiento ---------- -->
 <div id="linkPlaySessionsModal" class="modal-bg hidden">
   <div class="modal">
@@ -2368,7 +2383,7 @@ function attachRealtimeListeners(){
     teams = snap.docs.map(d=>({id:d.id, ...d.data()}));
     renderTeamManageList();
     renderTeamSelector();
-    populateSessionTeamSelect();
+    renderSessionTeamChips();
     renderCoachList();
     updateCompareCardVisibility();
   }, err => showSyncError_("equipos", err));
@@ -4534,19 +4549,51 @@ document.getElementById("teamSelector").onchange = (e) => {
   renderTeamSummary();
 };
 
-// Selector de equipo al crear/editar una sesión de entrenamiento (entrenadores con varios equipos)
+// Equipos de una sesión de entrenamiento: se puede elegir MÁS DE UNO, y sin restringir
+// a los equipos propios del entrenador — así una sesión se puede compartir con equipos
+// (y por tanto entrenadores) que no son los suyos.
+let sessionTeamIds = [];
+function renderSessionTeamChips(){
+  const wrap = document.getElementById("sessionTeamChips");
+  if(!wrap) return;
+  wrap.innerHTML = sessionTeamIds.map(id=>{
+    const t = teams.find(x=>x.id===id);
+    return `<span class="badge" style="display:flex;align-items:center;gap:6px;">👕 ${escapeHtml(t?t.name:"(equipo eliminado)")}
+      <button type="button" onclick="removeSessionTeamChip('${id}')" style="background:none;border:none;color:inherit;cursor:pointer;font-size:1em;line-height:1;padding:0;">✕</button>
+    </span>`;
+  }).join("");
+}
+window.removeSessionTeamChip = (id) => {
+  sessionTeamIds = sessionTeamIds.filter(x=>x!==id);
+  renderSessionTeamChips();
+};
+function renderSessionTeamsList(){
+  const wrap = document.getElementById("sessionTeamsList");
+  if(teams.length===0){ wrap.innerHTML = '<p class="muted">Todavía no hay equipos creados.</p>'; return; }
+  wrap.innerHTML = teams.slice().sort((a,b)=>(a.name||"").localeCompare(b.name||"","es")).map(t=>`
+    <label style="display:flex;align-items:center;gap:8px;padding:7px 4px;cursor:pointer;border-bottom:1px solid var(--border);">
+      <input type="checkbox" class="session-team-cb" value="${t.id}" ${sessionTeamIds.includes(t.id)?"checked":""} style="width:auto;">
+      <span>👕 ${escapeHtml(t.name)}</span>
+    </label>`).join("");
+}
+document.getElementById("btnSessionTeams").onclick = () => {
+  renderSessionTeamsList();
+  document.getElementById("sessionTeamsModal").classList.remove("hidden");
+};
+document.getElementById("btnCloseSessionTeams").onclick = () => {
+  document.getElementById("sessionTeamsModal").classList.add("hidden");
+};
+document.getElementById("btnApplySessionTeams").onclick = () => {
+  sessionTeamIds = Array.from(document.querySelectorAll(".session-team-cb:checked")).map(el=>el.value);
+  renderSessionTeamChips();
+  document.getElementById("sessionTeamsModal").classList.add("hidden");
+};
+// Al abrir "Crear sesión" en limpio, si el entrenador solo tiene un equipo propio, se lo dejamos ya puesto.
 function populateSessionTeamSelect(){
-  const sel = document.getElementById("sessionTeamId");
-  if(!sel) return;
-  const visible = coachVisibleTeams_();
-  const prev = sel.value;
-  if(visible.length===0){
-    sel.innerHTML = '<option value="">Sin equipos asignados</option>';
-    return;
-  }
-  sel.innerHTML = '<option value="">Elige equipo...</option>' + visible.map(t=>`<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("");
-  if(prev && visible.some(t=>t.id===prev)) sel.value = prev;
-  else if(visible.length===1) sel.value = visible[0].id;
+  sessionTeamIds = [];
+  const own = coachVisibleTeams_();
+  if(own.length===1) sessionTeamIds = [own[0].id];
+  renderSessionTeamChips();
 }
 
 function renderPlayersList(){
@@ -5677,14 +5724,13 @@ window.removeSessionTask = (block, i) => { sessionBlocks[block].splice(i,1); ren
 document.getElementById("btnSaveSession").onclick = async () => {
   const msgEl = document.getElementById("sessionMsg");
   const name = document.getElementById("sessionName").value.trim();
-  const teamId = document.getElementById("sessionTeamId").value || null;
   const flatIds = [...sessionBlocks.calentamiento, ...sessionBlocks.principal, ...sessionBlocks.vuelta];
   if(!name){ msgEl.innerHTML = '<p class="error-msg">Ponle un nombre a la sesión.</p>'; return; }
-  if(!teamId){ msgEl.innerHTML = '<p class="error-msg">Elige para qué equipo es la sesión.</p>'; return; }
+  if(sessionTeamIds.length===0){ msgEl.innerHTML = '<p class="error-msg">Elige al menos un equipo para la sesión.</p>'; return; }
   if(flatIds.length===0){ msgEl.innerHTML = '<p class="error-msg">Añade al menos una tarea.</p>'; return; }
   const payload = {
     name,
-    teamId,
+    teamIds: [...sessionTeamIds],
     date: document.getElementById("sessionDate").value || null,
     objectives: document.getElementById("sessionObjectives").value.trim(),
     notes: document.getElementById("sessionNotes").value.trim(),
@@ -5738,8 +5784,8 @@ window.editSession = (id) => {
   editingSessionId = id;
   document.getElementById("sessionName").value = s.name || "";
   document.getElementById("sessionDate").value = s.date || "";
-  populateSessionTeamSelect();
-  document.getElementById("sessionTeamId").value = s.teamId || "";
+  sessionTeamIds = Array.isArray(s.teamIds) && s.teamIds.length ? [...s.teamIds] : (s.teamId ? [s.teamId] : []);
+  renderSessionTeamChips();
   document.getElementById("sessionObjectives").value = s.objectives || "";
   document.getElementById("sessionNotes").value = s.notes || "";
   sessionLinkedPlayIds = [...(s.linkedPlaySessionIds||[])];
@@ -5815,14 +5861,14 @@ function sessionCardHtml(s){
   }
   const canManage = currentCoach && (currentCoach.role===ROLE_GESTOR || s.createdBy===currentUser.uid);
   const unread = isItemUnread("sessions", s);
-  const team = s.teamId ? teams.find(t=>t.id===s.teamId) : null;
+  const sTeams = sessionTeams_(s);
   return `
   <div class="card" style="margin-bottom:10px;">
     <div style="display:flex;justify-content:space-between;align-items:center;">
       <h3 style="font-size:.95rem;${unread?"cursor:pointer;":""}" ${unread ? `onclick="markItemSeen('sessions','${s.id}')" title="Toca para marcar como vista"` : ""}>${escapeHtml(s.name)}${unread ? '<span class="card-dot"></span>' : ""}</h3>
       <span class="muted">${s.date||""}</span>
     </div>
-    ${team ? `<span class="badge" style="margin-top:2px;display:inline-block;">👕 ${escapeHtml(team.name)}</span>` : ""}
+    ${sTeams.length ? sTeams.map(t=>`<span class="badge" style="margin-top:2px;margin-right:4px;display:inline-block;">👕 ${escapeHtml(t.name)}</span>`).join("") : ""}
     ${taskListHtml}
     <p class="muted" style="font-size:.78rem;margin-top:-2px;">Toca una tarea para ver sus notas y la pizarra táctica.</p>
     ${s.objectives ? `<p style="font-size:.85rem;white-space:pre-wrap;"><strong>Objetivos:</strong><br>${escapeHtml(s.objectives)}</p>` : ""}
@@ -5854,6 +5900,12 @@ function sessionMonthLabel(key){
   const [y,m] = key.split("-");
   return `${MONTH_NAMES_ES[Number(m)-1]} ${y}`;
 }
+// Equipos de una sesión, con compatibilidad hacia atrás para sesiones antiguas
+// que solo tenían un "teamId" único en vez del array "teamIds".
+function sessionTeams_(s){
+  const ids = Array.isArray(s.teamIds) && s.teamIds.length ? s.teamIds : (s.teamId ? [s.teamId] : []);
+  return ids.map(id=>teams.find(t=>t.id===id)).filter(Boolean);
+}
 function renderSavedSessions(){
   const wrap = document.getElementById("sessionsSaved");
   if(sessions.length===0){ wrap.innerHTML = '<div class="empty">🗓️ Todavía no se han guardado sesiones.</div>'; return; }
@@ -5868,10 +5920,12 @@ function renderSavedSessions(){
     const list = groups[name];
     const teamGroups = {};
     list.forEach(s=>{
-      const team = s.teamId ? teams.find(t=>t.id===s.teamId) : null;
-      const tk = team ? team.name : "Sin equipo";
-      if(!teamGroups[tk]) teamGroups[tk] = [];
-      teamGroups[tk].push(s);
+      const sTeams = sessionTeams_(s);
+      const names = sTeams.length ? sTeams.map(t=>t.name) : ["Sin equipo"];
+      names.forEach(tk=>{
+        if(!teamGroups[tk]) teamGroups[tk] = [];
+        teamGroups[tk].push(s);
+      });
     });
     const teamNames = Object.keys(teamGroups).sort((a,b)=>a.localeCompare(b,'es'));
     const teamsHtml = teamNames.map(tk=>{
@@ -6148,6 +6202,44 @@ function renderSessionIntoDoc(doc, s, opts){
       renderTaskPDF(t, i);
     });
   }
+
+  // ---- Sesiones de ABP vinculadas: listado de jugadas a trabajar ese día ----
+  const linkedPlays = (s.linkedPlaySessionIds||[]).map(id=>playSessions.find(x=>x.id===id)).filter(Boolean);
+  linkedPlays.forEach(ps=>{
+    y += 4;
+    sectionBar(`🎯 ABP: ${ps.name || ""}`);
+    if(ps.date){
+      doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(100,100,100);
+      ensureSpace(5);
+      doc.text(ps.date, margin, y+3.5);
+      y += 6;
+    }
+    const items = ps.plays || [];
+    if(items.length===0){
+      doc.setFont("helvetica","normal"); doc.setFontSize(9.5); doc.setTextColor(TEXT[0],TEXT[1],TEXT[2]);
+      ensureSpace(6);
+      doc.text("(sin jugadas)", margin, y+4);
+      y += 8;
+    } else {
+      items.forEach((item,i)=>{
+        doc.setFont("helvetica","normal"); doc.setFontSize(9.5);
+        const label = `${i+1}. ${item.title || ""}${item.categoryName ? "  ·  " + item.categoryName : ""}`;
+        const lines = doc.splitTextToSize(label, pageW-margin*2-4);
+        const obsLines = item.observations ? doc.splitTextToSize(item.observations, pageW-margin*2-8) : [];
+        const rowH = (lines.length*4.4) + (obsLines.length*4) + 3;
+        ensureSpace(rowH);
+        doc.setFont("helvetica","bold"); doc.setTextColor(TEXT[0],TEXT[1],TEXT[2]);
+        doc.text(lines, margin, y+4);
+        y += lines.length*4.4;
+        if(obsLines.length){
+          doc.setFont("helvetica","normal"); doc.setFontSize(8.5); doc.setTextColor(100,100,100);
+          doc.text(obsLines, margin+4, y+3.5);
+          y += obsLines.length*4;
+        }
+        y += 3;
+      });
+    }
+  });
 }
 
 window.exportSessionPDF = function(sessionId){
