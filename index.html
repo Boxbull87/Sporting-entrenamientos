@@ -2328,6 +2328,7 @@ function attachRealtimeListeners(){
   db.collection("coaches").orderBy("createdAt","asc").onSnapshot(snap=>{
     coaches = snap.docs.map(d=>({id:d.id, ...d.data()}));
     renderCoachList();
+    renderSavedSessions();
   }, err => showSyncError_("entrenadores", err));
 
   db.collection("sessions").orderBy("createdAt","desc").onSnapshot(snap=>{
@@ -2385,6 +2386,7 @@ function attachRealtimeListeners(){
     renderTeamSelector();
     renderSessionTeamChips();
     renderCoachList();
+    renderSavedSessions();
     updateCompareCardVisibility();
   }, err => showSyncError_("equipos", err));
 
@@ -5909,33 +5911,43 @@ function sessionTeams_(s){
 function renderSavedSessions(){
   const wrap = document.getElementById("sessionsSaved");
   if(sessions.length===0){ wrap.innerHTML = '<div class="empty">🗓️ Todavía no se han guardado sesiones.</div>'; return; }
+  // Cada grupo es un entrenador: {name, teamIds (los suyos), sessions}
   const groups = {};
+  function bucket_(key, name, coachTeamIds){
+    if(!groups[key]) groups[key] = {name, coachTeamIds, sessions: []};
+    return groups[key];
+  }
   sessions.forEach(s=>{
     const teamIds = Array.isArray(s.teamIds) && s.teamIds.length ? s.teamIds : (s.teamId ? [s.teamId] : []);
     // La sesión va a la sección de CADA entrenador que tenga asignado alguno de los
     // equipos de la sesión (independientemente de quién la haya creado). Si ninguno de
     // esos equipos tiene entrenador asignado (o la sesión no tiene equipo), se deja bajo
     // quien la creó para no perderla de vista.
-    const coachNamesForSession = new Set();
-    teamIds.forEach(tid=>{
-      coaches.forEach(c=>{
-        if(Array.isArray(c.teamIds) && c.teamIds.includes(tid)) coachNamesForSession.add(c.name || "Entrenador sin nombre");
+    const matched = coaches.filter(c => Array.isArray(c.teamIds) && c.teamIds.some(tid => teamIds.includes(tid)));
+    if(matched.length===0){
+      const name = s.createdByName || "Sin entrenador";
+      bucket_("created:"+name, name, null).sessions.push(s);
+    } else {
+      matched.forEach(c=>{
+        bucket_("coach:"+c.id, c.name || "Entrenador sin nombre", c.teamIds).sessions.push(s);
       });
-    });
-    if(coachNamesForSession.size===0) coachNamesForSession.add(s.createdByName || "Sin entrenador");
-    coachNamesForSession.forEach(key=>{
-      if(!groups[key]) groups[key] = [];
-      groups[key].push(s);
-    });
+    }
   });
-  const coachNames = Object.keys(groups).sort((a,b)=>a.localeCompare(b,'es'));
-  wrap.innerHTML = coachNames.map((name, idx)=>{
-    const list = groups[name];
+  const groupKeys = Object.keys(groups).sort((a,b)=>groups[a].name.localeCompare(groups[b].name,'es'));
+  wrap.innerHTML = groupKeys.map(gk=>{
+    const g = groups[gk];
+    const name = g.name;
+    const list = g.sessions;
     const teamGroups = {};
     list.forEach(s=>{
+      // Dentro de la sección de un entrenador, la sesión se cuelga de CADA equipo SUYO al
+      // que esté vinculada (si tiene dos equipos propios y la sesión es de ambos, la ve en
+      // los dos apartados). Solo se descarta el equipo que no es suyo.
       const sTeams = sessionTeams_(s);
-      const names = sTeams.length ? sTeams.map(t=>t.name) : ["Sin equipo"];
-      names.forEach(tk=>{
+      const mine = g.coachTeamIds ? sTeams.filter(t=>g.coachTeamIds.includes(t.id)) : sTeams;
+      const relevant = mine.length ? mine : sTeams;
+      const tkList = relevant.length ? relevant.map(t=>t.name) : ["Sin equipo"];
+      tkList.forEach(tk=>{
         if(!teamGroups[tk]) teamGroups[tk] = [];
         teamGroups[tk].push(s);
       });
