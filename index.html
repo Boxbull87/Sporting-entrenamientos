@@ -5780,10 +5780,44 @@ function resetSessionForm(){
 }
 document.getElementById("cancelSessionEdit").onclick = () => { resetSessionForm(); document.getElementById("sessionMsg").innerHTML = ""; };
 
+// Desdobla una sesión: crea una copia independiente que se queda solo con los equipos
+// indicados (teamIdsToFork) y se los retira a la sesión original, que sigue igual para
+// el resto de sus equipos. Se usa tanto cuando un entrenador con quien se ha compartido
+// la sesión quiere editarla del todo, como cuando el propio creador/gestor edita o borra
+// una sesión suya que reparte entre varios de sus equipos: a partir de ahí son sesiones
+// de verdad independientes, y tocar una no afecta a la otra.
+async function forkSessionForTeams_(s, teamIdsToFork){
+  const sTeamIds = Array.isArray(s.teamIds) && s.teamIds.length ? s.teamIds : (s.teamId ? [s.teamId] : []);
+  const myObs = (s.postObservationsByCoach && s.postObservationsByCoach[currentUser.uid]) || null;
+  const forkPayload = {
+    name: s.name || "",
+    teamIds: teamIdsToFork,
+    date: s.date || null,
+    objectives: s.objectives || "",
+    notes: s.notes || "",
+    linkedPlaySessionIds: [...(s.linkedPlaySessionIds||[])],
+    taskIds: [...(s.taskIds||[])],
+    blocks: s.blocks ? {
+      calentamiento: [...(s.blocks.calentamiento||[])],
+      principal: [...(s.blocks.principal||[])],
+      vuelta: [...(s.blocks.vuelta||[])]
+    } : null,
+    postObservationsByCoach: myObs ? {[currentUser.uid]: myObs} : {},
+    createdBy: currentUser.uid,
+    createdByName: currentCoach.name || "",
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    forkedFrom: s.id
+  };
+  const newDoc = await db.collection("sessions").add(forkPayload);
+  // Los equipos desdoblados se retiran de la sesión original: a partir de ahora la copia
+  // nueva es la que manda para esos equipos, y la original sigue igual para los demás.
+  const remaining = sTeamIds.filter(tid => !teamIdsToFork.includes(tid));
+  await db.collection("sessions").doc(s.id).update({teamIds: remaining});
+  return {id: newDoc.id, data: forkPayload};
+}
+
 // Un entrenador con quien se ha compartido la sesión (pero que no la creó, ni es gestor)
-// quiere editarla del todo. Para que sus cambios no afecten a la sesión original ni a los
-// demás entrenadores con quien está compartida, se le crea una COPIA independiente, propia
-// suya, solo para sus equipos — a partir de ahí son dos sesiones distintas de verdad.
+// quiere editarla del todo.
 window.forkAndEditSession = async (id) => {
   const s = sessions.find(x=>x.id===id);
   if(!s) return;
@@ -5793,41 +5827,31 @@ window.forkAndEditSession = async (id) => {
   if(mineTeamIds.length===0){ alert("Esta sesión no está compartida con ninguno de tus equipos."); return; }
   if(!confirm("Vas a crear tu propia copia de esta sesión para tu equipo. A partir de ahora será independiente: lo que cambies aquí no afectará a la sesión original ni a otros entrenadores. ¿Continuar?")) return;
   try{
-    const myObs = (s.postObservationsByCoach && s.postObservationsByCoach[currentUser.uid]) || null;
-    const forkPayload = {
-      name: s.name || "",
-      teamIds: mineTeamIds,
-      date: s.date || null,
-      objectives: s.objectives || "",
-      notes: s.notes || "",
-      linkedPlaySessionIds: [...(s.linkedPlaySessionIds||[])],
-      taskIds: [...(s.taskIds||[])],
-      blocks: s.blocks ? {
-        calentamiento: [...(s.blocks.calentamiento||[])],
-        principal: [...(s.blocks.principal||[])],
-        vuelta: [...(s.blocks.vuelta||[])]
-      } : null,
-      postObservationsByCoach: myObs ? {[currentUser.uid]: myObs} : {},
-      createdBy: currentUser.uid,
-      createdByName: currentCoach.name || "",
-      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      forkedFrom: s.id
-    };
-    const newDoc = await db.collection("sessions").add(forkPayload);
-    // El equipo (o equipos) de este entrenador se retira de la sesión original: a partir de
-    // ahora su copia es la que manda para su equipo, y la original sigue igual para los demás.
-    const remaining = sTeamIds.filter(tid => !mineTeamIds.includes(tid));
-    await db.collection("sessions").doc(s.id).update({teamIds: remaining});
+    const {id: newId, data} = await forkSessionForTeams_(s, mineTeamIds);
     // Se pinta el editor directamente con los datos que ya tenemos, sin esperar a que
     // llegue el snapshot de Firestore con el nuevo documento (evita una carrera de tiempos).
-    populateSessionEditor(newDoc.id, forkPayload);
+    populateSessionEditor(newId, data);
     document.getElementById("sessionMsg").innerHTML = '<p class="ok-msg">Se ha creado tu propia copia de esta sesión. Los cambios que hagas y guardes aquí ya no afectarán a la original.</p>';
   }catch(err){ alert("No se ha podido crear tu copia de la sesión: " + err.message); }
 };
 
-window.editSession = (id) => {
+// contextTeamId: el equipo bajo el que se está editando esta sesión (si viene de la lista
+// agrupada por equipo). Si la sesión está compartida con MÁS equipos aparte de ese, se
+// desdobla primero una copia independiente solo para ese equipo, y se edita esa copia —
+// así los cambios no afectan a los demás equipos con los que se comparte.
+window.editSession = async (id, contextTeamId) => {
   const s = sessions.find(x=>x.id===id);
   if(!s) return;
+  const sTeamIds = Array.isArray(s.teamIds) && s.teamIds.length ? s.teamIds : (s.teamId ? [s.teamId] : []);
+  if(contextTeamId && sTeamIds.length > 1){
+    if(!confirm("Esta sesión se comparte con más equipos. Se creará una copia independiente solo para este equipo antes de editarla, así los cambios no afectarán a los demás. ¿Continuar?")) return;
+    try{
+      const {id: newId, data} = await forkSessionForTeams_(s, [contextTeamId]);
+      populateSessionEditor(newId, data);
+      document.getElementById("sessionMsg").innerHTML = '<p class="ok-msg">Se ha creado una copia independiente de esta sesión para este equipo. Los cambios que hagas y guardes aquí ya no afectarán a los demás equipos.</p>';
+    }catch(err){ alert("No se ha podido crear la copia independiente: " + err.message); }
+    return;
+  }
   populateSessionEditor(id, s);
 };
 function populateSessionEditor(id, s){
@@ -5903,7 +5927,7 @@ document.getElementById("btnSaveSessionObs").onclick = async () => {
   }catch(err){ alert("No se han podido guardar las observaciones: " + err.message); }
 };
 
-function sessionCardHtml(s){
+function sessionCardHtml(s, contextTeamId){
   function taskLi(id){
     const t = tasks.find(x=>x.id===id);
     if(!t) return '<li class="muted">(tarea eliminada)</li>';
@@ -5950,12 +5974,13 @@ function sessionCardHtml(s){
       const ps = playSessions.find(x=>x.id===id);
       return `<button type="button" class="btn ghost small" style="margin:2px 4px 0 0;" onclick="viewLinkedPlaySession('${id}')">🎯 ${escapeHtml(ps?ps.name:"(sesión eliminada)")}</button>`;
     }).join("")}</div>` : ""}
+    ${(canManage && sTeams.length>1 && contextTeamId) ? `<p class="muted" style="font-size:.72rem;margin:4px 0 0 0;">ℹ️ Esta sesión se comparte con más equipos: al editar o borrar aquí se creará una copia independiente solo para ${escapeHtml((teams.find(t=>t.id===contextTeamId)||{}).name || "este equipo")}, sin tocar a los demás.</p>` : ""}
     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
       <button class="btn ghost small" onclick="exportSessionPDF('${s.id}')">📄 Exportar a PDF</button>
       ${canAddObs ? `<button class="btn ghost small" onclick="openSessionObservations('${s.id}')">📝 Observaciones</button>` : ""}
-      ${canManage ? `<button class="btn ghost small" onclick="editSession('${s.id}')">✏️ Editar sesión</button>` : ""}
+      ${canManage ? `<button class="btn ghost small" onclick="editSession('${s.id}'${contextTeamId?`,'${contextTeamId}'`:''})">✏️ Editar sesión</button>` : ""}
       ${(!canManage && sharedWithMe) ? `<button class="btn ghost small" onclick="forkAndEditSession('${s.id}')">✏️ Editar sesión</button>` : ""}
-      ${canManage ? `<button class="btn danger small" onclick="deleteSession('${s.id}')">🗑 Borrar sesión</button>` : ""}
+      ${canManage ? `<button class="btn danger small" onclick="deleteSession('${s.id}'${contextTeamId?`,'${contextTeamId}'`:''})">🗑 Borrar sesión</button>` : ""}
     </div>
   </div>`;
 }
@@ -6014,18 +6039,24 @@ function renderSavedSessions(){
       // Dentro de la sección de un entrenador, la sesión se cuelga de CADA equipo SUYO al
       // que esté vinculada (si tiene dos equipos propios y la sesión es de ambos, la ve en
       // los dos apartados). Solo se descarta el equipo que no es suyo.
+      // Se agrupa por ID de equipo (no por nombre) para poder pasarle a la tarjeta el
+      // "contexto" exacto de equipo bajo el que se está mostrando: así, si esa misma
+      // sesión aparece también bajo otro equipo, editar/borrar aquí no toca al otro.
       const sTeams = sessionTeams_(s);
       const mine = g.coachTeamIds ? sTeams.filter(t=>g.coachTeamIds.includes(t.id)) : sTeams;
       const relevant = mine.length ? mine : sTeams;
-      const tkList = relevant.length ? relevant.map(t=>t.name) : ["Sin equipo"];
-      tkList.forEach(tk=>{
-        if(!teamGroups[tk]) teamGroups[tk] = [];
-        teamGroups[tk].push(s);
+      const entries = relevant.length ? relevant.map(t=>({id:t.id, name:t.name})) : [{id:null, name:"Sin equipo"}];
+      entries.forEach(e=>{
+        const key = e.id || ("none:"+e.name);
+        if(!teamGroups[key]) teamGroups[key] = {id:e.id, name:e.name, sessions:[]};
+        teamGroups[key].sessions.push(s);
       });
     });
-    const teamNames = Object.keys(teamGroups).sort((a,b)=>a.localeCompare(b,'es'));
-    const teamsHtml = teamNames.map(tk=>{
-      const tlist = teamGroups[tk];
+    const teamKeys = Object.keys(teamGroups).sort((a,b)=>teamGroups[a].name.localeCompare(teamGroups[b].name,'es'));
+    const teamsHtml = teamKeys.map(tkKey=>{
+      const grp = teamGroups[tkKey];
+      const tlist = grp.sessions;
+      const contextTeamId = grp.id; // null cuando es el cajón "Sin equipo"
       const monthGroups = {};
       tlist.forEach(s=>{
         const mk = sessionMonthKey(s);
@@ -6035,7 +6066,10 @@ function renderSavedSessions(){
       const monthKeys = Object.keys(monthGroups).sort((a,b)=> b.localeCompare(a));
       const monthsHtml = monthKeys.map((mk, mIdx)=>{
         const mlist = monthGroups[mk].slice().sort((a,b)=> (a.date||"").localeCompare(b.date||""));
-        const cardsHtml = mlist.map(sessionCardHtml).join("");
+        // Se le pasa a cada tarjeta el equipo bajo el que se está mostrando, para que
+        // "Editar"/"Borrar" solo afecten a este equipo cuando la sesión esté compartida
+        // con más de uno (ver forkSessionForTeams_).
+        const cardsHtml = mlist.map(s => sessionCardHtml(s, contextTeamId)).join("");
         return `
         <details class="month-group" style="margin:8px 0 0 4px;">
           <summary style="cursor:pointer;font-weight:600;font-size:.85rem;padding:8px 10px;background:#faf8f5;border:1px solid var(--border);border-radius:8px;">
@@ -6047,7 +6081,7 @@ function renderSavedSessions(){
       return `
       <details class="team-group" style="margin:8px 0 0 4px;">
         <summary style="cursor:pointer;font-weight:600;padding:9px 11px;background:#f2f6f4;border:1px solid var(--border);border-radius:8px;">
-          👕 ${escapeHtml(tk)} <span class="muted" style="font-weight:400;">(${tlist.length} sesión${tlist.length===1?"":"es"})</span>
+          👕 ${escapeHtml(grp.name)} <span class="muted" style="font-weight:400;">(${tlist.length} sesión${tlist.length===1?"":"es"})</span>
         </summary>
         <div style="margin-top:8px;">${monthsHtml}</div>
       </details>`;
@@ -6061,7 +6095,26 @@ function renderSavedSessions(){
     </details>`;
   }).join("");
 }
-window.deleteSession = async (id) => {
+// contextTeamId: el equipo bajo el que se está borrando (si viene de la lista agrupada
+// por equipo). Si la sesión está compartida con MÁS equipos aparte de ese, en vez de
+// borrar el documento entero se desdobla una copia independiente solo para ese equipo y
+// se manda ESA copia a la papelera — la sesión original sigue intacta para los demás.
+window.deleteSession = async (id, contextTeamId) => {
+  const s = sessions.find(x=>x.id===id);
+  if(!s) return;
+  const sTeamIds = Array.isArray(s.teamIds) && s.teamIds.length ? s.teamIds : (s.teamId ? [s.teamId] : []);
+  if(contextTeamId && sTeamIds.length > 1){
+    if(!confirm("Esta sesión se comparte con más equipos. Se borrará solo para este equipo; los demás equipos la seguirán teniendo. ¿Continuar?")) return;
+    try{
+      const {id: newId} = await forkSessionForTeams_(s, [contextTeamId]);
+      await db.collection("sessions").doc(newId).update({
+        deleted: true,
+        deletedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        deletedBy: currentCoach.name || ""
+      });
+    }catch(err){ alert("No se ha podido borrar la sesión: " + err.message); }
+    return;
+  }
   if(!confirm("¿Mover esta sesión a la papelera? Las tareas que contiene no se verán afectadas y podrás restaurarla más tarde.")) return;
   try{
     await db.collection("sessions").doc(id).update({
