@@ -484,6 +484,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
     <button class="tab" data-tab="sessions">Sesiones</button>
     <button class="tab" data-tab="modelo">Modelo de juego</button>
     <button class="tab" data-tab="abp">ABP</button>
+    <button class="tab" data-tab="miequipo">🎽 Mi equipo</button>
     <button class="tab" data-tab="plantilla">👕 Plantilla</button>
     <button class="tab hidden" id="tabCoachesBtn" data-tab="coaches">Entrenadores</button>
     <button class="tab hidden" id="tabPapeleraBtn" data-tab="papelera">🗑️ Papelera</button>
@@ -518,6 +519,11 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
           <span class="home-card-icon">🎯</span>
           <span class="home-card-label">ABP <span id="homeDotAbp" class="card-dot hidden"></span></span>
           <span class="home-card-desc">Jugadas a balón parado</span>
+        </button>
+        <button type="button" class="home-card" data-goto="miequipo">
+          <span class="home-card-icon">🎽</span>
+          <span class="home-card-label">Mi equipo</span>
+          <span class="home-card-desc">Tu plantilla, jornadas y resumen</span>
         </button>
         <button type="button" class="home-card" data-goto="plantilla">
           <span class="home-card-icon">👕</span>
@@ -952,14 +958,14 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
               <label>Fecha</label>
               <input type="date" id="playSessionDate">
             </div>
-            <div>
-              <label>Carpeta</label>
-              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                <span id="playSessionFolderLabel" class="muted" style="flex:1;min-width:120px;">🏦 Raíz (sin carpeta)</span>
-                <button type="button" class="btn ghost small" id="btnPickPlaySessionFolder">📁 Elegir carpeta</button>
-              </div>
-            </div>
           </div>
+          <label style="margin-top:10px;">Carpetas</label>
+          <p class="muted" style="font-size:.78rem;margin-top:-4px;">Puedes meter la misma sesión en varias carpetas a la vez.</p>
+          <div id="playSessionFolderChips" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
+            <span class="muted">🏦 Raíz (sin carpeta)</span>
+          </div>
+          <button type="button" class="btn ghost small" id="btnPickPlaySessionFolder">📁+ Añadir carpeta</button>
+
           <label style="margin-top:10px;">Notas</label>
           <textarea id="playSessionNotes" placeholder="Observaciones generales..."></textarea>
           <label style="margin-top:10px;display:flex;align-items:center;gap:8px;text-transform:none;font-family:inherit;font-weight:400;">
@@ -1004,6 +1010,40 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
         </div>
       </div>
 
+    </div>
+
+    <!-- ---------- MI EQUIPO: acceso rápido y personal a los equipos asignados al entrenador ---------- -->
+    <div id="tab-miequipo" class="hidden">
+      <div id="miEquipoTeamsView">
+        <div class="card">
+          <h2 style="font-size:1.05rem;">🎽 Mi equipo</h2>
+          <p class="muted">Elige uno de tus equipos asignados para ver su plantilla, sus jornadas y su resumen.</p>
+          <div id="miEquipoTeamsList" class="home-grid" style="margin-top:10px;"></div>
+        </div>
+      </div>
+      <div id="miEquipoMenuView" class="hidden">
+        <button type="button" class="btn ghost small" id="miEquipoMenuBack" style="margin-bottom:10px;">← Volver</button>
+        <div class="card">
+          <h2 style="font-size:1.05rem;" id="miEquipoMenuTitle">🎽 Mi equipo</h2>
+          <div class="home-grid" style="margin-top:10px;">
+            <button type="button" class="home-card" id="miEquipoGoRoster">
+              <span class="home-card-icon">👥</span>
+              <span class="home-card-label">Plantilla de jugadores</span>
+              <span class="home-card-desc">Dorsal, nombre y posición</span>
+            </button>
+            <button type="button" class="home-card" id="miEquipoGoMatchdays">
+              <span class="home-card-icon">🗓️</span>
+              <span class="home-card-label">Jornadas</span>
+              <span class="home-card-desc">Convocatorias, goles y tarjetas</span>
+            </button>
+            <button type="button" class="home-card" id="miEquipoGoSummary">
+              <span class="home-card-icon">📊</span>
+              <span class="home-card-label">Resumen</span>
+              <span class="home-card-desc">Estadísticas automáticas</span>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- ---------- COACHES TAB (gestor only) ---------- -->
@@ -1331,6 +1371,16 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
       <button class="btn ghost" id="btnCloseSessionTeams" style="flex:1;">Cancelar</button>
       <button class="btn accent" id="btnApplySessionTeams" style="flex:1;">Aplicar</button>
     </div>
+  </div>
+</div>
+
+<!-- ---------- Elegir EN QUÉ CARPETA editar/borrar una sesión de ABP metida en varias ---------- -->
+<div id="playSessionPickFolderModal" class="modal-bg hidden">
+  <div class="modal">
+    <h2 style="font-size:1.05rem;">📁 ¿En qué carpeta?</h2>
+    <p class="muted" style="font-size:.8rem;margin-top:2px;">Esta sesión de ABP está metida en más de una carpeta. Elige en cuál quieres <strong id="playSessionPickFolderAction"></strong>: se creará una copia independiente solo para esa carpeta, sin tocar a las demás.</p>
+    <div id="playSessionPickFolderList" style="margin-top:10px;max-height:48vh;overflow-y:auto;"></div>
+    <button class="btn ghost" id="btnClosePlaySessionPickFolder" style="width:100%;margin-top:14px;">Cancelar</button>
   </div>
 </div>
 
@@ -1807,7 +1857,7 @@ document.querySelectorAll(".tab").forEach(btn=>{
   btn.onclick = () => {
     document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));
     btn.classList.add("active");
-    ["home","tasks","sessions","modelo","abp","plantilla","coaches","papelera"].forEach(t=>{
+    ["home","tasks","sessions","modelo","abp","miequipo","plantilla","coaches","papelera"].forEach(t=>{
       document.getElementById("tab-"+t).classList.toggle("hidden", t!==btn.dataset.tab);
     });
     placeBoardWrapFor(btn.dataset.tab);
@@ -1816,6 +1866,7 @@ document.querySelectorAll(".tab").forEach(btn=>{
     if(btn.dataset.tab === "sessions") showSessionsView("home");
     if(btn.dataset.tab === "modelo") markSectionSeen("gameModelFiles");
     if(btn.dataset.tab === "plantilla") { showPlantillaView("home"); renderTeamSelector(); }
+    if(btn.dataset.tab === "miequipo") { showMiEquipoView("teams"); renderMiEquipoTeams(); }
     window.scrollTo({top:0, behavior:"smooth"});
   };
 });
@@ -2032,7 +2083,7 @@ function renderPlaySessionsFolderList(){
   document.getElementById("btnNewPlaySessionFolder").classList.toggle("hidden", curId==="__NONE__");
   let html = "";
   if(curId===null){
-    const noneCount = playSessions.filter(s=>!s.folderId || !folderExists_("playSessions", s.folderId)).length;
+    const noneCount = playSessions.filter(s=>playSessionHasNoValidFolder_(s)).length;
     if(noneCount>0){
       html += `<div class="home-grid">
       <button type="button" class="home-card" onclick="playSessionBrowserPath=['__NONE__']; renderAbpSessionsBank();">
@@ -2047,9 +2098,9 @@ function renderPlaySessionsFolderList(){
     const folders = folderChildren_("playSessions", curId).sort((a,b)=>(a.name||"").localeCompare(b.name||"","es"));
     if(folders.length){
       html += `<div class="home-grid" style="margin-top:10px;">` + folders.map(f=>{
-        const count = playSessions.filter(s=>(s.folderId||null)===f.id).length;
+        const count = playSessions.filter(s=>playSessionInFolder_(s, f.id)).length;
         const subCount = folderChildren_("playSessions", f.id).length;
-        const hasUnread = playSessions.some(s=> (s.folderId||null)===f.id && isItemUnread("playSessions", s));
+        const hasUnread = playSessions.some(s=> playSessionInFolder_(s, f.id) && isItemUnread("playSessions", s));
         return `
         <div class="home-card folder-card">
           <button type="button" class="folder-card-main" onclick="playSessionBrowserPath=[...playSessionBrowserPath,'${f.id}']; renderAbpSessionsBank();">
@@ -2384,6 +2435,7 @@ function attachRealtimeListeners(){
     teams = snap.docs.map(d=>({id:d.id, ...d.data()}));
     renderTeamManageList();
     renderTeamSelector();
+    renderMiEquipoTeams();
     renderSessionTeamChips();
     renderCoachList();
     renderSavedSessions();
@@ -2798,7 +2850,7 @@ document.getElementById("btnDeleteFolder").onclick = async () => {
   const hasSubfolders = folderChildren_(section, id).length>0;
   const hasItems = section==="tasks" ? tasks.some(t=>taskInFolder_(t, id))
     : section==="abp" ? plays.some(p=>playInFolder_(p, id))
-    : playSessions.some(s=>(s.folderId||null)===id);
+    : playSessions.some(s=>playSessionInFolder_(s, id));
   const msg = (hasSubfolders || hasItems)
     ? "Esta carpeta tiene contenido dentro. Al eliminarla, su contenido subirá a la carpeta superior. ¿Continuar?"
     : "¿Eliminar esta carpeta?";
@@ -2820,8 +2872,9 @@ document.getElementById("btnDeleteFolder").onclick = async () => {
         jobs.push(db.collection("plays").doc(p.id).update({categoryIds: newIds}));
       });
     } else {
-      playSessions.filter(s=>(s.folderId||null)===id).forEach(s=>{
-        jobs.push(db.collection("playSessions").doc(s.id).update({folderId: parentId}));
+      playSessions.filter(s=>playSessionInFolder_(s, id)).forEach(s=>{
+        const newIds = Array.from(new Set(playSessionCategoryIds(s).map(x=> x===id ? parentId : x).filter(Boolean)));
+        jobs.push(db.collection("playSessions").doc(s.id).update({folderIds: newIds}));
       });
     }
     await Promise.all(jobs);
@@ -2881,14 +2934,26 @@ function renderPlayFolderLabel(){
 }
 
 document.getElementById("btnPickPlaySessionFolder").onclick = () => {
-  openFolderPicker("playSessions", null, "Elegir carpeta para la sesión", (id) => {
-    selectedPlaySessionFolderId = id;
-    renderPlaySessionFolderLabel();
+  openFolderPicker("playSessions", null, "Añadir carpeta a la sesión", (id) => {
+    if(id && !selectedPlaySessionFolderIds.includes(id)) selectedPlaySessionFolderIds.push(id);
+    renderPlaySessionFolderChips();
   });
 };
-let selectedPlaySessionFolderId = null;
-function renderPlaySessionFolderLabel(){
-  document.getElementById("playSessionFolderLabel").textContent = selectedPlaySessionFolderId ? ("📁 " + playSessionFolderName_(selectedPlaySessionFolderId)) : "🏦 Raíz (sin carpeta)";
+let selectedPlaySessionFolderIds = [];
+window.removePlaySessionFolder = (id) => {
+  selectedPlaySessionFolderIds = selectedPlaySessionFolderIds.filter(x=>x!==id);
+  renderPlaySessionFolderChips();
+};
+function renderPlaySessionFolderChips(){
+  const wrap = document.getElementById("playSessionFolderChips");
+  if(selectedPlaySessionFolderIds.length===0){
+    wrap.innerHTML = '<span class="muted">🏦 Raíz (sin carpeta)</span>';
+    return;
+  }
+  wrap.innerHTML = selectedPlaySessionFolderIds.map(id=>`
+    <span class="badge" style="display:inline-flex;align-items:center;gap:6px;">📁 ${escapeHtml(playSessionFolderName_(id))}
+      <a href="javascript:void(0)" onclick="removePlaySessionFolder('${id}')" style="color:inherit;text-decoration:none;font-weight:700;">✕</a>
+    </span>`).join("");
 }
 
 
@@ -4205,6 +4270,21 @@ function playHasNoValidFolder_(p){
   const ids = playCategoryIds(p);
   return ids.length===0 || !ids.some(id=>folderExists_("abp", id));
 }
+// Carpetas de una sesión de ABP: puede estar en VARIAS a la vez (compat con sesiones
+// antiguas que solo tenían un "folderId" único en vez del array "folderIds").
+function playSessionCategoryIds(s){
+  if(s && Array.isArray(s.folderIds) && s.folderIds.length) return s.folderIds;
+  if(s && s.folderId) return [s.folderId];
+  return [];
+}
+function playSessionCategoryNames(s){
+  return playSessionCategoryIds(s).map(playSessionFolderName_).filter(Boolean);
+}
+function playSessionInFolder_(s, folderId){ return playSessionCategoryIds(s).includes(folderId); }
+function playSessionHasNoValidFolder_(s){
+  const ids = playSessionCategoryIds(s);
+  return ids.length===0 || !ids.some(id=>folderExists_("playSessions", id));
+}
 
 /* ---------- View task modal ---------- */
 window.viewTask = (id) => {
@@ -4462,16 +4542,88 @@ function showPlantillaView(view){
   document.getElementById("plantillaTeamsView").classList.toggle("hidden", view!=="teams");
   document.getElementById("plantillaCompareView").classList.toggle("hidden", view!=="compare");
 }
-document.getElementById("plantillaGoRoster").onclick = () => { showPlantillaView("roster"); renderPlayersList(); };
-document.getElementById("plantillaGoMatchdays").onclick = () => { showPlantillaView("matchdays"); showMatchdaySub("list"); renderMatchdaysList(); };
-document.getElementById("plantillaGoSummary").onclick = () => { showPlantillaView("summary"); renderTeamSummary(); };
+// Roster/Jornadas/Resumen son subsecciones compartidas: se entra en ellas tanto desde el
+// menú general de "Plantilla" como desde "Mi equipo" (con el equipo ya fijado). Este flag
+// recuerda desde dónde se entró, para que el botón "← Volver" lleve al sitio correcto.
+let plantillaBackTarget = "plantilla-home";
+function goBackFromPlantillaDetail_(){
+  if(plantillaBackTarget === "miequipo"){
+    document.querySelector('.tab[data-tab="miequipo"]').click();
+    showMiEquipoView("menu");
+  } else {
+    showPlantillaView("home");
+  }
+}
+document.getElementById("plantillaGoRoster").onclick = () => { plantillaBackTarget = "plantilla-home"; showPlantillaView("roster"); renderPlayersList(); };
+document.getElementById("plantillaGoMatchdays").onclick = () => { plantillaBackTarget = "plantilla-home"; showPlantillaView("matchdays"); showMatchdaySub("list"); renderMatchdaysList(); };
+document.getElementById("plantillaGoSummary").onclick = () => { plantillaBackTarget = "plantilla-home"; showPlantillaView("summary"); renderTeamSummary(); };
 document.getElementById("plantillaGoTeams").onclick = () => { showPlantillaView("teams"); renderTeamManageList(); };
 document.getElementById("plantillaGoCompare").onclick = () => { showPlantillaView("compare"); renderTeamCompare(); };
-document.getElementById("plantillaRosterBack").onclick = () => showPlantillaView("home");
-document.getElementById("plantillaMatchdaysBack").onclick = () => showPlantillaView("home");
-document.getElementById("plantillaSummaryBack").onclick = () => showPlantillaView("home");
+document.getElementById("plantillaRosterBack").onclick = goBackFromPlantillaDetail_;
+document.getElementById("plantillaMatchdaysBack").onclick = goBackFromPlantillaDetail_;
+document.getElementById("plantillaSummaryBack").onclick = goBackFromPlantillaDetail_;
 document.getElementById("plantillaTeamsBack").onclick = () => showPlantillaView("home");
 document.getElementById("plantillaCompareBack").onclick = () => showPlantillaView("home");
+
+/* ---------- MI EQUIPO: elegir uno de tus equipos asignados y entrar directo a sus
+   secciones de plantilla (reutiliza roster/jornadas/resumen de la pestaña Plantilla) ---------- */
+function showMiEquipoView(view){
+  document.getElementById("miEquipoTeamsView").classList.toggle("hidden", view!=="teams");
+  document.getElementById("miEquipoMenuView").classList.toggle("hidden", view!=="menu");
+}
+function renderMiEquipoTeams(){
+  const wrap = document.getElementById("miEquipoTeamsList");
+  if(!wrap) return;
+  const ids = (currentCoach && Array.isArray(currentCoach.teamIds)) ? currentCoach.teamIds : [];
+  const myTeams = ids.map(id=>teams.find(t=>t.id===id)).filter(Boolean).sort((a,b)=>(a.name||"").localeCompare(b.name||"","es"));
+  if(myTeams.length===0){
+    wrap.innerHTML = '<div class="empty">Todavía no tienes ningún equipo asignado. Pídele a un gestor que te lo asigne desde la pestaña "Entrenadores".</div>';
+    return;
+  }
+  wrap.innerHTML = myTeams.map(t=>`
+    <button type="button" class="home-card" onclick="openMiEquipoTeam('${t.id}')">
+      <span class="home-card-icon">🎽</span>
+      <span class="home-card-label">${escapeHtml(t.name)}</span>
+      <span class="home-card-desc">Ver plantilla, jornadas y resumen</span>
+    </button>`).join("");
+}
+// Selecciona el equipo elegido exactamente igual que si se hubiera cambiado en el
+// desplegable de la pestaña Plantilla (mismos efectos: temporada, plantilla, jornadas,
+// resumen), para que ambas pantallas queden siempre consistentes entre sí.
+window.openMiEquipoTeam = (teamId) => {
+  selectedTeamId = teamId;
+  selectedSeason = null;
+  const sel = document.getElementById("teamSelector");
+  if(sel) sel.value = teamId;
+  renderPlayersList();
+  showMatchdaySub("list");
+  renderSeasonSelector();
+  renderMatchdaysList();
+  renderTeamSummary();
+  const t = teams.find(x=>x.id===teamId);
+  document.getElementById("miEquipoMenuTitle").textContent = "🎽 " + (t ? t.name : "Mi equipo");
+  showMiEquipoView("menu");
+};
+document.getElementById("miEquipoMenuBack").onclick = () => showMiEquipoView("teams");
+document.getElementById("miEquipoGoRoster").onclick = () => {
+  plantillaBackTarget = "miequipo";
+  document.querySelector('.tab[data-tab="plantilla"]').click();
+  showPlantillaView("roster");
+  renderPlayersList();
+};
+document.getElementById("miEquipoGoMatchdays").onclick = () => {
+  plantillaBackTarget = "miequipo";
+  document.querySelector('.tab[data-tab="plantilla"]').click();
+  showPlantillaView("matchdays");
+  showMatchdaySub("list");
+  renderMatchdaysList();
+};
+document.getElementById("miEquipoGoSummary").onclick = () => {
+  plantillaBackTarget = "miequipo";
+  document.querySelector('.tab[data-tab="plantilla"]').click();
+  showPlantillaView("summary");
+  renderTeamSummary();
+};
 
 function renderTeamManageList(){
   const wrap = document.getElementById("teamManageList");
@@ -6814,6 +6966,49 @@ function renderPlayList(){
    ABP · SESIONES (constructor + guardado + enlace público)
 ============================================================= */
 let playSessionItems = [];
+
+// Al editar o borrar una sesión de ABP metida en más de una carpeta, hace falta saber en
+// CUÁL de sus carpetas se quiere la acción (ver editPlaySession/deletePlaySession con
+// contextFolderId): este mini-modal se lo pregunta al entrenador antes de continuar.
+let playSessionPickFolderCallback = null;
+function openPlaySessionPickFolder_(s, actionLabel, onPick){
+  document.getElementById("playSessionPickFolderAction").textContent = actionLabel;
+  const wrap = document.getElementById("playSessionPickFolderList");
+  const sFolders = playSessionCategoryIds(s).map(id=>playSessionFolders.find(f=>f.id===id)).filter(Boolean);
+  wrap.innerHTML = sFolders.map(f=>`<button type="button" class="btn ghost small" style="display:block;width:100%;text-align:left;margin-top:6px;" onclick="playSessionPickFolderCallback && playSessionPickFolderCallback('${f.id}')">📁 ${escapeHtml(f.name)}</button>`).join("");
+  playSessionPickFolderCallback = (folderId) => {
+    document.getElementById("playSessionPickFolderModal").classList.add("hidden");
+    playSessionPickFolderCallback = null;
+    onPick(folderId);
+  };
+  document.getElementById("playSessionPickFolderModal").classList.remove("hidden");
+}
+document.getElementById("btnClosePlaySessionPickFolder").onclick = () => {
+  document.getElementById("playSessionPickFolderModal").classList.add("hidden");
+  playSessionPickFolderCallback = null;
+};
+// Punto de entrada de los botones "Editar"/"Borrar" de la tarjeta: si la sesión solo está
+// en una carpeta (o ninguna) se actúa directamente sobre ella, como siempre. Si está en
+// varias, se pregunta antes en cuál, y esa elección se pasa como contextFolderId.
+window.handleEditPlaySessionClick = (id) => {
+  const s = playSessions.find(x=>x.id===id);
+  if(!s) return;
+  if(playSessionCategoryIds(s).length > 1){
+    openPlaySessionPickFolder_(s, "editar", (folderId) => editPlaySession(id, folderId));
+    return;
+  }
+  editPlaySession(id);
+};
+window.handleDeletePlaySessionClick = (id) => {
+  const s = playSessions.find(x=>x.id===id);
+  if(!s) return;
+  if(playSessionCategoryIds(s).length > 1){
+    openPlaySessionPickFolder_(s, "borrar", (folderId) => deletePlaySession(id, folderId));
+    return;
+  }
+  deletePlaySession(id);
+};
+
 let editingPlaySessionId = null;
 
 document.getElementById("playSessionFilterCategory").onchange = renderPlaySessionBrowser;
@@ -6901,7 +7096,7 @@ document.getElementById("btnSavePlaySession").onclick = async () => {
     date: document.getElementById("playSessionDate").value || null,
     notes: document.getElementById("playSessionNotes").value.trim(),
     public: document.getElementById("playSessionPublic").checked,
-    folderId: selectedPlaySessionFolderId,
+    folderIds: [...selectedPlaySessionFolderIds],
     plays: JSON.parse(JSON.stringify(playSessionItems))
   };
   try{
@@ -6929,8 +7124,8 @@ function resetPlaySessionForm(){
   document.getElementById("playSessionFilterCategory").value = "";
   document.getElementById("playSessionAddSearch").value = "";
   document.getElementById("playSessionFilterFavOnly").checked = false;
-  selectedPlaySessionFolderId = null;
-  renderPlaySessionFolderLabel();
+  selectedPlaySessionFolderIds = [];
+  renderPlaySessionFolderChips();
   playSessionItems = [];
   renderPlaySessionList();
   renderPlaySessionBrowser();
@@ -6944,16 +7139,14 @@ document.getElementById("cancelPlaySessionEdit").onclick = () => {
   if(abpSessionFormReturnView === "sessionsSaved") renderAbpSessionsBank();
 };
 
-window.editPlaySession = (id) => {
-  const s = playSessions.find(x=>x.id===id);
-  if(!s) return;
+function populatePlaySessionEditor(id, s){
   editingPlaySessionId = id;
   document.getElementById("playSessionName").value = s.name || "";
   document.getElementById("playSessionDate").value = s.date || "";
   document.getElementById("playSessionNotes").value = s.notes || "";
   document.getElementById("playSessionPublic").checked = !!s.public;
-  selectedPlaySessionFolderId = s.folderId || null;
-  renderPlaySessionFolderLabel();
+  selectedPlaySessionFolderIds = playSessionCategoryIds(s).slice();
+  renderPlaySessionFolderChips();
   playSessionItems = JSON.parse(JSON.stringify(s.plays || []));
   renderPlaySessionList();
   renderPlaySessionBrowser();
@@ -6964,15 +7157,79 @@ window.editPlaySession = (id) => {
   abpSessionFormReturnView = "sessionsSaved";
   showAbpView("sessions");
   document.getElementById("playSessionEditorPanel").scrollIntoView({behavior:"smooth"});
+}
+
+// Desdobla una sesión de ABP: crea una copia independiente que se queda solo con las
+// carpetas indicadas (folderIdsToFork) y se las retira a la sesión original, que sigue
+// igual para el resto de sus carpetas.
+async function forkPlaySessionForFolders_(s, folderIdsToFork){
+  const sFolderIds = playSessionCategoryIds(s);
+  const forkPayload = {
+    name: s.name || "",
+    date: s.date || null,
+    notes: s.notes || "",
+    public: !!s.public,
+    folderIds: folderIdsToFork,
+    plays: JSON.parse(JSON.stringify(s.plays || [])),
+    createdBy: currentUser.uid,
+    createdByName: currentCoach.name || "",
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    forkedFrom: s.id
+  };
+  const newDoc = await db.collection("playSessions").add(forkPayload);
+  const remaining = sFolderIds.filter(fid => !folderIdsToFork.includes(fid));
+  await db.collection("playSessions").doc(s.id).update({folderIds: remaining});
+  return {id: newDoc.id, data: forkPayload};
+}
+
+// contextFolderId: la carpeta para la que se quiere editar (si la acción se lanzó eligiendo
+// una carpeta concreta, ver openPlaySessionPickFolder_). Si la sesión está metida en MÁS
+// carpetas aparte de esa, se desdobla primero una copia independiente solo para esa
+// carpeta, y se edita esa copia — así los cambios no afectan a las demás carpetas.
+window.editPlaySession = async (id, contextFolderId) => {
+  const s = playSessions.find(x=>x.id===id);
+  if(!s) return;
+  const sFolderIds = playSessionCategoryIds(s);
+  if(contextFolderId && sFolderIds.length > 1){
+    if(!confirm("Esta sesión de ABP está metida en más carpetas. Se creará una copia independiente solo para esta carpeta antes de editarla, así los cambios no afectarán a las demás. ¿Continuar?")) return;
+    try{
+      const {id: newId, data} = await forkPlaySessionForFolders_(s, [contextFolderId]);
+      populatePlaySessionEditor(newId, data);
+      document.getElementById("playSessionMsg").innerHTML = '<p class="ok-msg">Se ha creado una copia independiente de esta sesión de ABP para esta carpeta. Los cambios que hagas y guardes aquí ya no afectarán a las demás carpetas.</p>';
+    }catch(err){ alert("No se ha podido crear la copia independiente: " + err.message); }
+    return;
+  }
+  populatePlaySessionEditor(id, s);
 };
 
-window.deletePlaySession = async (id) => {
+// contextFolderId: la carpeta para la que se quiere borrar. Si la sesión está metida en MÁS
+// carpetas aparte de esa, en vez de borrar el documento entero se desdobla una copia
+// independiente solo para esa carpeta y se manda ESA copia a la papelera — la sesión
+// original sigue intacta en las demás carpetas.
+window.deletePlaySession = async (id, contextFolderId) => {
+  const s = playSessions.find(x=>x.id===id);
+  if(!s) return;
+  const sFolderIds = playSessionCategoryIds(s);
+  if(contextFolderId && sFolderIds.length > 1){
+    if(!confirm("Esta sesión de ABP está metida en más carpetas. Se borrará solo de esta carpeta; las demás la seguirán teniendo. ¿Continuar?")) return;
+    try{
+      const {id: newId} = await forkPlaySessionForFolders_(s, [contextFolderId]);
+      await db.collection("playSessions").doc(newId).update({
+        deleted: true,
+        deletedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        deletedBy: currentCoach.name || ""
+      });
+    }catch(err){ alert("No se ha podido borrar la sesión de ABP: " + err.message); }
+    return;
+  }
   if(!confirm("¿Mover esta sesión de ABP a la papelera? Podrás restaurarla más tarde.")) return;
-  await db.collection("playSessions").doc(id).update({
-    deleted: true,
-    deletedAt: firebase.firestore.FieldValue.serverTimestamp(),
-    deletedBy: currentCoach.name || ""
-  });
+  try{
+    await db.collection("playSessions").doc(id).update({
+      deleted: true,
+      deletedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      deletedBy: currentCoach.name || ""
+    });
+  }catch(err){ alert("No se ha podido borrar la sesión de ABP: " + err.message); }
 };
 
 window.copyPublicLink = (id) => {
@@ -6989,13 +7246,12 @@ function renderSavedPlaySessions(){
   const search = document.getElementById("filterPlaySessionSearch") ? document.getElementById("filterPlaySessionSearch").value.trim().toLowerCase() : "";
   const curId = playSessionCurrentFolder();
   const list = playSessions.filter(s=>{
-    const folderId = s.folderId || null;
     if(search){
       // con texto de búsqueda, se busca en todas las sesiones, no solo en la carpeta actual
     } else if(curId === "__NONE__"){
-      if(folderId && folderExists_("playSessions", folderId)) return false;
+      if(!playSessionHasNoValidFolder_(s)) return false;
     } else if(curId !== null){
-      if(folderId !== curId) return false;
+      if(!playSessionInFolder_(s, curId)) return false;
     } else {
       return false; // en la raíz, sin buscar, no se listan sesiones sueltas (solo carpetas arriba)
     }
@@ -7008,6 +7264,7 @@ function renderSavedPlaySessions(){
   }
   wrap.innerHTML = list.map(s=>{
     const canManage = currentCoach && (currentCoach.role===ROLE_GESTOR || s.createdBy===currentUser.uid);
+    const sFolderIds = playSessionCategoryIds(s);
     const publicUrl = location.origin + location.pathname + "#public=" + s.id;
     const itemsHtml = (s.plays||[]).map((item,i)=>`<li>${escapeHtml(item.title)}${item.categoryName?` <span class="muted">· ${escapeHtml(item.categoryName)}</span>`:""} <a href="javascript:void(0)" onclick="viewSessionPlayItem('${s.id}',${i})" style="color:var(--accent);font-weight:600;text-decoration:none;">👁️ Ver</a></li>`).join("");
     const unread = isItemUnread("playSessions", s);
@@ -7018,6 +7275,10 @@ function renderSavedPlaySessions(){
         <span class="muted">${s.date||""}</span>
       </div>
       <p class="muted" style="margin:2px 0 8px 0;">Por ${escapeHtml(s.createdByName||"")} · ${(s.plays||[]).length} jugada${(s.plays||[]).length===1?"":"s"}</p>
+      ${sFolderIds.length ? sFolderIds.map(fid=>{
+        const f = playSessionFolders.find(x=>x.id===fid);
+        return f ? `<span class="badge" style="margin:0 4px 6px 0;display:inline-block;">📁 ${escapeHtml(f.name)}</span>` : "";
+      }).join("") : ""}
       <ol style="margin:0 0 6px 18px;padding:0;font-size:.88rem;">${itemsHtml}</ol>
       ${s.notes ? `<p class="muted" style="font-size:.85rem;">${escapeHtml(s.notes)}</p>` : ""}
       ${s.public ? `
@@ -7025,9 +7286,10 @@ function renderSavedPlaySessions(){
         <input type="text" readonly value="${escapeHtml(publicUrl)}" onclick="this.select()" style="font-size:.78rem;">
         <button type="button" class="btn small ghost" style="flex:0 0 auto;" onclick="copyPublicLink('${s.id}')">🔗 Copiar enlace</button>
       </div>` : `<p class="muted" style="font-size:.78rem;">Enlace público desactivado para esta sesión.</p>`}
+      ${(canManage && sFolderIds.length>1) ? `<p class="muted" style="font-size:.72rem;margin:4px 0 0 0;">ℹ️ Esta sesión está metida en más carpetas: al editar o borrar se te preguntará en cuál, y se creará una copia independiente solo para esa carpeta, sin tocar a las demás.</p>` : ""}
       <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
-        ${canManage ? `<button class="btn ghost small" onclick="editPlaySession('${s.id}')">✏️ Editar sesión</button>` : ""}
-        ${canManage ? `<button class="btn danger small" onclick="deletePlaySession('${s.id}')">🗑 Borrar sesión</button>` : ""}
+        ${canManage ? `<button class="btn ghost small" onclick="handleEditPlaySessionClick('${s.id}')">✏️ Editar sesión</button>` : ""}
+        ${canManage ? `<button class="btn danger small" onclick="handleDeletePlaySessionClick('${s.id}')">🗑 Borrar sesión</button>` : ""}
       </div>
     </div>`;
   }).join("");
