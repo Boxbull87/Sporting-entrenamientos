@@ -1026,6 +1026,24 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
         <div class="card">
           <h2 style="font-size:1.05rem;" id="miEquipoMenuTitle">🎽 Mi equipo</h2>
           <div class="home-grid" style="margin-top:10px;">
+            <button type="button" class="home-card" id="miEquipoGoPlantillaMenu">
+              <span class="home-card-icon">👕</span>
+              <span class="home-card-label">Plantilla</span>
+              <span class="home-card-desc">Jugadores, jornadas y estadísticas</span>
+            </button>
+            <button type="button" class="home-card" id="miEquipoGoSessions">
+              <span class="home-card-icon">🎯</span>
+              <span class="home-card-label">Sesiones</span>
+              <span class="home-card-desc">Solo las de este equipo</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div id="miEquipoPlantillaMenuView" class="hidden">
+        <button type="button" class="btn ghost small" id="miEquipoPlantillaMenuBack" style="margin-bottom:10px;">← Volver</button>
+        <div class="card">
+          <h2 style="font-size:1.05rem;" id="miEquipoPlantillaMenuTitle">👕 Plantilla</h2>
+          <div class="home-grid" style="margin-top:10px;">
             <button type="button" class="home-card" id="miEquipoGoRoster">
               <span class="home-card-icon">👥</span>
               <span class="home-card-label">Plantilla de jugadores</span>
@@ -1042,6 +1060,13 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
               <span class="home-card-desc">Estadísticas automáticas</span>
             </button>
           </div>
+        </div>
+      </div>
+      <div id="miEquipoSessionsView" class="hidden">
+        <button type="button" class="btn ghost small" id="miEquipoSessionsBack" style="margin-bottom:10px;">← Volver</button>
+        <div class="card">
+          <h2 style="font-size:1.05rem;" id="miEquipoSessionsTitle">🗓️ Sesiones</h2>
+          <div id="miEquipoSessionsList" style="margin-top:10px;"></div>
         </div>
       </div>
     </div>
@@ -4544,12 +4569,14 @@ function showPlantillaView(view){
 }
 // Roster/Jornadas/Resumen son subsecciones compartidas: se entra en ellas tanto desde el
 // menú general de "Plantilla" como desde "Mi equipo" (con el equipo ya fijado). Este flag
-// recuerda desde dónde se entró, para que el botón "← Volver" lleve al sitio correcto.
+// recuerda desde dónde se entró, para que el botón "← Volver" lleve al sitio correcto —
+// y para que, viniendo de "Mi equipo", nunca se pase por el menú general de Plantilla (que
+// deja elegir cualquier otro equipo del club): solo se ven las cosas del equipo elegido.
 let plantillaBackTarget = "plantilla-home";
 function goBackFromPlantillaDetail_(){
   if(plantillaBackTarget === "miequipo"){
     document.querySelector('.tab[data-tab="miequipo"]').click();
-    showMiEquipoView("menu");
+    showMiEquipoView("plantilla");
   } else {
     showPlantillaView("home");
   }
@@ -4566,10 +4593,12 @@ document.getElementById("plantillaTeamsBack").onclick = () => showPlantillaView(
 document.getElementById("plantillaCompareBack").onclick = () => showPlantillaView("home");
 
 /* ---------- MI EQUIPO: elegir uno de tus equipos asignados y entrar directo a sus
-   secciones de plantilla (reutiliza roster/jornadas/resumen de la pestaña Plantilla) ---------- */
+   secciones (plantilla, jornadas, resumen y sesiones), siempre fijadas a ese equipo ---------- */
 function showMiEquipoView(view){
   document.getElementById("miEquipoTeamsView").classList.toggle("hidden", view!=="teams");
   document.getElementById("miEquipoMenuView").classList.toggle("hidden", view!=="menu");
+  document.getElementById("miEquipoPlantillaMenuView").classList.toggle("hidden", view!=="plantilla");
+  document.getElementById("miEquipoSessionsView").classList.toggle("hidden", view!=="sessions");
 }
 function renderMiEquipoTeams(){
   const wrap = document.getElementById("miEquipoTeamsList");
@@ -4584,7 +4613,7 @@ function renderMiEquipoTeams(){
     <button type="button" class="home-card" onclick="openMiEquipoTeam('${t.id}')">
       <span class="home-card-icon">🎽</span>
       <span class="home-card-label">${escapeHtml(t.name)}</span>
-      <span class="home-card-desc">Ver plantilla, jornadas y resumen</span>
+      <span class="home-card-desc">Ver plantilla y sesiones</span>
     </button>`).join("");
 }
 // Selecciona el equipo elegido exactamente igual que si se hubiera cambiado en el
@@ -4602,9 +4631,13 @@ window.openMiEquipoTeam = (teamId) => {
   renderTeamSummary();
   const t = teams.find(x=>x.id===teamId);
   document.getElementById("miEquipoMenuTitle").textContent = "🎽 " + (t ? t.name : "Mi equipo");
+  document.getElementById("miEquipoPlantillaMenuTitle").textContent = "👕 Plantilla de " + (t ? t.name : "");
+  document.getElementById("miEquipoSessionsTitle").textContent = "🗓️ Sesiones de " + (t ? t.name : "");
   showMiEquipoView("menu");
 };
 document.getElementById("miEquipoMenuBack").onclick = () => showMiEquipoView("teams");
+document.getElementById("miEquipoGoPlantillaMenu").onclick = () => showMiEquipoView("plantilla");
+document.getElementById("miEquipoPlantillaMenuBack").onclick = () => showMiEquipoView("menu");
 document.getElementById("miEquipoGoRoster").onclick = () => {
   plantillaBackTarget = "miequipo";
   document.querySelector('.tab[data-tab="plantilla"]').click();
@@ -4624,6 +4657,22 @@ document.getElementById("miEquipoGoSummary").onclick = () => {
   showPlantillaView("summary");
   renderTeamSummary();
 };
+document.getElementById("miEquipoGoSessions").onclick = () => {
+  showMiEquipoView("sessions");
+  renderMiEquipoSessions();
+};
+document.getElementById("miEquipoSessionsBack").onclick = () => showMiEquipoView("menu");
+// Mismo agrupado por mes → semana que el listado general de Sesiones, pero ya filtrado a
+// un único equipo (el elegido en "Mi equipo"): no hace falta agrupar por entrenador/equipo,
+// solo listar directamente las sesiones de ese equipo.
+function renderMiEquipoSessions(){
+  const wrap = document.getElementById("miEquipoSessionsList");
+  if(!wrap) return;
+  if(!selectedTeamId){ wrap.innerHTML = '<div class="empty">Elige un equipo primero.</div>'; return; }
+  const list = sessions.filter(s => sessionTeams_(s).some(t=>t.id===selectedTeamId));
+  if(list.length===0){ wrap.innerHTML = '<div class="empty">🗓️ Este equipo todavía no tiene sesiones de entrenamiento guardadas.</div>'; return; }
+  wrap.innerHTML = sessionsByMonthWeekHtml_(list, selectedTeamId);
+}
 
 function renderTeamManageList(){
   const wrap = document.getElementById("teamManageList");
@@ -6170,6 +6219,56 @@ function sessionTeams_(s){
   const ids = Array.isArray(s.teamIds) && s.teamIds.length ? s.teamIds : (s.teamId ? [s.teamId] : []);
   return ids.map(id=>teams.find(t=>t.id===id)).filter(Boolean);
 }
+// Agrupa una lista PLANA de sesiones (ya filtrada) por mes → semana. Se usa tanto en el
+// listado general de Sesiones (agrupado antes por entrenador → equipo) como en el listado
+// de "Mi equipo" (ya filtrado a un único equipo, sin ese nivel de agrupación previo).
+// contextTeamId es el equipo bajo el que se están mostrando estas tarjetas, para que
+// "Editar"/"Borrar" solo afecten a ese equipo cuando la sesión esté compartida con más de
+// uno (ver forkSessionForTeams_).
+function sessionsByMonthWeekHtml_(list, contextTeamId){
+  const monthGroups = {};
+  list.forEach(s=>{
+    const mk = sessionMonthKey(s);
+    if(!monthGroups[mk]) monthGroups[mk] = [];
+    monthGroups[mk].push(s);
+  });
+  const monthKeys = Object.keys(monthGroups).sort((a,b)=> b.localeCompare(a));
+  return monthKeys.map((mk, mIdx)=>{
+    const mlist = monthGroups[mk].slice().sort((a,b)=> (a.date||"").localeCompare(b.date||""));
+    let innerHtml;
+    if(mk === "0000-00"){
+      // Sesiones sin fecha: no hay día del mes con el que calcular la semana,
+      // así que se listan directamente, sin subdividir en semanas.
+      innerHtml = mlist.map(s => sessionCardHtml(s, contextTeamId)).join("");
+    } else {
+      const weekGroups = {};
+      mlist.forEach(s => {
+        const wk = sessionWeekOfMonth_(s) || 1;
+        if(!weekGroups[wk]) weekGroups[wk] = [];
+        weekGroups[wk].push(s);
+      });
+      const weekKeys = Object.keys(weekGroups).map(Number).sort((a,b)=>a-b);
+      innerHtml = weekKeys.map(wk=>{
+        const wlist = weekGroups[wk];
+        const cardsHtml = wlist.map(s => sessionCardHtml(s, contextTeamId)).join("");
+        return `
+        <details class="week-group" style="margin:6px 0 0 4px;">
+          <summary style="cursor:pointer;font-weight:600;font-size:.8rem;padding:7px 9px;background:#fff;border:1px solid var(--border);border-radius:8px;">
+            📅 Semana ${wk} <span class="muted" style="font-weight:400;">(${wlist.length} sesión${wlist.length===1?"":"es"})</span>
+          </summary>
+          <div style="margin-top:6px;">${cardsHtml}</div>
+        </details>`;
+      }).join("");
+    }
+    return `
+    <details class="month-group" style="margin:8px 0 0 4px;">
+      <summary style="cursor:pointer;font-weight:600;font-size:.85rem;padding:8px 10px;background:#faf8f5;border:1px solid var(--border);border-radius:8px;">
+        🗓️ ${sessionMonthLabel(mk)} <span class="muted" style="font-weight:400;">(${mlist.length} sesión${mlist.length===1?"":"es"})</span>
+      </summary>
+      <div style="margin-top:8px;">${innerHtml}</div>
+    </details>`;
+  }).join("");
+}
 function renderSavedSessions(){
   const wrap = document.getElementById("sessionsSaved");
   if(sessions.length===0){ wrap.innerHTML = '<div class="empty">🗓️ Todavía no se han guardado sesiones.</div>'; return; }
@@ -6223,51 +6322,7 @@ function renderSavedSessions(){
       const grp = teamGroups[tkKey];
       const tlist = grp.sessions;
       const contextTeamId = grp.id; // null cuando es el cajón "Sin equipo"
-      const monthGroups = {};
-      tlist.forEach(s=>{
-        const mk = sessionMonthKey(s);
-        if(!monthGroups[mk]) monthGroups[mk] = [];
-        monthGroups[mk].push(s);
-      });
-      const monthKeys = Object.keys(monthGroups).sort((a,b)=> b.localeCompare(a));
-      const monthsHtml = monthKeys.map((mk, mIdx)=>{
-        const mlist = monthGroups[mk].slice().sort((a,b)=> (a.date||"").localeCompare(b.date||""));
-        // Se le pasa a cada tarjeta el equipo bajo el que se está mostrando, para que
-        // "Editar"/"Borrar" solo afecten a este equipo cuando la sesión esté compartida
-        // con más de uno (ver forkSessionForTeams_).
-        let innerHtml;
-        if(mk === "0000-00"){
-          // Sesiones sin fecha: no hay día del mes con el que calcular la semana,
-          // así que se listan directamente, sin subdividir en semanas.
-          innerHtml = mlist.map(s => sessionCardHtml(s, contextTeamId)).join("");
-        } else {
-          const weekGroups = {};
-          mlist.forEach(s => {
-            const wk = sessionWeekOfMonth_(s) || 1;
-            if(!weekGroups[wk]) weekGroups[wk] = [];
-            weekGroups[wk].push(s);
-          });
-          const weekKeys = Object.keys(weekGroups).map(Number).sort((a,b)=>a-b);
-          innerHtml = weekKeys.map(wk=>{
-            const wlist = weekGroups[wk];
-            const cardsHtml = wlist.map(s => sessionCardHtml(s, contextTeamId)).join("");
-            return `
-            <details class="week-group" style="margin:6px 0 0 4px;">
-              <summary style="cursor:pointer;font-weight:600;font-size:.8rem;padding:7px 9px;background:#fff;border:1px solid var(--border);border-radius:8px;">
-                📅 Semana ${wk} <span class="muted" style="font-weight:400;">(${wlist.length} sesión${wlist.length===1?"":"es"})</span>
-              </summary>
-              <div style="margin-top:6px;">${cardsHtml}</div>
-            </details>`;
-          }).join("");
-        }
-        return `
-        <details class="month-group" style="margin:8px 0 0 4px;">
-          <summary style="cursor:pointer;font-weight:600;font-size:.85rem;padding:8px 10px;background:#faf8f5;border:1px solid var(--border);border-radius:8px;">
-            🗓️ ${sessionMonthLabel(mk)} <span class="muted" style="font-weight:400;">(${mlist.length} sesión${mlist.length===1?"":"es"})</span>
-          </summary>
-          <div style="margin-top:8px;">${innerHtml}</div>
-        </details>`;
-      }).join("");
+      const monthsHtml = sessionsByMonthWeekHtml_(tlist, contextTeamId);
       return `
       <details class="team-group" style="margin:8px 0 0 4px;">
         <summary style="cursor:pointer;font-weight:600;padding:9px 11px;background:#f2f6f4;border:1px solid var(--border);border-radius:8px;">
