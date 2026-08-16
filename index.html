@@ -484,6 +484,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
     <button class="tab" data-tab="sessions">Sesiones</button>
     <button class="tab" data-tab="modelo">Modelo de juego</button>
     <button class="tab" data-tab="abp">ABP</button>
+    <button class="tab" data-tab="miequipo">🎽 Mi equipo</button>
     <button class="tab" data-tab="plantilla">👕 Plantilla</button>
     <button class="tab hidden" id="tabCoachesBtn" data-tab="coaches">Entrenadores</button>
     <button class="tab hidden" id="tabPapeleraBtn" data-tab="papelera">🗑️ Papelera</button>
@@ -518,6 +519,11 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
           <span class="home-card-icon">🎯</span>
           <span class="home-card-label">ABP <span id="homeDotAbp" class="card-dot hidden"></span></span>
           <span class="home-card-desc">Jugadas a balón parado</span>
+        </button>
+        <button type="button" class="home-card" data-goto="miequipo">
+          <span class="home-card-icon">🎽</span>
+          <span class="home-card-label">Mi equipo</span>
+          <span class="home-card-desc">Tu plantilla, jornadas y resumen</span>
         </button>
         <button type="button" class="home-card" data-goto="plantilla">
           <span class="home-card-icon">👕</span>
@@ -1004,6 +1010,40 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
         </div>
       </div>
 
+    </div>
+
+    <!-- ---------- MI EQUIPO: acceso rápido y personal a los equipos asignados al entrenador ---------- -->
+    <div id="tab-miequipo" class="hidden">
+      <div id="miEquipoTeamsView">
+        <div class="card">
+          <h2 style="font-size:1.05rem;">🎽 Mi equipo</h2>
+          <p class="muted">Elige uno de tus equipos asignados para ver su plantilla, sus jornadas y su resumen.</p>
+          <div id="miEquipoTeamsList" class="home-grid" style="margin-top:10px;"></div>
+        </div>
+      </div>
+      <div id="miEquipoMenuView" class="hidden">
+        <button type="button" class="btn ghost small" id="miEquipoMenuBack" style="margin-bottom:10px;">← Volver</button>
+        <div class="card">
+          <h2 style="font-size:1.05rem;" id="miEquipoMenuTitle">🎽 Mi equipo</h2>
+          <div class="home-grid" style="margin-top:10px;">
+            <button type="button" class="home-card" id="miEquipoGoRoster">
+              <span class="home-card-icon">👥</span>
+              <span class="home-card-label">Plantilla de jugadores</span>
+              <span class="home-card-desc">Dorsal, nombre y posición</span>
+            </button>
+            <button type="button" class="home-card" id="miEquipoGoMatchdays">
+              <span class="home-card-icon">🗓️</span>
+              <span class="home-card-label">Jornadas</span>
+              <span class="home-card-desc">Convocatorias, goles y tarjetas</span>
+            </button>
+            <button type="button" class="home-card" id="miEquipoGoSummary">
+              <span class="home-card-icon">📊</span>
+              <span class="home-card-label">Resumen</span>
+              <span class="home-card-desc">Estadísticas automáticas</span>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- ---------- COACHES TAB (gestor only) ---------- -->
@@ -1817,7 +1857,7 @@ document.querySelectorAll(".tab").forEach(btn=>{
   btn.onclick = () => {
     document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));
     btn.classList.add("active");
-    ["home","tasks","sessions","modelo","abp","plantilla","coaches","papelera"].forEach(t=>{
+    ["home","tasks","sessions","modelo","abp","miequipo","plantilla","coaches","papelera"].forEach(t=>{
       document.getElementById("tab-"+t).classList.toggle("hidden", t!==btn.dataset.tab);
     });
     placeBoardWrapFor(btn.dataset.tab);
@@ -1826,6 +1866,7 @@ document.querySelectorAll(".tab").forEach(btn=>{
     if(btn.dataset.tab === "sessions") showSessionsView("home");
     if(btn.dataset.tab === "modelo") markSectionSeen("gameModelFiles");
     if(btn.dataset.tab === "plantilla") { showPlantillaView("home"); renderTeamSelector(); }
+    if(btn.dataset.tab === "miequipo") { showMiEquipoView("teams"); renderMiEquipoTeams(); }
     window.scrollTo({top:0, behavior:"smooth"});
   };
 });
@@ -2394,6 +2435,7 @@ function attachRealtimeListeners(){
     teams = snap.docs.map(d=>({id:d.id, ...d.data()}));
     renderTeamManageList();
     renderTeamSelector();
+    renderMiEquipoTeams();
     renderSessionTeamChips();
     renderCoachList();
     renderSavedSessions();
@@ -4500,16 +4542,88 @@ function showPlantillaView(view){
   document.getElementById("plantillaTeamsView").classList.toggle("hidden", view!=="teams");
   document.getElementById("plantillaCompareView").classList.toggle("hidden", view!=="compare");
 }
-document.getElementById("plantillaGoRoster").onclick = () => { showPlantillaView("roster"); renderPlayersList(); };
-document.getElementById("plantillaGoMatchdays").onclick = () => { showPlantillaView("matchdays"); showMatchdaySub("list"); renderMatchdaysList(); };
-document.getElementById("plantillaGoSummary").onclick = () => { showPlantillaView("summary"); renderTeamSummary(); };
+// Roster/Jornadas/Resumen son subsecciones compartidas: se entra en ellas tanto desde el
+// menú general de "Plantilla" como desde "Mi equipo" (con el equipo ya fijado). Este flag
+// recuerda desde dónde se entró, para que el botón "← Volver" lleve al sitio correcto.
+let plantillaBackTarget = "plantilla-home";
+function goBackFromPlantillaDetail_(){
+  if(plantillaBackTarget === "miequipo"){
+    document.querySelector('.tab[data-tab="miequipo"]').click();
+    showMiEquipoView("menu");
+  } else {
+    showPlantillaView("home");
+  }
+}
+document.getElementById("plantillaGoRoster").onclick = () => { plantillaBackTarget = "plantilla-home"; showPlantillaView("roster"); renderPlayersList(); };
+document.getElementById("plantillaGoMatchdays").onclick = () => { plantillaBackTarget = "plantilla-home"; showPlantillaView("matchdays"); showMatchdaySub("list"); renderMatchdaysList(); };
+document.getElementById("plantillaGoSummary").onclick = () => { plantillaBackTarget = "plantilla-home"; showPlantillaView("summary"); renderTeamSummary(); };
 document.getElementById("plantillaGoTeams").onclick = () => { showPlantillaView("teams"); renderTeamManageList(); };
 document.getElementById("plantillaGoCompare").onclick = () => { showPlantillaView("compare"); renderTeamCompare(); };
-document.getElementById("plantillaRosterBack").onclick = () => showPlantillaView("home");
-document.getElementById("plantillaMatchdaysBack").onclick = () => showPlantillaView("home");
-document.getElementById("plantillaSummaryBack").onclick = () => showPlantillaView("home");
+document.getElementById("plantillaRosterBack").onclick = goBackFromPlantillaDetail_;
+document.getElementById("plantillaMatchdaysBack").onclick = goBackFromPlantillaDetail_;
+document.getElementById("plantillaSummaryBack").onclick = goBackFromPlantillaDetail_;
 document.getElementById("plantillaTeamsBack").onclick = () => showPlantillaView("home");
 document.getElementById("plantillaCompareBack").onclick = () => showPlantillaView("home");
+
+/* ---------- MI EQUIPO: elegir uno de tus equipos asignados y entrar directo a sus
+   secciones de plantilla (reutiliza roster/jornadas/resumen de la pestaña Plantilla) ---------- */
+function showMiEquipoView(view){
+  document.getElementById("miEquipoTeamsView").classList.toggle("hidden", view!=="teams");
+  document.getElementById("miEquipoMenuView").classList.toggle("hidden", view!=="menu");
+}
+function renderMiEquipoTeams(){
+  const wrap = document.getElementById("miEquipoTeamsList");
+  if(!wrap) return;
+  const ids = (currentCoach && Array.isArray(currentCoach.teamIds)) ? currentCoach.teamIds : [];
+  const myTeams = ids.map(id=>teams.find(t=>t.id===id)).filter(Boolean).sort((a,b)=>(a.name||"").localeCompare(b.name||"","es"));
+  if(myTeams.length===0){
+    wrap.innerHTML = '<div class="empty">Todavía no tienes ningún equipo asignado. Pídele a un gestor que te lo asigne desde la pestaña "Entrenadores".</div>';
+    return;
+  }
+  wrap.innerHTML = myTeams.map(t=>`
+    <button type="button" class="home-card" onclick="openMiEquipoTeam('${t.id}')">
+      <span class="home-card-icon">🎽</span>
+      <span class="home-card-label">${escapeHtml(t.name)}</span>
+      <span class="home-card-desc">Ver plantilla, jornadas y resumen</span>
+    </button>`).join("");
+}
+// Selecciona el equipo elegido exactamente igual que si se hubiera cambiado en el
+// desplegable de la pestaña Plantilla (mismos efectos: temporada, plantilla, jornadas,
+// resumen), para que ambas pantallas queden siempre consistentes entre sí.
+window.openMiEquipoTeam = (teamId) => {
+  selectedTeamId = teamId;
+  selectedSeason = null;
+  const sel = document.getElementById("teamSelector");
+  if(sel) sel.value = teamId;
+  renderPlayersList();
+  showMatchdaySub("list");
+  renderSeasonSelector();
+  renderMatchdaysList();
+  renderTeamSummary();
+  const t = teams.find(x=>x.id===teamId);
+  document.getElementById("miEquipoMenuTitle").textContent = "🎽 " + (t ? t.name : "Mi equipo");
+  showMiEquipoView("menu");
+};
+document.getElementById("miEquipoMenuBack").onclick = () => showMiEquipoView("teams");
+document.getElementById("miEquipoGoRoster").onclick = () => {
+  plantillaBackTarget = "miequipo";
+  document.querySelector('.tab[data-tab="plantilla"]').click();
+  showPlantillaView("roster");
+  renderPlayersList();
+};
+document.getElementById("miEquipoGoMatchdays").onclick = () => {
+  plantillaBackTarget = "miequipo";
+  document.querySelector('.tab[data-tab="plantilla"]').click();
+  showPlantillaView("matchdays");
+  showMatchdaySub("list");
+  renderMatchdaysList();
+};
+document.getElementById("miEquipoGoSummary").onclick = () => {
+  plantillaBackTarget = "miequipo";
+  document.querySelector('.tab[data-tab="plantilla"]').click();
+  showPlantillaView("summary");
+  renderTeamSummary();
+};
 
 function renderTeamManageList(){
   const wrap = document.getElementById("teamManageList");
