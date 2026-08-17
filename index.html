@@ -1031,8 +1031,18 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
               <span class="home-card-label">Plantilla</span>
               <span class="home-card-desc">Jugadores, jornadas y estadísticas</span>
             </button>
-            <button type="button" class="home-card" id="miEquipoGoSessions">
+            <button type="button" class="home-card" id="miEquipoGoAbp">
               <span class="home-card-icon">🎯</span>
+              <span class="home-card-label">ABP</span>
+              <span class="home-card-desc">Tus carpetas de jugadas para este equipo</span>
+            </button>
+            <button type="button" class="home-card" id="miEquipoGoTasks">
+              <span class="home-card-icon">📋</span>
+              <span class="home-card-label">Tareas</span>
+              <span class="home-card-desc">Tus carpetas de tareas para este equipo</span>
+            </button>
+            <button type="button" class="home-card" id="miEquipoGoSessions">
+              <span class="home-card-icon">🗓️</span>
               <span class="home-card-label">Sesiones</span>
               <span class="home-card-desc">Solo las de este equipo</span>
             </button>
@@ -1062,12 +1072,50 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
           </div>
         </div>
       </div>
+      <div id="miEquipoAbpView" class="hidden">
+        <button type="button" class="btn ghost small" id="miEquipoAbpBack" style="margin-bottom:10px;">← Volver</button>
+        <div class="card">
+          <h2 style="font-size:1.05rem;" id="miEquipoAbpTitle">🎯 ABP</h2>
+          <p class="muted" style="margin-top:-6px;">Tus propias carpetas para este equipo. Crea carpetas (y subcarpetas) y mete en ellas las jugadas del banco que quieras tener a mano para este equipo.</p>
+          <div id="miEquipoAbpBreadcrumb" class="breadcrumb"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+            <button type="button" class="btn ghost small" id="btnNewMiEquipoAbpFolder">📁+ Carpeta</button>
+            <button type="button" class="btn ghost small hidden" id="btnAddMiEquipoAbpPlay">➕ Añadir jugada</button>
+          </div>
+          <div id="miEquipoAbpFolderList" style="margin-top:10px;"></div>
+          <div id="miEquipoAbpItemList" style="margin-top:10px;"></div>
+        </div>
+      </div>
+      <div id="miEquipoTaskView" class="hidden">
+        <button type="button" class="btn ghost small" id="miEquipoTaskBack" style="margin-bottom:10px;">← Volver</button>
+        <div class="card">
+          <h2 style="font-size:1.05rem;" id="miEquipoTaskTitle">📋 Tareas</h2>
+          <p class="muted" style="margin-top:-6px;">Tus propias carpetas para este equipo. Crea carpetas (y subcarpetas) y mete en ellas las tareas del banco que quieras tener a mano para este equipo.</p>
+          <div id="miEquipoTaskBreadcrumb" class="breadcrumb"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+            <button type="button" class="btn ghost small" id="btnNewMiEquipoTaskFolder">📁+ Carpeta</button>
+            <button type="button" class="btn ghost small hidden" id="btnAddMiEquipoTask">➕ Añadir tarea</button>
+          </div>
+          <div id="miEquipoTaskFolderList" style="margin-top:10px;"></div>
+          <div id="miEquipoTaskItemList" style="margin-top:10px;"></div>
+        </div>
+      </div>
       <div id="miEquipoSessionsView" class="hidden">
         <button type="button" class="btn ghost small" id="miEquipoSessionsBack" style="margin-bottom:10px;">← Volver</button>
         <div class="card">
           <h2 style="font-size:1.05rem;" id="miEquipoSessionsTitle">🗓️ Sesiones</h2>
           <div id="miEquipoSessionsList" style="margin-top:10px;"></div>
         </div>
+      </div>
+    </div>
+
+    <!-- ---------- Añadir jugada/tarea a una carpeta de equipo (Mi equipo → ABP/Tareas) ---------- -->
+    <div id="teamFolderItemPickModal" class="modal-bg hidden">
+      <div class="modal">
+        <h2 style="font-size:1.05rem;" id="teamFolderItemPickTitle">Añadir a la carpeta</h2>
+        <input type="text" id="teamFolderItemPickSearch" placeholder="🔍 Buscar por nombre..." style="margin-top:10px;">
+        <div id="teamFolderItemPickList" style="margin-top:10px;max-height:48vh;overflow-y:auto;"></div>
+        <button class="btn ghost" id="btnCloseTeamFolderItemPick" style="width:100%;margin-top:14px;">Cerrar</button>
       </div>
     </div>
 
@@ -4732,6 +4780,8 @@ function showMiEquipoView(view){
   document.getElementById("miEquipoTeamsView").classList.toggle("hidden", view!=="teams");
   document.getElementById("miEquipoMenuView").classList.toggle("hidden", view!=="menu");
   document.getElementById("miEquipoPlantillaMenuView").classList.toggle("hidden", view!=="plantilla");
+  document.getElementById("miEquipoAbpView").classList.toggle("hidden", view!=="abp");
+  document.getElementById("miEquipoTaskView").classList.toggle("hidden", view!=="tasks");
   document.getElementById("miEquipoSessionsView").classList.toggle("hidden", view!=="sessions");
 }
 function renderMiEquipoTeams(){
@@ -4766,6 +4816,8 @@ window.openMiEquipoTeam = (teamId) => {
   const t = teams.find(x=>x.id===teamId);
   document.getElementById("miEquipoMenuTitle").textContent = "🎽 " + (t ? t.name : "Mi equipo");
   document.getElementById("miEquipoPlantillaMenuTitle").textContent = "👕 Plantilla de " + (t ? t.name : "");
+  document.getElementById("miEquipoAbpTitle").textContent = "🎯 ABP de " + (t ? t.name : "");
+  document.getElementById("miEquipoTaskTitle").textContent = "📋 Tareas de " + (t ? t.name : "");
   document.getElementById("miEquipoSessionsTitle").textContent = "🗓️ Sesiones de " + (t ? t.name : "");
   showMiEquipoView("menu");
 };
@@ -4807,6 +4859,298 @@ function renderMiEquipoSessions(){
   if(list.length===0){ wrap.innerHTML = '<div class="empty">🗓️ Este equipo todavía no tiene sesiones de entrenamiento guardadas.</div>'; return; }
   wrap.innerHTML = sessionsByMonthHtml_(list, selectedTeamId);
 }
+
+/* ---------- MI EQUIPO · ABP / Tareas: carpetas PROPIAS de cada entrenador, por equipo -----
+   Nada que ver con "Favoritos" (★): aquí el entrenador crea sus propias carpetas (y
+   subcarpetas) para CADA equipo, y mete dentro las jugadas/tareas del banco que quiera
+   tener a mano para ese equipo en concreto. "section" es "abp" o "tasks". ---------- */
+function teamFolderField_(section){ return section==="tasks" ? "teamTaskFolders" : "teamAbpFolders"; }
+function teamFolderMapField_(section){ return section==="tasks" ? "teamTaskFolderItems" : "teamAbpFolderItems"; }
+function coachTeamFolders_(section, teamId){
+  const all = (currentCoach && currentCoach[teamFolderField_(section)]) || {};
+  return Array.isArray(all[teamId]) ? all[teamId] : [];
+}
+function teamFolderChildren_(section, teamId, parentId){
+  return coachTeamFolders_(section, teamId).filter(f => (f.parentId||null) === (parentId||null));
+}
+function teamFolderDescendantIds_(section, teamId, id){
+  const ids = new Set();
+  (function walk(pid){
+    teamFolderChildren_(section, teamId, pid).forEach(f=>{ ids.add(f.id); walk(f.id); });
+  })(id);
+  return ids;
+}
+function teamFolderName_(section, teamId, id){ const f = coachTeamFolders_(section, teamId).find(x=>x.id===id); return f ? f.name : ""; }
+function teamFolderItemMap_(section, teamId){
+  const all = (currentCoach && currentCoach[teamFolderMapField_(section)]) || {};
+  return all[teamId] || {};
+}
+function teamItemFolderIds_(section, teamId, itemId){
+  const map = teamFolderItemMap_(section, teamId);
+  return Array.isArray(map[itemId]) ? map[itemId] : [];
+}
+function teamFolderItemIds_(section, teamId){
+  // Ojo: incluye también los que se hayan quedado con la lista de carpetas vacía (huérfanos
+  // por un borrado de carpeta) — así siguen contando para "Sin carpeta" en vez de
+  // desaparecer del todo. removeMiEquipoTeamItem sí borra la entrada por completo cuando
+  // el propio entrenador quita el elemento a propósito.
+  return Object.keys(teamFolderItemMap_(section, teamId));
+}
+function teamItemHasNoValidFolder_(section, teamId, itemId){
+  const ids = coachTeamFolders_(section, teamId).map(f=>f.id);
+  const assigned = teamItemFolderIds_(section, teamId, itemId);
+  return assigned.length===0 || !assigned.some(id=>ids.includes(id));
+}
+// Cuenta jugadas/tareas de una carpeta de equipo INCLUYENDO sus subcarpetas.
+function teamFolderCountTree_(section, teamId, folderId){
+  const ids = new Set([folderId, ...teamFolderDescendantIds_(section, teamId, folderId)]);
+  return teamFolderItemIds_(section, teamId).filter(itemId => teamItemFolderIds_(section, teamId, itemId).some(fid=>ids.has(fid))).length;
+}
+// Guarda solo la parte de este equipo dentro de un campo del entrenador (notación de punto
+// de Firestore), sin pisar los datos de sus demás equipos.
+async function saveCoachTeamMapField_(field, teamId, value){
+  currentCoach[field] = currentCoach[field] || {};
+  currentCoach[field][teamId] = value;
+  await db.collection("coaches").doc(currentUser.uid).update({ [`${field}.${teamId}`]: value });
+}
+
+let miEquipoAbpPath = [];  // pila de ids de carpeta, dentro del árbol de ESTE equipo
+let miEquipoTaskPath = [];
+function miEquipoFolderPath_(section){ return section==="tasks" ? miEquipoTaskPath : miEquipoAbpPath; }
+function miEquipoCurrentFolder_(section){ const p = miEquipoFolderPath_(section); return p.length ? p[p.length-1] : null; }
+window.miEquipoFolderGo_ = (section, folderId) => {
+  if(section==="tasks") miEquipoTaskPath.push(folderId); else miEquipoAbpPath.push(folderId);
+  renderMiEquipoSection_(section);
+};
+window.miEquipoBreadcrumbGo_ = (section, idx) => {
+  if(section==="tasks") miEquipoTaskPath = miEquipoTaskPath.slice(0, idx); else miEquipoAbpPath = miEquipoAbpPath.slice(0, idx);
+  renderMiEquipoSection_(section);
+};
+function renderMiEquipoSectionBreadcrumb_(section){
+  const el = document.getElementById(section==="tasks" ? "miEquipoTaskBreadcrumb" : "miEquipoAbpBreadcrumb");
+  const path = miEquipoFolderPath_(section);
+  const crumbs = [{idx:0, label: section==="tasks" ? "📋 Tareas" : "🎯 ABP"}];
+  path.forEach((id,i)=>{
+    const label = id==="__NONE__" ? "❔ Sin carpeta" : (teamFolderName_(section, selectedTeamId, id) || "Carpeta");
+    crumbs.push({idx:i+1, label});
+  });
+  el.innerHTML = crumbs.map((c,i)=>`<span class="crumb${i===crumbs.length-1?" current":""}" onclick="miEquipoBreadcrumbGo_('${section}',${c.idx})">${escapeHtml(c.label)}</span>`).join(' <span class="crumb-sep">›</span> ');
+}
+function renderMiEquipoSection_(section){
+  if(!selectedTeamId) return;
+  renderMiEquipoSectionBreadcrumb_(section);
+  const teamId = selectedTeamId;
+  const curId = miEquipoCurrentFolder_(section);
+  const itemWord = section==="tasks" ? "tarea" : "jugada";
+  const folderListEl = document.getElementById(section==="tasks" ? "miEquipoTaskFolderList" : "miEquipoAbpFolderList");
+  const itemListEl = document.getElementById(section==="tasks" ? "miEquipoTaskItemList" : "miEquipoAbpItemList");
+  const addBtn = document.getElementById(section==="tasks" ? "btnAddMiEquipoTask" : "btnAddMiEquipoAbpPlay");
+  // Solo se pueden añadir jugadas/tareas DENTRO de una carpeta (real o "Sin carpeta"),
+  // igual que se pide en carpetas nuevas: primero se crea la carpeta, luego se llena.
+  addBtn.classList.toggle("hidden", curId===null);
+  let folderHtml = "";
+  if(curId===null){
+    const noneCount = teamFolderItemIds_(section, teamId).filter(itemId=>teamItemHasNoValidFolder_(section, teamId, itemId)).length;
+    if(noneCount>0){
+      folderHtml += `<div class="home-grid">
+      <button type="button" class="home-card" onclick="miEquipoFolderGo_('${section}','__NONE__')">
+        <span class="home-card-icon">❔</span>
+        <span class="home-card-label">Sin carpeta</span>
+        <span class="home-card-desc">${noneCount} ${itemWord}${noneCount===1?"":"s"}</span>
+      </button>
+      </div>`;
+    }
+  }
+  if(curId!=="__NONE__"){
+    const folders = teamFolderChildren_(section, teamId, curId).sort((a,b)=>(a.name||"").localeCompare(b.name||"","es"));
+    if(folders.length){
+      folderHtml += `<div class="home-grid" style="margin-top:10px;">` + folders.map(f=>{
+        const count = teamFolderCountTree_(section, teamId, f.id);
+        const subCount = teamFolderChildren_(section, teamId, f.id).length;
+        return `
+        <div class="home-card folder-card">
+          <button type="button" class="folder-card-main" onclick="miEquipoFolderGo_('${section}','${f.id}')">
+            <span class="home-card-icon">📁</span>
+            <span class="home-card-label">${escapeHtml(f.name)}</span>
+            <span class="home-card-desc">${count} ${itemWord}${count===1?"":"s"}${subCount?` · ${subCount} carpeta${subCount===1?"":"s"}`:""}</span>
+          </button>
+          <button type="button" class="folder-menu-btn" onclick="openTeamFolderActions('${section}','${f.id}')" title="Gestionar carpeta">⋯</button>
+        </div>`;
+      }).join("") + `</div>`;
+    }
+  }
+  folderListEl.innerHTML = folderHtml;
+  let itemHtml = "";
+  if(curId !== null){
+    const itemIds = teamFolderItemIds_(section, teamId).filter(itemId=>{
+      if(curId==="__NONE__") return teamItemHasNoValidFolder_(section, teamId, itemId);
+      return teamItemFolderIds_(section, teamId, itemId).includes(curId);
+    });
+    if(itemIds.length===0){
+      itemHtml = `<div class="empty">Todavía no hay ${itemWord}s en esta carpeta.</div>`;
+    } else if(section==="tasks"){
+      itemHtml = itemIds.map(id=>{
+        const t = tasks.find(x=>x.id===id);
+        if(!t) return "";
+        return `<div class="task-item">
+          <div><h4>${escapeHtml(t.title)}</h4>
+          <div class="task-meta">${taskCategoryNames(t).map(n=>`<span class="badge">${escapeHtml(n)}</span>`).join("")}</div></div>
+          <div class="task-actions">
+            <button class="btn small ghost" onclick="viewTask('${id}')">Ver</button>
+            <button class="btn small danger" onclick="removeMiEquipoTeamItem('tasks','${id}')">Quitar</button>
+          </div>
+        </div>`;
+      }).join("");
+    } else {
+      itemHtml = itemIds.map(id=>{
+        const p = plays.find(x=>x.id===id);
+        if(!p) return "";
+        return `<div class="task-item">
+          <div><h4>${escapeHtml(p.title)}</h4>
+          <div class="task-meta">${playCategoryNames(p).map(n=>`<span class="badge">${escapeHtml(n)}</span>`).join("")}</div></div>
+          <div class="task-actions">
+            <button class="btn small ghost" onclick="viewPlay('${id}')">Ver</button>
+            <button class="btn small danger" onclick="removeMiEquipoTeamItem('abp','${id}')">Quitar</button>
+          </div>
+        </div>`;
+      }).join("");
+    }
+  }
+  itemListEl.innerHTML = itemHtml;
+}
+document.getElementById("miEquipoGoAbp").onclick = () => {
+  miEquipoAbpPath = [];
+  showMiEquipoView("abp");
+  renderMiEquipoSection_("abp");
+};
+document.getElementById("miEquipoGoTasks").onclick = () => {
+  miEquipoTaskPath = [];
+  showMiEquipoView("tasks");
+  renderMiEquipoSection_("tasks");
+};
+document.getElementById("miEquipoAbpBack").onclick = () => showMiEquipoView("menu");
+document.getElementById("miEquipoTaskBack").onclick = () => showMiEquipoView("menu");
+async function createMiEquipoTeamFolder_(section){
+  const teamId = selectedTeamId;
+  if(!teamId) return;
+  const curId = miEquipoCurrentFolder_(section);
+  const parentId = (curId===null || curId==="__NONE__") ? null : curId;
+  const name = prompt(parentId ? "Nombre de la subcarpeta:" : "Nombre de la carpeta:");
+  if(!name || !name.trim()) return;
+  const folders = coachTeamFolders_(section, teamId);
+  folders.push({ id: "f"+Date.now().toString(36)+Math.random().toString(36).slice(2,7), name: name.trim(), parentId });
+  try{
+    await saveCoachTeamMapField_(teamFolderField_(section), teamId, folders);
+    renderMiEquipoSection_(section);
+  }catch(err){ alert("No se ha podido crear la carpeta: " + err.message); }
+}
+document.getElementById("btnNewMiEquipoAbpFolder").onclick = () => createMiEquipoTeamFolder_("abp");
+document.getElementById("btnNewMiEquipoTaskFolder").onclick = () => createMiEquipoTeamFolder_("tasks");
+window.openTeamFolderActions = async (section, id) => {
+  const teamId = selectedTeamId;
+  const folders = coachTeamFolders_(section, teamId);
+  const f = folders.find(x=>x.id===id);
+  if(!f) return;
+  const action = prompt(`Carpeta "${f.name}"\n\nEscribe un nuevo nombre para renombrarla, o "borrar" para eliminarla.\n(deja vacío para cancelar)`);
+  if(!action || !action.trim()) return;
+  try{
+    if(action.trim().toLowerCase()==="borrar"){
+      const hasSubfolders = teamFolderChildren_(section, teamId, id).length>0;
+      const itemWord = section==="tasks" ? "tareas" : "jugadas";
+      const msg = hasSubfolders
+        ? `¿Eliminar la carpeta "${f.name}"? Las ${itemWord} que contiene se quedarán sin carpeta, y sus subcarpetas subirán a la carpeta superior.`
+        : `¿Eliminar la carpeta "${f.name}"? Las ${itemWord} que contiene se quedarán sin carpeta.`;
+      if(!confirm(msg)) return;
+      const parentId = f.parentId || null;
+      const newFolders = folders.filter(x=>x.id!==id).map(x => x.parentId===id ? Object.assign({}, x, {parentId}) : x);
+      const mapField = teamFolderMapField_(section);
+      const map = Object.assign({}, teamFolderItemMap_(section, teamId));
+      // Se mantiene la entrada aunque quede vacía (a diferencia de "Quitar" en un elemento
+      // suelto): así el elemento no desaparece del todo, cae en "Sin carpeta".
+      Object.keys(map).forEach(itemId=>{
+        map[itemId] = Array.from(new Set((map[itemId]||[]).map(fid=> fid===id ? parentId : fid).filter(Boolean)));
+      });
+      await saveCoachTeamMapField_(teamFolderField_(section), teamId, newFolders);
+      await saveCoachTeamMapField_(mapField, teamId, map);
+    } else {
+      f.name = action.trim();
+      await saveCoachTeamMapField_(teamFolderField_(section), teamId, folders);
+    }
+    renderMiEquipoSection_(section);
+  }catch(err){ alert("No se ha podido actualizar la carpeta: " + err.message); }
+};
+window.removeMiEquipoTeamItem = async (section, itemId) => {
+  const teamId = selectedTeamId;
+  const curId = miEquipoCurrentFolder_(section);
+  if(!teamId || !curId) return;
+  const mapField = teamFolderMapField_(section);
+  const map = Object.assign({}, teamFolderItemMap_(section, teamId));
+  if(curId==="__NONE__"){
+    delete map[itemId]; // "sin carpeta" es un cajón de huérfanos: quitarlo de aquí es borrar su entrada del todo
+  } else {
+    const ids = (map[itemId]||[]).filter(fid=>fid!==curId);
+    if(ids.length) map[itemId]=ids; else delete map[itemId];
+  }
+  try{
+    await saveCoachTeamMapField_(mapField, teamId, map);
+    renderMiEquipoSection_(section);
+  }catch(err){ alert("No se ha podido quitar: " + err.message); }
+};
+
+/* ---------- Modal para añadir una jugada/tarea del banco a la carpeta abierta ---------- */
+let teamFolderItemPickSection = null;
+document.getElementById("btnAddMiEquipoAbpPlay").onclick = () => openTeamFolderItemPick_("abp");
+document.getElementById("btnAddMiEquipoTask").onclick = () => openTeamFolderItemPick_("tasks");
+function openTeamFolderItemPick_(section){
+  teamFolderItemPickSection = section;
+  document.getElementById("teamFolderItemPickTitle").textContent = section==="tasks" ? "➕ Añadir tarea a la carpeta" : "➕ Añadir jugada a la carpeta";
+  document.getElementById("teamFolderItemPickSearch").value = "";
+  renderTeamFolderItemPickList_();
+  document.getElementById("teamFolderItemPickModal").classList.remove("hidden");
+}
+document.getElementById("teamFolderItemPickSearch").oninput = renderTeamFolderItemPickList_;
+function renderTeamFolderItemPickList_(){
+  const section = teamFolderItemPickSection;
+  if(!section) return;
+  const search = document.getElementById("teamFolderItemPickSearch").value.trim().toLowerCase();
+  const teamId = selectedTeamId;
+  const curId = miEquipoCurrentFolder_(section);
+  const wrap = document.getElementById("teamFolderItemPickList");
+  if(!search){ wrap.innerHTML = '<p class="muted" style="padding:10px 0;">Escribe un nombre para buscar en el banco...</p>'; return; }
+  const source = section==="tasks" ? tasks : plays;
+  const list = source.filter(x=>(x.title||"").toLowerCase().includes(search));
+  if(list.length===0){ wrap.innerHTML = '<div class="empty">🔍 Sin resultados.</div>'; return; }
+  wrap.innerHTML = list.map(x=>{
+    const already = curId && curId!=="__NONE__" && teamItemFolderIds_(section, teamId, x.id).includes(curId);
+    return `<div class="task-item">
+      <div><h4>${escapeHtml(x.title)}</h4></div>
+      <div class="task-actions">
+        ${already
+          ? `<button class="btn small ghost" disabled>✔ En la carpeta</button>`
+          : `<button class="btn small accent" onclick="addMiEquipoTeamItem('${section}','${x.id}')">➕ Añadir</button>`}
+      </div>
+    </div>`;
+  }).join("");
+}
+window.addMiEquipoTeamItem = async (section, itemId) => {
+  const teamId = selectedTeamId;
+  const curId = miEquipoCurrentFolder_(section);
+  if(!teamId || !curId || curId==="__NONE__") return; // hace falta estar dentro de una carpeta real
+  const mapField = teamFolderMapField_(section);
+  const map = Object.assign({}, teamFolderItemMap_(section, teamId));
+  const ids = new Set(map[itemId] || []);
+  ids.add(curId);
+  map[itemId] = Array.from(ids);
+  try{
+    await saveCoachTeamMapField_(mapField, teamId, map);
+    renderTeamFolderItemPickList_();
+    renderMiEquipoSection_(section);
+  }catch(err){ alert("No se ha podido añadir: " + err.message); }
+};
+document.getElementById("btnCloseTeamFolderItemPick").onclick = () => {
+  document.getElementById("teamFolderItemPickModal").classList.add("hidden");
+  teamFolderItemPickSection = null;
+};
 
 function renderTeamManageList(){
   const wrap = document.getElementById("teamManageList");
