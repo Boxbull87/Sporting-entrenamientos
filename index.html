@@ -41,6 +41,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -177,6 +178,19 @@ input,select,textarea{font-family:inherit;}
 .mi-equipo-cal-today{border-color:var(--accent,#c0392b);}
 .mi-equipo-cal-today .mi-equipo-cal-daynum{font-weight:700;color:var(--accent,#c0392b);}
 .mi-equipo-cal-marks{font-size:.72rem;display:flex;gap:3px;flex-wrap:wrap;}
+
+.goal-chart-card{background:#fff;border-radius:12px;overflow:hidden;border:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:10px;}
+.goal-chart-header{background:#12224f;color:#fff;font-family:'Oswald',sans-serif;text-transform:uppercase;letter-spacing:.03em;font-weight:600;font-size:.78rem;padding:10px 12px;}
+.goal-chart-body{display:flex;flex-wrap:wrap;gap:14px;align-items:center;padding:14px;}
+.goal-chart-donut-wrap{width:140px;height:140px;flex:0 0 auto;position:relative;margin:0 auto;}
+.goal-chart-legend{flex:1;min-width:170px;}
+.goal-chart-legend-row{display:grid;grid-template-columns:12px 1fr auto auto;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:.76rem;}
+.goal-chart-legend-row:last-child{border-bottom:none;}
+.goal-chart-legend-dot{width:12px;height:12px;border-radius:50%;flex:0 0 auto;}
+.goal-chart-legend-label{font-weight:600;text-transform:uppercase;font-size:.68rem;color:#1a1a1a;}
+.goal-chart-legend-count{font-weight:700;color:#1a1a1a;text-align:right;}
+.goal-chart-legend-pct{color:#666;text-align:right;min-width:30px;}
+.goal-chart-total{background:#12224f;color:#fff;text-align:center;font-family:'Oswald',sans-serif;font-weight:600;letter-spacing:.03em;padding:8px 16px;font-size:.78rem;border-radius:999px;margin:0 14px 14px;}
 
 .card{
   background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
@@ -1043,7 +1057,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
             <button type="button" class="home-card" id="miEquipoGoPlantillaMenu">
               <span class="home-card-icon">👕</span>
               <span class="home-card-label">Plantilla</span>
-              <span class="home-card-desc">Jugadores, jornadas y estadísticas</span>
+              <span class="home-card-desc">Jugadores y jornadas</span>
             </button>
             <button type="button" class="home-card" id="miEquipoGoAbp">
               <span class="home-card-icon">🎯</span>
@@ -1059,6 +1073,11 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
               <span class="home-card-icon">🗓️</span>
               <span class="home-card-label">Sesiones</span>
               <span class="home-card-desc">Solo las de este equipo</span>
+            </button>
+            <button type="button" class="home-card" id="miEquipoGoStats">
+              <span class="home-card-icon">📊</span>
+              <span class="home-card-label">Estadísticas</span>
+              <span class="home-card-desc">Resultados y goles por categoría</span>
             </button>
           </div>
         </div>
@@ -1086,11 +1105,6 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
               <span class="home-card-icon">🗓️</span>
               <span class="home-card-label">Jornadas</span>
               <span class="home-card-desc">Convocatorias, goles y tarjetas</span>
-            </button>
-            <button type="button" class="home-card" id="miEquipoGoSummary">
-              <span class="home-card-icon">📊</span>
-              <span class="home-card-label">Resumen</span>
-              <span class="home-card-desc">Estadísticas automáticas</span>
             </button>
           </div>
         </div>
@@ -1191,8 +1205,8 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
           </button>
           <button type="button" class="home-card" id="plantillaGoSummary">
             <span class="home-card-icon">📊</span>
-            <span class="home-card-label">Resumen</span>
-            <span class="home-card-desc">Estadísticas automáticas</span>
+            <span class="home-card-label">Estadísticas</span>
+            <span class="home-card-desc">Resultados y goles por categoría</span>
           </button>
           <button type="button" class="home-card hidden" id="plantillaGoCompare">
             <span class="home-card-icon">🆚</span>
@@ -1334,8 +1348,12 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
       <div id="plantillaSummaryView" class="hidden">
         <button type="button" class="btn ghost small" id="plantillaSummaryBack" style="margin-bottom:10px;">← Volver</button>
         <div class="card" id="teamSummaryCard">
-          <h2 style="font-size:1.05rem;">📊 Resumen</h2>
+          <h2 style="font-size:1.05rem;">📊 Estadísticas</h2>
           <p class="muted" style="margin-top:-6px;">Se calcula solo, a partir de todas las jornadas guardadas de este equipo.</p>
+          <div class="row" id="summaryTeamSelectorRow" style="margin-bottom:10px;">
+            <label style="font-size:.8rem;font-weight:600;align-self:center;">🎽 Equipo:</label>
+            <select id="summaryTeamSelector" style="flex:1;min-width:160px;"></select>
+          </div>
           <div class="row" style="margin-bottom:10px;">
             <button type="button" class="btn small" id="summaryModeSeasonBtn">📅 Temporada completa</button>
             <button type="button" class="btn small ghost" id="summaryModeMatchdayBtn">🗓️ Por jornada</button>
@@ -4828,7 +4846,7 @@ function goBackFromPlantillaDetail_(){
 }
 document.getElementById("plantillaGoRoster").onclick = () => { plantillaBackTarget = "plantilla-home"; showPlantillaView("roster"); renderPlayersList(); };
 document.getElementById("plantillaGoMatchdays").onclick = () => { plantillaBackTarget = "plantilla-home"; showPlantillaView("matchdays"); showMatchdaySub("list"); renderMatchdaysList(); };
-document.getElementById("plantillaGoSummary").onclick = () => { plantillaBackTarget = "plantilla-home"; showPlantillaView("summary"); renderTeamSummary(); };
+document.getElementById("plantillaGoSummary").onclick = () => { plantillaBackTarget = "plantilla-home"; showPlantillaView("summary"); renderSummaryTeamSelector_(); renderTeamSummary(); };
 document.getElementById("plantillaGoTeams").onclick = () => { showPlantillaView("teams"); renderTeamManageList(); };
 document.getElementById("plantillaGoCompare").onclick = () => { showPlantillaView("compare"); renderTeamCompare(); };
 document.getElementById("plantillaRosterBack").onclick = goBackFromPlantillaDetail_;
@@ -4869,13 +4887,7 @@ function renderMiEquipoTeams(){
 window.openMiEquipoTeam = (teamId) => {
   selectedTeamId = teamId;
   selectedSeason = null;
-  const sel = document.getElementById("teamSelector");
-  if(sel) sel.value = teamId;
-  renderPlayersList();
-  showMatchdaySub("list");
-  renderSeasonSelector();
-  renderMatchdaysList();
-  renderTeamSummary();
+  applySelectedTeamChange_();
   const t = teams.find(x=>x.id===teamId);
   document.getElementById("miEquipoMenuTitle").textContent = "🎽 " + (t ? t.name : "Mi equipo");
   document.getElementById("miEquipoPlantillaMenuTitle").textContent = "👕 Plantilla de " + (t ? t.name : "");
@@ -4901,10 +4913,11 @@ document.getElementById("miEquipoGoMatchdays").onclick = () => {
   showMatchdaySub("list");
   renderMatchdaysList();
 };
-document.getElementById("miEquipoGoSummary").onclick = () => {
+document.getElementById("miEquipoGoStats").onclick = () => {
   plantillaBackTarget = "miequipo";
   document.querySelector('.tab[data-tab="plantilla"]').click();
   showPlantillaView("summary");
+  renderSummaryTeamSelector_();
   renderTeamSummary();
 };
 document.getElementById("miEquipoGoSessions").onclick = () => {
@@ -5401,6 +5414,21 @@ window.deleteTeam = async (id) => {
   }catch(err){ alert("No se ha podido eliminar: " + err.message); }
 };
 
+// Re-renderiza todo lo que depende de selectedTeamId, y mantiene sincronizados los DOS
+// desplegables de equipo que puede haber visibles a la vez (el de arriba de Plantilla y el
+// de Estadísticas): cambiar uno cambia el otro, para que nunca queden desincronizados.
+function applySelectedTeamChange_(){
+  const teamSel = document.getElementById("teamSelector");
+  const summarySel = document.getElementById("summaryTeamSelector");
+  if(teamSel && selectedTeamId) teamSel.value = selectedTeamId;
+  if(summarySel && selectedTeamId) summarySel.value = selectedTeamId;
+  renderSummaryTeamSelector_();
+  renderPlayersList();
+  showMatchdaySub("list");
+  renderSeasonSelector();
+  renderMatchdaysList();
+  renderTeamSummary();
+}
 function renderTeamSelector(){
   const sel = document.getElementById("teamSelector");
   if(!sel) return;
@@ -5409,30 +5437,38 @@ function renderTeamSelector(){
   if(visible.length===0){
     sel.innerHTML = '<option value="">Sin equipos asignados</option>';
     selectedTeamId = null;
-    renderPlayersList();
-    showMatchdaySub("list");
-    renderSeasonSelector();
-    renderMatchdaysList();
-    renderTeamSummary();
+    applySelectedTeamChange_();
     return;
   }
   sel.innerHTML = visible.map(t=>`<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("");
   if(prev && visible.some(t=>t.id===prev)) sel.value = prev;
   selectedTeamId = sel.value || visible[0].id;
-  renderPlayersList();
-  showMatchdaySub("list");
-  renderSeasonSelector();
-  renderMatchdaysList();
-  renderTeamSummary();
+  applySelectedTeamChange_();
 }
 document.getElementById("teamSelector").onchange = (e) => {
   selectedTeamId = e.target.value || null;
   selectedSeason = null;
-  renderPlayersList();
-  showMatchdaySub("list");
-  renderSeasonSelector();
-  renderMatchdaysList();
-  renderTeamSummary();
+  applySelectedTeamChange_();
+};
+// Desplegable de equipo propio de la tarjeta de Estadísticas (mismos equipos que ya
+// muestra coachVisibleTeams_ arriba en Plantilla): deja cambiar de equipo sin salir de la
+// vista, tanto entrando desde Plantilla como desde Mi equipo → Estadísticas. Si solo hay
+// un equipo visible, se oculta (no aporta nada elegir entre una sola opción).
+function renderSummaryTeamSelector_(){
+  const sel = document.getElementById("summaryTeamSelector");
+  const row = document.getElementById("summaryTeamSelectorRow");
+  if(!sel || !row) return;
+  const visible = coachVisibleTeams_();
+  row.classList.toggle("hidden", visible.length<=1);
+  if(visible.length===0){ sel.innerHTML = '<option value="">Sin equipos asignados</option>'; return; }
+  sel.innerHTML = visible.map(t=>`<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("");
+  if(selectedTeamId && visible.some(t=>t.id===selectedTeamId)) sel.value = selectedTeamId;
+}
+document.getElementById("summaryTeamSelector").onchange = (e) => {
+  if(!e.target.value) return;
+  selectedTeamId = e.target.value;
+  selectedSeason = null;
+  applySelectedTeamChange_();
 };
 
 // Equipos de una sesión de entrenamiento: se puede elegir MÁS DE UNO, y sin restringir
@@ -5941,28 +5977,95 @@ function aggregateGoalEvents_(mdList, field){
     subs: c.subs.filter(s=>byCat[c.id].subs[s.id]).map(s=>({label:s.label, count:byCat[c.id].subs[s.id]}))
   }));
 }
-const GOAL_CHART_PALETTE_ = ["#c0392b","#2f80ed","#27ae60","#f2c94c","#9b59b6","#16a085","#e67e22","#34495e"];
+// Color fijo por categoría (por id, no por posición en el array filtrado): así una
+// categoría siempre sale del mismo color en cualquier gráfica, aunque en otra no aparezca.
+const GOAL_CATEGORY_COLORS_ = {
+  estrategia: "#e63946",
+  penales: "#f2c14e",
+  posicional: "#1e8449",
+  superioridad: "#8e44ad",
+  inferioridad: "#a3d977",
+  transicion: "#2f80ed"
+};
+function goalChartTotal_(aggData){ return aggData.reduce((s,c)=>s+c.count, 0); }
+// HTML completo de una "tarjeta" de gráfica (cabecera oscura + donut + leyenda con
+// recuento/porcentaje + pastilla de total), al estilo de un informe de análisis de goles.
+// El <canvas> se deja vacío aquí: renderGoalDonutChart_ lo rellena después con Chart.js,
+// una vez que este HTML ya está insertado en el DOM.
+function goalChartCardHtml_(title, canvasId, aggData){
+  if(aggData.length===0){
+    return `<div class="goal-chart-card">
+      <div class="goal-chart-header">${escapeHtml(title)}</div>
+      <div class="empty" style="margin:14px;">Sin goles etiquetados por categoría todavía.</div>
+    </div>`;
+  }
+  const total = goalChartTotal_(aggData);
+  const legendRows = aggData.map(c=>{
+    const pct = total ? Math.round(c.count/total*100) : 0;
+    return `<div class="goal-chart-legend-row">
+      <span class="goal-chart-legend-dot" style="background:${GOAL_CATEGORY_COLORS_[c.id]||"#999"};"></span>
+      <span class="goal-chart-legend-label">${escapeHtml(c.label)}</span>
+      <span class="goal-chart-legend-count">${c.count}</span>
+      <span class="goal-chart-legend-pct">${pct}%</span>
+    </div>`;
+  }).join("");
+  return `<div class="goal-chart-card">
+    <div class="goal-chart-header">${escapeHtml(title)}</div>
+    <div class="goal-chart-body">
+      <div class="goal-chart-donut-wrap"><canvas id="${canvasId}"></canvas></div>
+      <div class="goal-chart-legend">${legendRows}</div>
+    </div>
+    <div class="goal-chart-total">TOTAL: ${total} GOL${total===1?"":"ES"}</div>
+  </div>`;
+}
+// Plugin de Chart.js casero (sin librería aparte) para escribir "TOTAL / nº / GOLES" en
+// el hueco central del donut, como en un informe de analítica.
+const goalCenterTextPlugin_ = {
+  id: "goalCenterText",
+  afterDraw(chart){
+    const opts = chart.config.options.plugins && chart.config.options.plugins.goalCenterText;
+    if(!opts) return;
+    const {ctx, chartArea:{left,right,top,bottom}} = chart;
+    const cx = (left+right)/2, cy = (top+bottom)/2;
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#12224f";
+    ctx.font = "600 10px 'Oswald', sans-serif";
+    ctx.fillText(opts.label1, cx, cy-16);
+    ctx.font = "800 22px 'Oswald', sans-serif";
+    ctx.fillText(String(opts.total), cx, cy+2);
+    ctx.font = "600 10px 'Oswald', sans-serif";
+    ctx.fillText(opts.label2, cx, cy+18);
+    ctx.restore();
+  }
+};
+if(typeof Chart!=="undefined") Chart.register(goalCenterTextPlugin_);
 const goalChartInstances_ = {};
-// Dibuja (o borra si no hay datos) un pastel de Chart.js por categoría principal; el
-// tooltip de cada porción añade el desglose de subcategorías. emptyId es el mensaje
-// "sin goles etiquetados" que se muestra/oculta según haya datos o no.
-function renderGoalCategoryChartBlock_(canvasId, emptyId, aggData){
-  const emptyEl = document.getElementById(emptyId);
-  const canvas = document.getElementById(canvasId);
-  if(emptyEl) emptyEl.classList.toggle("hidden", aggData.length>0);
-  if(canvas) canvas.classList.toggle("hidden", aggData.length===0);
+// Crea (o borra si no hay datos) el donut de Chart.js dentro del <canvas> que ya insertó
+// goalChartCardHtml_. El tooltip de cada porción añade el desglose de subcategorías.
+function renderGoalDonutChart_(canvasId, aggData){
   if(goalChartInstances_[canvasId]){ goalChartInstances_[canvasId].destroy(); delete goalChartInstances_[canvasId]; }
+  const canvas = document.getElementById(canvasId);
   if(!canvas || aggData.length===0 || typeof Chart==="undefined") return;
+  const total = goalChartTotal_(aggData);
   goalChartInstances_[canvasId] = new Chart(canvas.getContext("2d"), {
-    type: "pie",
+    type: "doughnut",
     data: {
       labels: aggData.map(c=>c.label),
-      datasets: [{ data: aggData.map(c=>c.count), backgroundColor: aggData.map((c,i)=>GOAL_CHART_PALETTE_[i%GOAL_CHART_PALETTE_.length]) }]
+      datasets: [{
+        data: aggData.map(c=>c.count),
+        backgroundColor: aggData.map(c=>GOAL_CATEGORY_COLORS_[c.id]||"#999"),
+        borderColor: "#ffffff",
+        borderWidth: 2
+      }]
     },
     options: {
       responsive: true,
+      cutout: "58%",
       plugins: {
-        legend: { position: "bottom", labels: { boxWidth: 12, font: {size: 11} } },
+        legend: { display: false },
+        goalCenterText: { total, label1: "TOTAL", label2: total===1?"GOL":"GOLES" },
         tooltip: {
           callbacks: {
             label: (ctx) => {
@@ -5971,6 +6074,14 @@ function renderGoalCategoryChartBlock_(canvasId, emptyId, aggData){
               cat.subs.forEach(s => lines.push(`   ${s.label}: ${s.count}`));
               return lines;
             }
+          }
+        },
+        datalabels: {
+          color: "#ffffff",
+          font: { weight: "bold", size: 12 },
+          formatter: (value) => {
+            const pct = total ? Math.round(value/total*100) : 0;
+            return [String(value), pct+"%"];
           }
         }
       }
@@ -6287,7 +6398,7 @@ document.getElementById("btnExportSummaryPDF").onclick = () => {
     gks.map(s=>[`${s.player.dorsal!=null?s.player.dorsal+". ":""}${s.player.name}`, s.gkMatches, s.goalsConceded, s.cleanSheets, s.yellow, s.red, s.avgRating!=null?s.avgRating.toFixed(1):"-"])
   );
 
-  doc.save(`Resumen_${(team?team.name:"equipo").replace(/[^a-zA-Z0-9]+/g,"_")}.pdf`);
+  doc.save(`Estadisticas_${(team?team.name:"equipo").replace(/[^a-zA-Z0-9]+/g,"_")}.pdf`);
 };
 
 document.getElementById("btnExportSummaryExcel").onclick = () => {
@@ -6311,7 +6422,7 @@ document.getElementById("btnExportSummaryExcel").onclick = () => {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, wsOut, "Jugadores");
   XLSX.utils.book_append_sheet(wb, wsGk, "Porteros");
-  XLSX.writeFile(wb, `Resumen_${(team?team.name:"equipo").replace(/[^a-zA-Z0-9]+/g,"_")}.xlsx`);
+  XLSX.writeFile(wb, `Estadisticas_${(team?team.name:"equipo").replace(/[^a-zA-Z0-9]+/g,"_")}.xlsx`);
 };
 
 /* ---------- Resumen automático ---------- */
@@ -6420,6 +6531,8 @@ function renderSeasonSummary_(wrap){
   const sum = computeTeamSummary_(selectedTeamId, selectedSeason, summaryDifficultyFilter);
   const outfield = sum.stats.filter(s=>s.player.position!=="Portero").sort((a,b)=> b.goals-a.goals || b.played-a.played);
   const gks = sum.stats.filter(s=>s.player.position==="Portero").sort((a,b)=> b.cleanSheets-a.cleanSheets || a.goalsConceded-b.goalsConceded);
+  const forAgg = aggregateGoalEvents_(sum.teamMds, "goalsForEvents");
+  const againstAgg = aggregateGoalEvents_(sum.teamMds, "goalsAgainstEvents");
   wrap.innerHTML = `
     <p class="muted" style="margin-top:-6px;">Temporada: ${escapeHtml(selectedSeason||"-")}</p>
     <div class="row" style="margin-bottom:12px;">
@@ -6429,16 +6542,8 @@ function renderSeasonSummary_(wrap){
     </div>
     <h3 style="font-size:.9rem;">Goles por categoría (temporada)</h3>
     <div class="row" style="align-items:flex-start;margin-bottom:12px;">
-      <div style="flex:1;min-width:220px;">
-        <h4 style="font-size:.82rem;margin:0 0 6px;">⚽ Marcados</h4>
-        <div id="summaryGoalsForChartEmpty" class="empty hidden">Sin goles marcados etiquetados por categoría todavía.</div>
-        <div style="max-width:260px;"><canvas id="summaryGoalsForChart"></canvas></div>
-      </div>
-      <div style="flex:1;min-width:220px;">
-        <h4 style="font-size:.82rem;margin:0 0 6px;">🥅 Encajados</h4>
-        <div id="summaryGoalsAgainstChartEmpty" class="empty hidden">Sin goles encajados etiquetados por categoría todavía.</div>
-        <div style="max-width:260px;"><canvas id="summaryGoalsAgainstChart"></canvas></div>
-      </div>
+      <div style="flex:1;min-width:260px;">${goalChartCardHtml_("⚽ Goles marcados — Temporada", "summaryGoalsForChart", forAgg)}</div>
+      <div style="flex:1;min-width:260px;">${goalChartCardHtml_("🥅 Goles encajados — Temporada", "summaryGoalsAgainstChart", againstAgg)}</div>
     </div>
     <h3 style="font-size:.9rem;">Jugadores</h3>
     <div style="overflow-x:auto;">
@@ -6482,8 +6587,8 @@ function renderSeasonSummary_(wrap){
       </tbody>
     </table>
     </div>`;
-  renderGoalCategoryChartBlock_("summaryGoalsForChart", "summaryGoalsForChartEmpty", aggregateGoalEvents_(sum.teamMds, "goalsForEvents"));
-  renderGoalCategoryChartBlock_("summaryGoalsAgainstChart", "summaryGoalsAgainstChartEmpty", aggregateGoalEvents_(sum.teamMds, "goalsAgainstEvents"));
+  renderGoalDonutChart_("summaryGoalsForChart", forAgg);
+  renderGoalDonutChart_("summaryGoalsAgainstChart", againstAgg);
 }
 function renderMatchdaySummary_(wrap){
   const m = matchdays.find(x=>x.id===summarySelectedMatchdayId);
@@ -6496,6 +6601,8 @@ function renderMatchdaySummary_(wrap){
   const diff = matchDifficultyInfo_(m.difficulty);
   const notes = m.playerNotes || {};
   const ratings = m.playerRatings || {};
+  const forAgg = aggregateGoalEvents_([m], "goalsForEvents");
+  const againstAgg = aggregateGoalEvents_([m], "goalsAgainstEvents");
   wrap.innerHTML = `
     <div class="row" style="margin-bottom:12px;">
       <div class="badge outline" style="padding:8px 12px;">🗓️ Jornada ${m.number}${m.date?` · ${escapeHtml(m.date)}`:""}</div>
@@ -6508,16 +6615,8 @@ function renderMatchdaySummary_(wrap){
     ${m.videoUrl ? `<div style="margin-bottom:12px;">${videoEmbedHtml(m.videoUrl)}</div>` : ""}
     <h3 style="font-size:.9rem;">Goles por categoría (este partido)</h3>
     <div class="row" style="align-items:flex-start;margin-bottom:12px;">
-      <div style="flex:1;min-width:220px;">
-        <h4 style="font-size:.82rem;margin:0 0 6px;">⚽ Marcados</h4>
-        <div id="mdSummaryGoalsForChartEmpty" class="empty hidden">Sin goles marcados etiquetados por categoría en este partido.</div>
-        <div style="max-width:260px;"><canvas id="mdSummaryGoalsForChart"></canvas></div>
-      </div>
-      <div style="flex:1;min-width:220px;">
-        <h4 style="font-size:.82rem;margin:0 0 6px;">🥅 Encajados</h4>
-        <div id="mdSummaryGoalsAgainstChartEmpty" class="empty hidden">Sin goles encajados etiquetados por categoría en este partido.</div>
-        <div style="max-width:260px;"><canvas id="mdSummaryGoalsAgainstChart"></canvas></div>
-      </div>
+      <div style="flex:1;min-width:260px;">${goalChartCardHtml_("⚽ Goles marcados", "mdSummaryGoalsForChart", forAgg)}</div>
+      <div style="flex:1;min-width:260px;">${goalChartCardHtml_("🥅 Goles encajados", "mdSummaryGoalsAgainstChart", againstAgg)}</div>
     </div>
     ${linkedSessions.length ? `
       <h3 style="font-size:.9rem;">🔗 Sesiones de entrenamiento de esa semana</h3>
@@ -6558,8 +6657,8 @@ function renderMatchdaySummary_(wrap){
           ${roster.filter(p=>notes[p.id]).map(p=>`<li><strong>${escapeHtml(p.name)}:</strong> ${escapeHtml(notes[p.id])}</li>`).join("")}
         </ul>` : ""}
     ` : ""}`;
-  renderGoalCategoryChartBlock_("mdSummaryGoalsForChart", "mdSummaryGoalsForChartEmpty", aggregateGoalEvents_([m], "goalsForEvents"));
-  renderGoalCategoryChartBlock_("mdSummaryGoalsAgainstChart", "mdSummaryGoalsAgainstChartEmpty", aggregateGoalEvents_([m], "goalsAgainstEvents"));
+  renderGoalDonutChart_("mdSummaryGoalsForChart", forAgg);
+  renderGoalDonutChart_("mdSummaryGoalsAgainstChart", againstAgg);
 }
 window.goToMatchdayReport = (id) => {
   showPlantillaView("matchdays");
