@@ -164,6 +164,19 @@ input,select,textarea{font-family:inherit;}
 }
 .folder-menu-btn:hover{background:rgba(0,0,0,.06);color:var(--ink);}
 
+.mi-equipo-cal-weekdays{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;font-size:.72rem;font-weight:600;color:var(--muted);text-align:center;margin-bottom:4px;}
+.mi-equipo-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+.mi-equipo-cal-day{
+  min-height:52px;border:1px solid var(--border);border-radius:8px;padding:4px;cursor:pointer;
+  display:flex;flex-direction:column;justify-content:space-between;background:var(--card);
+  transition:background .15s ease;
+}
+.mi-equipo-cal-day:hover{background:rgba(192,57,41,.08);}
+.mi-equipo-cal-daynum{font-size:.76rem;color:var(--ink);}
+.mi-equipo-cal-today{border-color:var(--accent,#c0392b);}
+.mi-equipo-cal-today .mi-equipo-cal-daynum{font-weight:700;color:var(--accent,#c0392b);}
+.mi-equipo-cal-marks{font-size:.72rem;display:flex;gap:3px;flex-wrap:wrap;}
+
 .card{
   background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
   padding:16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.04);
@@ -1048,6 +1061,15 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
             </button>
           </div>
         </div>
+        <div class="card" style="margin-top:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+            <button type="button" class="btn ghost small" id="miEquipoCalPrev" style="flex:0 0 auto;">← Mes anterior</button>
+            <h3 style="font-size:.95rem;margin:0;text-align:center;flex:1;" id="miEquipoCalLabel"></h3>
+            <button type="button" class="btn ghost small" id="miEquipoCalNext" style="flex:0 0 auto;">Mes siguiente →</button>
+          </div>
+          <div id="miEquipoCalGrid" style="margin-top:10px;"></div>
+          <p class="muted" style="font-size:.75rem;margin-top:8px;margin-bottom:0;">🗓️ Sesión de entrenamiento · ⚽ Partido — pulsa un día para verlo o para crear uno nuevo.</p>
+        </div>
       </div>
       <div id="miEquipoPlantillaMenuView" class="hidden">
         <button type="button" class="btn ghost small" id="miEquipoPlantillaMenuBack" style="margin-bottom:10px;">← Volver</button>
@@ -1106,6 +1128,19 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
           <h2 style="font-size:1.05rem;" id="miEquipoSessionsTitle">🗓️ Sesiones</h2>
           <div id="miEquipoSessionsList" style="margin-top:10px;"></div>
         </div>
+      </div>
+    </div>
+
+    <!-- ---------- Mi equipo: calendario, elegir qué crear/ver en un día ---------- -->
+    <div id="miEquipoCalDayModal" class="modal-bg hidden">
+      <div class="modal">
+        <h2 style="font-size:1.05rem;" id="miEquipoCalDayTitle">Día</h2>
+        <div id="miEquipoCalDayExisting" style="margin-bottom:10px;"></div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <button type="button" class="btn accent" id="miEquipoCalDayNewSession">🗓️ Crear sesión de entrenamiento</button>
+          <button type="button" class="btn accent" id="miEquipoCalDayNewMatchday">⚽ Crear partido (jornada)</button>
+        </div>
+        <button class="btn ghost" id="btnCloseMiEquipoCalDay" style="width:100%;margin-top:14px;">Cerrar</button>
       </div>
     </div>
 
@@ -2528,6 +2563,7 @@ function attachRealtimeListeners(){
     renderSavedSessions();
     renderTrash();
     renderNotifications();
+    renderMiEquipoCalendar_();
   }, err => showSyncError_("sesiones de entrenamiento", err));
 
   db.collection("abpCategories").orderBy("name").onSnapshot(snap=>{
@@ -2595,6 +2631,7 @@ function attachRealtimeListeners(){
     if(statsMatchdayId && !document.getElementById("matchdayStatsView").classList.contains("hidden")){
       renderMatchdayStatsTable();
     }
+    renderMiEquipoCalendar_();
   }, err => showSyncError_("jornadas", err));
 }
 
@@ -4820,6 +4857,7 @@ window.openMiEquipoTeam = (teamId) => {
   document.getElementById("miEquipoTaskTitle").textContent = "📋 Tareas de " + (t ? t.name : "");
   document.getElementById("miEquipoSessionsTitle").textContent = "🗓️ Sesiones de " + (t ? t.name : "");
   showMiEquipoView("menu");
+  renderMiEquipoCalendar_();
 };
 document.getElementById("miEquipoMenuBack").onclick = () => showMiEquipoView("teams");
 document.getElementById("miEquipoGoPlantillaMenu").onclick = () => showMiEquipoView("plantilla");
@@ -4859,6 +4897,114 @@ function renderMiEquipoSessions(){
   if(list.length===0){ wrap.innerHTML = '<div class="empty">🗓️ Este equipo todavía no tiene sesiones de entrenamiento guardadas.</div>'; return; }
   wrap.innerHTML = sessionsByMonthHtml_(list, selectedTeamId);
 }
+
+/* ---------- MI EQUIPO · Calendario: vista de mes directamente en la ventana principal
+   (no es una pestaña más), con las sesiones de entrenamiento y los partidos (jornadas)
+   YA GUARDADOS de este equipo marcados en su día, y que al pulsar cualquier día deja
+   crear una sesión o un partido de verdad — van a parar a las mismas colecciones
+   "sessions"/"matchdays" de siempre, se editan y aparecen igual que si se hubieran
+   creado desde Sesiones o desde Plantilla → Jornadas. ---------- */
+let miEquipoCalDate = new Date();
+miEquipoCalDate.setDate(1);
+let miEquipoCalOpenDate = null; // día abierto en el modal de "crear/ver" (yyyy-mm-dd)
+const MI_EQUIPO_CAL_WEEKDAYS = ["L","M","X","J","V","S","D"];
+function miEquipoCalIso_(y, m, d){
+  return `${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+}
+function renderMiEquipoCalendar_(){
+  const grid = document.getElementById("miEquipoCalGrid");
+  const label = document.getElementById("miEquipoCalLabel");
+  if(!grid || !label) return;
+  const y = miEquipoCalDate.getFullYear();
+  const m = miEquipoCalDate.getMonth();
+  const monthLabel = miEquipoCalDate.toLocaleDateString("es-ES", {month:"long", year:"numeric"});
+  label.textContent = monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1);
+  if(!selectedTeamId){
+    grid.innerHTML = '<p class="muted">Elige un equipo para ver su calendario.</p>';
+    return;
+  }
+  const teamSessions = sessions.filter(s => s.date && sessionTeams_(s).some(t=>t.id===selectedTeamId));
+  const teamMatchdays = matchdays.filter(md => md.date && md.teamId===selectedTeamId);
+  const sessByDate = {}, mdByDate = {};
+  teamSessions.forEach(s => { (sessByDate[s.date] = sessByDate[s.date] || []).push(s); });
+  teamMatchdays.forEach(md => { (mdByDate[md.date] = mdByDate[md.date] || []).push(md); });
+
+  const startOffset = (new Date(y, m, 1).getDay() + 6) % 7; // semana empieza en lunes
+  const daysInMonth = new Date(y, m+1, 0).getDate();
+  const todayIso = new Date().toISOString().slice(0,10);
+
+  let cells = "";
+  for(let i=0;i<startOffset;i++) cells += `<div></div>`;
+  for(let d=1; d<=daysInMonth; d++){
+    const iso = miEquipoCalIso_(y, m, d);
+    const daySessions = sessByDate[iso] || [];
+    const dayMatchdays = mdByDate[iso] || [];
+    const marks = `${daySessions.length ? `<span title="${daySessions.length} sesión(es) de entrenamiento">🗓️${daySessions.length>1?daySessions.length:""}</span>` : ""}${dayMatchdays.length ? `<span title="${dayMatchdays.length} partido(s)">⚽${dayMatchdays.length>1?dayMatchdays.length:""}</span>` : ""}`;
+    cells += `<div class="mi-equipo-cal-day${iso===todayIso?" mi-equipo-cal-today":""}" onclick="openMiEquipoCalDay_('${iso}')">
+      <span class="mi-equipo-cal-daynum">${d}</span>
+      <span class="mi-equipo-cal-marks">${marks}</span>
+    </div>`;
+  }
+  grid.innerHTML = `
+    <div class="mi-equipo-cal-weekdays">${MI_EQUIPO_CAL_WEEKDAYS.map(w=>`<div>${w}</div>`).join("")}</div>
+    <div class="mi-equipo-cal-grid">${cells}</div>`;
+}
+document.getElementById("miEquipoCalPrev").onclick = () => { miEquipoCalDate.setMonth(miEquipoCalDate.getMonth()-1); renderMiEquipoCalendar_(); };
+document.getElementById("miEquipoCalNext").onclick = () => { miEquipoCalDate.setMonth(miEquipoCalDate.getMonth()+1); renderMiEquipoCalendar_(); };
+
+window.openMiEquipoCalDay_ = (iso) => {
+  if(!selectedTeamId) return;
+  miEquipoCalOpenDate = iso;
+  const [y,m,d] = iso.split("-");
+  document.getElementById("miEquipoCalDayTitle").textContent = `🗓️ ${d}/${m}/${y}`;
+  const daySessions = sessions.filter(s => s.date===iso && sessionTeams_(s).some(t=>t.id===selectedTeamId));
+  const dayMatchdays = matchdays.filter(md => md.date===iso && md.teamId===selectedTeamId);
+  const wrap = document.getElementById("miEquipoCalDayExisting");
+  if(daySessions.length===0 && dayMatchdays.length===0){
+    wrap.innerHTML = '<p class="muted" style="margin-top:0;">Todavía no hay nada guardado este día.</p>';
+  } else {
+    wrap.innerHTML = `<p class="muted" style="margin-top:0;">Ya guardado este día:</p>` +
+      daySessions.map(s=>`<button type="button" class="btn ghost small" style="width:100%;text-align:left;margin-bottom:4px;" onclick="viewMiEquipoCalSession_('${s.id}')">🗓️ ${escapeHtml(s.name||"(sin título)")}</button>`).join("") +
+      dayMatchdays.map(md=>`<button type="button" class="btn ghost small" style="width:100%;text-align:left;margin-bottom:4px;" onclick="viewMiEquipoCalMatchday_('${md.id}')">⚽ Jornada ${md.number||"?"} vs ${escapeHtml(md.rival||"?")}</button>`).join("");
+  }
+  document.getElementById("miEquipoCalDayModal").classList.remove("hidden");
+};
+document.getElementById("btnCloseMiEquipoCalDay").onclick = () => {
+  document.getElementById("miEquipoCalDayModal").classList.add("hidden");
+  miEquipoCalOpenDate = null;
+};
+window.viewMiEquipoCalSession_ = (id) => {
+  document.getElementById("miEquipoCalDayModal").classList.add("hidden");
+  viewLinkedSession(id);
+};
+window.viewMiEquipoCalMatchday_ = (id) => {
+  document.getElementById("miEquipoCalDayModal").classList.add("hidden");
+  plantillaBackTarget = "miequipo";
+  document.querySelector('.tab[data-tab="plantilla"]').click();
+  showPlantillaView("matchdays");
+  openMatchdayStats(id);
+};
+document.getElementById("miEquipoCalDayNewSession").onclick = () => {
+  const iso = miEquipoCalOpenDate;
+  if(!iso) return;
+  document.getElementById("miEquipoCalDayModal").classList.add("hidden");
+  resetSessionForm();
+  document.getElementById("sessionDate").value = iso;
+  if(selectedTeamId){ sessionTeamIds = [selectedTeamId]; renderSessionTeamChips(); }
+  document.querySelector('.tab[data-tab="sessions"]').click();
+  showSessionsView("new");
+  document.getElementById("sessionEditorPanel").scrollIntoView({behavior:"smooth"});
+};
+document.getElementById("miEquipoCalDayNewMatchday").onclick = () => {
+  const iso = miEquipoCalOpenDate;
+  if(!iso || !selectedTeamId) return;
+  document.getElementById("miEquipoCalDayModal").classList.add("hidden");
+  plantillaBackTarget = "miequipo";
+  document.querySelector('.tab[data-tab="plantilla"]').click();
+  showPlantillaView("matchdays");
+  openNewMatchdayForm_(iso);
+  document.getElementById("matchdaysCard").scrollIntoView({behavior:"smooth"});
+};
 
 /* ---------- MI EQUIPO · ABP / Tareas: carpetas PROPIAS de cada entrenador, por equipo -----
    Nada que ver con "Favoritos" (★): aquí el entrenador crea sus propias carpetas (y
@@ -5425,13 +5571,14 @@ function renderMatchdaysList(){
     </tbody>
   </table>`;
 }
-document.getElementById("btnNewMatchday").onclick = () => {
-  if(!selectedTeamId){ alert("Elige primero un equipo arriba."); return; }
+// prefillDate (opcional, "yyyy-mm-dd"): se usa al crear un partido desde el calendario de
+// Mi equipo, para que la jornada nueva ya nazca con la fecha del día pulsado.
+function openNewMatchdayForm_(prefillDate){
   editingMatchdayId = null;
   const teamMds = matchdays.filter(m=>m.teamId===selectedTeamId);
   const nextNum = teamMds.length ? Math.max(...teamMds.map(m=>m.number||0))+1 : 1;
   document.getElementById("mdNumber").value = nextNum;
-  document.getElementById("mdDate").value = "";
+  document.getElementById("mdDate").value = prefillDate || "";
   document.getElementById("mdRival").value = "";
   document.getElementById("mdCompetition").value = "Liga";
   document.getElementById("mdHomeAway").value = "Local";
@@ -5440,6 +5587,10 @@ document.getElementById("btnNewMatchday").onclick = () => {
   document.getElementById("mdVideoUrl").value = "";
   document.getElementById("matchdayMsg").innerHTML = "";
   showMatchdaySub("form");
+}
+document.getElementById("btnNewMatchday").onclick = () => {
+  if(!selectedTeamId){ alert("Elige primero un equipo arriba."); return; }
+  openNewMatchdayForm_();
 };
 window.editMatchdayInfo = (id) => {
   const m = matchdays.find(x=>x.id===id);
