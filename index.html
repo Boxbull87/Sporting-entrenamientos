@@ -5116,14 +5116,23 @@ function renderTeamFolderItemPickList_(){
   const teamId = selectedTeamId;
   const curId = miEquipoCurrentFolder_(section);
   const wrap = document.getElementById("teamFolderItemPickList");
-  if(!search){ wrap.innerHTML = '<p class="muted" style="padding:10px 0;">Escribe un nombre para buscar en el banco...</p>'; return; }
+  if(!search){ wrap.innerHTML = '<p class="muted" style="padding:10px 0;">Escribe un nombre, o el de una carpeta del banco, para buscar...</p>'; return; }
   const source = section==="tasks" ? tasks : plays;
-  const list = source.filter(x=>(x.title||"").toLowerCase().includes(search));
+  // Encuentra tanto por el nombre del propio elemento como por el nombre de cualquiera de
+  // las carpetas del banco general en las que esté (p. ej. buscar "Córners" encuentra todas
+  // las jugadas de esa carpeta, tengan o no "córners" en su título).
+  const list = source.filter(x=>{
+    if((x.title||"").toLowerCase().includes(search)) return true;
+    const catNames = section==="tasks" ? taskCategoryNames(x) : playCategoryNames(x);
+    return catNames.some(n=>(n||"").toLowerCase().includes(search));
+  });
   if(list.length===0){ wrap.innerHTML = '<div class="empty">🔍 Sin resultados.</div>'; return; }
   wrap.innerHTML = list.map(x=>{
     const already = curId && curId!=="__NONE__" && teamItemFolderIds_(section, teamId, x.id).includes(curId);
+    const catNames = section==="tasks" ? taskCategoryNames(x) : playCategoryNames(x);
     return `<div class="task-item">
-      <div><h4>${escapeHtml(x.title)}</h4></div>
+      <div><h4>${escapeHtml(x.title)}</h4>
+      <div class="task-meta">${catNames.map(n=>`<span class="badge">${escapeHtml(n)}</span>`).join("")}</div></div>
       <div class="task-actions">
         ${already
           ? `<button class="btn small ghost" disabled>✔ En la carpeta</button>`
