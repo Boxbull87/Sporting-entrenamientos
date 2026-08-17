@@ -1342,11 +1342,11 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
   </div>
 </div>
 
-<!-- ---------- Selector de carpetas personales de favoritos (ABP) ---------- -->
+<!-- ---------- Selector de carpetas personales de favoritos (Tareas y ABP) ---------- -->
 <div id="favFolderPickModal" class="modal-bg hidden">
   <div class="modal">
     <h2 style="font-size:1.05rem;">⭐ Guardar en carpetas de favoritos</h2>
-    <p class="muted" style="margin-top:-6px;">Elige en qué carpeta(s) tuyas quieres guardar esta jugada (opcional).</p>
+    <p class="muted" style="margin-top:-6px;" id="favFolderPickDesc">Elige en qué carpeta(s) tuyas quieres guardar esto (opcional).</p>
     <div id="favFolderPickList" style="margin-top:12px;"></div>
     <div style="display:flex;gap:8px;margin-top:14px;">
       <button class="btn accent" id="btnSaveFavFolderPick" style="flex:1;">Guardar</button>
@@ -1934,7 +1934,11 @@ function renderTaskBreadcrumb(){
   const el = document.getElementById("taskBreadcrumb");
   const crumbs = [{idx:0, label:"🏦 Raíz"}];
   taskBrowserPath.forEach((id,i)=>{
-    const label = id==="__FAV__" ? "⭐ Favoritos" : id==="__NONE__" ? "❔ Sin carpeta" : (catName_(id) || "Carpeta");
+    let label;
+    if(id==="__FAV__") label = "⭐ Favoritos";
+    else if(id==="__NONE__") label = "❔ Sin carpeta";
+    else if(taskBrowserPath[0]==="__FAV__" && i>0) label = favFolderName_("tasks", id) || "Carpeta";
+    else label = catName_(id) || "Carpeta";
     crumbs.push({idx:i+1, label});
   });
   el.innerHTML = crumbs.map((c,i)=>`<span class="crumb${i===crumbs.length-1?" current":""}" onclick="taskBrowserPath=taskBrowserPath.slice(0,${c.idx}); renderTaskBank();">${escapeHtml(c.label)}</span>`).join(' <span class="crumb-sep">›</span> ');
@@ -1942,8 +1946,48 @@ function renderTaskBreadcrumb(){
 function renderTaskFolderList(){
   const wrap = document.getElementById("taskFolderList");
   const curId = taskCurrentFolder();
-  document.getElementById("btnNewTaskFolder").classList.toggle("hidden", curId==="__FAV__" || curId==="__NONE__");
+  const inFav = taskBrowserPath[0]==="__FAV__";
+  document.getElementById("btnNewTaskFolder").classList.toggle("hidden", curId==="__NONE__");
   let html = "";
+  if(inFav){
+    // Dentro de Favoritos: navegador (con subcarpetas) de las carpetas PERSONALES de
+    // este entrenador. curFolderId es null en la raíz de Favoritos, o el id de la
+    // carpeta personal actual si se ha entrado en una (a cualquier profundidad).
+    const curFolderId = curId==="__FAV__" ? null : curId;
+    if(curFolderId===null){
+      const favIds = coachFavIds_("tasks");
+      const noneCount = favIds.filter(tid=>itemHasNoValidFavFolder_("tasks", tid)).length;
+      if(noneCount>0){
+        html += `<div class="home-grid">
+        <button type="button" class="home-card" onclick="taskBrowserPath=['__FAV__','__NONE__']; renderTaskBank();">
+          <span class="home-card-icon">❔</span>
+          <span class="home-card-label">Sin carpeta</span>
+          <span class="home-card-desc">${noneCount} tarea${noneCount===1?"":"s"}</span>
+        </button>
+        </div>`;
+      }
+    }
+    if(curId!=="__NONE__"){
+      const folders = favFolderChildren_("tasks", curFolderId).sort((a,b)=>(a.name||"").localeCompare(b.name||"","es"));
+      if(folders.length){
+        html += `<div class="home-grid" style="margin-top:10px;">` + folders.map(f=>{
+          const count = favCountInFolderTree_("tasks", f.id);
+          const subCount = favFolderChildren_("tasks", f.id).length;
+          return `
+          <div class="home-card folder-card">
+            <button type="button" class="folder-card-main" onclick="taskBrowserPath=[...taskBrowserPath,'${f.id}']; renderTaskBank();">
+              <span class="home-card-icon">📁</span>
+              <span class="home-card-label">${escapeHtml(f.name)}</span>
+              <span class="home-card-desc">${count} tarea${count===1?"":"s"}${subCount?` · ${subCount} carpeta${subCount===1?"":"s"}`:""}</span>
+            </button>
+            <button type="button" class="folder-menu-btn" onclick="openFavFolderActions('tasks','${f.id}')" title="Gestionar carpeta">⋯</button>
+          </div>`;
+        }).join("") + `</div>`;
+      }
+    }
+    wrap.innerHTML = html;
+    return;
+  }
   if(curId===null){
     const favIds = (currentCoach && Array.isArray(currentCoach.favoriteTaskIds)) ? currentCoach.favoriteTaskIds : [];
     const favCount = tasks.filter(t=>favIds.includes(t.id)).length;
@@ -1992,6 +2036,20 @@ function renderTaskBank(){
   renderTaskList();
 }
 document.getElementById("btnNewTaskFolder").onclick = async () => {
+  const inFav = taskBrowserPath[0]==="__FAV__";
+  if(inFav){
+    const curId = taskCurrentFolder();
+    const parentId = curId==="__FAV__" ? null : curId; // null = carpeta personal en la raíz de Favoritos
+    const name = prompt(parentId ? "Nombre de la subcarpeta:" : "Nombre de tu carpeta personal de favoritos:");
+    if(!name || !name.trim()) return;
+    const folders = coachFavFolders_("tasks");
+    folders.push({ id: "f"+Date.now().toString(36)+Math.random().toString(36).slice(2,7), name: name.trim(), parentId });
+    try{
+      await saveCoachField_("taskFavFolders", folders);
+      renderTaskBank();
+    }catch(err){ alert("No se ha podido crear la carpeta: " + err.message); }
+    return;
+  }
   const name = prompt("Nombre de la nueva carpeta:");
   if(!name || !name.trim()) return;
   const cur = taskCurrentFolder();
@@ -2167,7 +2225,7 @@ function renderAbpBreadcrumb(){
     let label;
     if(id==="__FAV__") label = "⭐ Favoritos";
     else if(id==="__NONE__") label = "❔ Sin carpeta";
-    else if(abpBrowserPath[0]==="__FAV__" && i>0) label = favFolderName_(id) || "Carpeta";
+    else if(abpBrowserPath[0]==="__FAV__" && i>0) label = favFolderName_("abp", id) || "Carpeta";
     else label = abpCatName_(id) || "Carpeta";
     crumbs.push({idx:i+1, label});
   });
@@ -2176,38 +2234,44 @@ function renderAbpBreadcrumb(){
 function renderAbpFolderList(){
   const wrap = document.getElementById("abpFolderList");
   const curId = abpCurrentFolder();
-  const inFavRoot = abpBrowserPath.length===1 && abpBrowserPath[0]==="__FAV__";
-  const inFavSub = abpBrowserPath.length===2 && abpBrowserPath[0]==="__FAV__";
-  document.getElementById("btnNewAbpFolder").classList.toggle("hidden", curId==="__NONE__" || inFavSub);
+  const inFav = abpBrowserPath[0]==="__FAV__";
+  document.getElementById("btnNewAbpFolder").classList.toggle("hidden", curId==="__NONE__");
   let html = "";
-  if(inFavRoot){
-    // Dentro de Favoritos: navegador de carpetas PERSONALES de este entrenador
-    const favIds = (currentCoach && Array.isArray(currentCoach.favoritePlayIds)) ? currentCoach.favoritePlayIds : [];
-    const folders = coachFavFolders();
-    const noneCount = favIds.filter(pid=>playHasNoValidFavFolder_(pid)).length;
-    html += `<div class="home-grid">`;
-    if(noneCount>0){
-      html += `
-      <button type="button" class="home-card" onclick="abpBrowserPath=['__FAV__','__NONE__']; renderAbpBank();">
-        <span class="home-card-icon">❔</span>
-        <span class="home-card-label">Sin carpeta</span>
-        <span class="home-card-desc">${noneCount} jugada${noneCount===1?"":"s"}</span>
-      </button>`;
-    }
-    html += `</div>`;
-    if(folders.length){
-      html += `<div class="home-grid" style="margin-top:10px;">` + folders.map(f=>{
-        const count = favIds.filter(pid=>playFavFolderIds(pid).includes(f.id)).length;
-        return `
-        <div class="home-card folder-card">
-          <button type="button" class="folder-card-main" onclick="abpBrowserPath=['__FAV__','${f.id}']; renderAbpBank();">
-            <span class="home-card-icon">📁</span>
-            <span class="home-card-label">${escapeHtml(f.name)}</span>
-            <span class="home-card-desc">${count} jugada${count===1?"":"s"}</span>
-          </button>
-          <button type="button" class="folder-menu-btn" onclick="openFavFolderActions('${f.id}')" title="Gestionar carpeta">⋯</button>
+  if(inFav){
+    // Dentro de Favoritos: navegador (con subcarpetas) de las carpetas PERSONALES de
+    // este entrenador. curFolderId es null en la raíz de Favoritos, o el id de la
+    // carpeta personal actual si se ha entrado en una (a cualquier profundidad).
+    const curFolderId = curId==="__FAV__" ? null : curId;
+    if(curFolderId===null){
+      const favIds = coachFavIds_("abp");
+      const noneCount = favIds.filter(pid=>itemHasNoValidFavFolder_("abp", pid)).length;
+      if(noneCount>0){
+        html += `<div class="home-grid">
+        <button type="button" class="home-card" onclick="abpBrowserPath=['__FAV__','__NONE__']; renderAbpBank();">
+          <span class="home-card-icon">❔</span>
+          <span class="home-card-label">Sin carpeta</span>
+          <span class="home-card-desc">${noneCount} jugada${noneCount===1?"":"s"}</span>
+        </button>
         </div>`;
-      }).join("") + `</div>`;
+      }
+    }
+    if(curId!=="__NONE__"){
+      const folders = favFolderChildren_("abp", curFolderId).sort((a,b)=>(a.name||"").localeCompare(b.name||"","es"));
+      if(folders.length){
+        html += `<div class="home-grid" style="margin-top:10px;">` + folders.map(f=>{
+          const count = favCountInFolderTree_("abp", f.id);
+          const subCount = favFolderChildren_("abp", f.id).length;
+          return `
+          <div class="home-card folder-card">
+            <button type="button" class="folder-card-main" onclick="abpBrowserPath=[...abpBrowserPath,'${f.id}']; renderAbpBank();">
+              <span class="home-card-icon">📁</span>
+              <span class="home-card-label">${escapeHtml(f.name)}</span>
+              <span class="home-card-desc">${count} jugada${count===1?"":"s"}${subCount?` · ${subCount} carpeta${subCount===1?"":"s"}`:""}</span>
+            </button>
+            <button type="button" class="folder-menu-btn" onclick="openFavFolderActions('abp','${f.id}')" title="Gestionar carpeta">⋯</button>
+          </div>`;
+        }).join("") + `</div>`;
+      }
     }
     wrap.innerHTML = html;
     return;
@@ -2260,12 +2324,14 @@ function renderAbpBank(){
   renderPlayList();
 }
 document.getElementById("btnNewAbpFolder").onclick = async () => {
-  const inFavRoot = abpBrowserPath.length===1 && abpBrowserPath[0]==="__FAV__";
-  if(inFavRoot){
-    const name = prompt("Nombre de tu carpeta personal de favoritos:");
+  const inFav = abpBrowserPath[0]==="__FAV__";
+  if(inFav){
+    const curId = abpCurrentFolder();
+    const parentId = curId==="__FAV__" ? null : curId; // null = carpeta personal en la raíz de Favoritos
+    const name = prompt(parentId ? "Nombre de la subcarpeta:" : "Nombre de tu carpeta personal de favoritos:");
     if(!name || !name.trim()) return;
-    const folders = coachFavFolders();
-    folders.push({ id: "f"+Date.now().toString(36)+Math.random().toString(36).slice(2,7), name: name.trim() });
+    const folders = coachFavFolders_("abp");
+    folders.push({ id: "f"+Date.now().toString(36)+Math.random().toString(36).slice(2,7), name: name.trim(), parentId });
     try{
       await saveCoachField_("abpFavFolders", folders);
       renderAbpBank();
@@ -2653,72 +2719,119 @@ document.addEventListener("click", (e) => {
 document.getElementById("btnMarkAllSeen").onclick = () => window.markAllNotificationsSeen();
 
 function abpCatName_(id){ const c = abpCategories.find(x=>x.id===id); return c ? c.name : ""; }
-/* ---------- Carpetas personales de favoritos de ABP (por entrenador) ---------- */
-function coachFavFolders(){ return (currentCoach && Array.isArray(currentCoach.abpFavFolders)) ? currentCoach.abpFavFolders : []; }
-function favFolderName_(id){ const f = coachFavFolders().find(x=>x.id===id); return f ? f.name : ""; }
-function playFavFolderIds(playId){
-  const map = (currentCoach && currentCoach.favoritePlayFolders) || {};
-  return Array.isArray(map[playId]) ? map[playId] : [];
+/* ---------- Carpetas personales de favoritos (por entrenador): Tareas y ABP ----------
+   "section" es "tasks" o "abp". Son carpetas propias de cada entrenador para organizar
+   SUS favoritos (no las carpetas del banco general), y admiten subcarpetas igual que las
+   carpetas normales de Tareas/ABP. */
+function favFolderField_(section){ return section==="tasks" ? "taskFavFolders" : "abpFavFolders"; }
+function favMapField_(section){ return section==="tasks" ? "favoriteTaskFolders" : "favoritePlayFolders"; }
+function favIdsField_(section){ return section==="tasks" ? "favoriteTaskIds" : "favoritePlayIds"; }
+function coachFavIds_(section){
+  const field = favIdsField_(section);
+  return (currentCoach && Array.isArray(currentCoach[field])) ? currentCoach[field] : [];
 }
-function playHasNoValidFavFolder_(playId){
-  const ids = coachFavFolders().map(f=>f.id);
-  const assigned = playFavFolderIds(playId);
+function coachFavFolders_(section){
+  const field = favFolderField_(section);
+  return (currentCoach && Array.isArray(currentCoach[field])) ? currentCoach[field] : [];
+}
+function favFolderChildren_(section, parentId){
+  return coachFavFolders_(section).filter(f => (f.parentId||null) === (parentId||null));
+}
+function favFolderDescendantIds_(section, id){
+  const ids = new Set();
+  (function walk(pid){
+    favFolderChildren_(section, pid).forEach(f=>{ ids.add(f.id); walk(f.id); });
+  })(id);
+  return ids;
+}
+function favFolderName_(section, id){ const f = coachFavFolders_(section).find(x=>x.id===id); return f ? f.name : ""; }
+function itemFavFolderIds_(section, itemId){
+  const map = (currentCoach && currentCoach[favMapField_(section)]) || {};
+  return Array.isArray(map[itemId]) ? map[itemId] : [];
+}
+function itemHasNoValidFavFolder_(section, itemId){
+  const ids = coachFavFolders_(section).map(f=>f.id);
+  const assigned = itemFavFolderIds_(section, itemId);
   return assigned.length===0 || !assigned.some(id=>ids.includes(id));
+}
+// Cuenta favoritos de una carpeta personal INCLUYENDO sus subcarpetas, igual que las
+// carpetas normales del banco (ver playCountInFolderTree_ / taskCountInFolderTree_).
+function favCountInFolderTree_(section, folderId){
+  const favIds = coachFavIds_(section);
+  const ids = new Set([folderId, ...favFolderDescendantIds_(section, folderId)]);
+  return favIds.filter(itemId => itemFavFolderIds_(section, itemId).some(fid=>ids.has(fid))).length;
 }
 async function saveCoachField_(field, value){
   currentCoach[field] = value;
   await db.collection("coaches").doc(currentUser.uid).update({ [field]: value });
 }
-let favFolderPickPlayId = null;
-function openFavFolderPick(playId){
-  favFolderPickPlayId = playId;
-  const folders = coachFavFolders();
-  const current = new Set(playFavFolderIds(playId));
+let favFolderPickCtx = null; // {section, itemId}
+function openFavFolderPick(section, itemId){
+  favFolderPickCtx = {section, itemId};
+  const folders = coachFavFolders_(section);
+  const current = new Set(itemFavFolderIds_(section, itemId));
+  const bankLabel = section==="tasks" ? "Banco de tareas" : "Banco de ABP";
+  document.getElementById("favFolderPickDesc").textContent = `Elige en qué carpeta(s) tuyas quieres guardar ${section==="tasks"?"esta tarea":"esta jugada"} (opcional).`;
   document.getElementById("favFolderPickList").innerHTML = folders.length ? folders.map(f=>`
     <label style="display:flex;align-items:center;gap:8px;padding:6px 0;">
       <input type="checkbox" value="${f.id}" ${current.has(f.id)?"checked":""}> ${escapeHtml(f.name)}
-    </label>`).join("") : '<p class="muted">Todavía no tienes carpetas de favoritos. Puedes crearlas desde "⭐ Favoritos" en el Banco de ABP.</p>';
+    </label>`).join("") : `<p class="muted">Todavía no tienes carpetas de favoritos. Puedes crearlas desde "⭐ Favoritos" en el ${bankLabel}.</p>`;
   document.getElementById("favFolderPickModal").classList.remove("hidden");
 }
 document.getElementById("btnCancelFavFolderPick").onclick = () => {
   document.getElementById("favFolderPickModal").classList.add("hidden");
-  favFolderPickPlayId = null;
+  favFolderPickCtx = null;
 };
 document.getElementById("btnSaveFavFolderPick").onclick = async () => {
+  if(!favFolderPickCtx) return;
+  const {section, itemId} = favFolderPickCtx;
   const checked = Array.from(document.querySelectorAll("#favFolderPickList input[type=checkbox]:checked")).map(el=>el.value);
-  const map = Object.assign({}, (currentCoach.favoritePlayFolders || {}));
-  if(checked.length) map[favFolderPickPlayId] = checked; else delete map[favFolderPickPlayId];
+  const field = favMapField_(section);
+  const map = Object.assign({}, (currentCoach[field] || {}));
+  if(checked.length) map[itemId] = checked; else delete map[itemId];
   document.getElementById("favFolderPickModal").classList.add("hidden");
-  const pid = favFolderPickPlayId;
-  favFolderPickPlayId = null;
+  favFolderPickCtx = null;
   try{
-    await saveCoachField_("favoritePlayFolders", map);
+    await saveCoachField_(field, map);
   }catch(err){ alert("No se ha podido guardar: " + err.message); }
-  renderPlayList();
-  if(document.getElementById("abpFolderList")) renderAbpFolderList();
+  if(section==="tasks"){
+    renderTaskList();
+    if(document.getElementById("taskFolderList")) renderTaskFolderList();
+  } else {
+    renderPlayList();
+    if(document.getElementById("abpFolderList")) renderAbpFolderList();
+  }
 };
-window.openFavFolderActions = async (id) => {
-  const folders = coachFavFolders();
+window.openFavFolderActions = async (section, id) => {
+  const folders = coachFavFolders_(section);
   const f = folders.find(x=>x.id===id);
   if(!f) return;
   const action = prompt(`Carpeta "${f.name}"\n\nEscribe un nuevo nombre para renombrarla, o "borrar" para eliminarla.\n(deja vacío para cancelar)`);
   if(!action || !action.trim()) return;
   try{
     if(action.trim().toLowerCase()==="borrar"){
-      if(!confirm(`¿Eliminar la carpeta "${f.name}"? Las jugadas favoritas seguirán en tus favoritos, solo dejarán de estar en esta carpeta.`)) return;
-      const newFolders = folders.filter(x=>x.id!==id);
-      const map = Object.assign({}, (currentCoach.favoritePlayFolders||{}));
-      Object.keys(map).forEach(pid=>{
-        map[pid] = (map[pid]||[]).filter(fid=>fid!==id);
-        if(map[pid].length===0) delete map[pid];
+      const hasSubfolders = favFolderChildren_(section, id).length>0;
+      const itemWord = section==="tasks" ? "tareas favoritas" : "jugadas favoritas";
+      const msg = hasSubfolders
+        ? `¿Eliminar la carpeta "${f.name}"? Las ${itemWord} seguirán en tus favoritos, y sus subcarpetas subirán a la carpeta superior.`
+        : `¿Eliminar la carpeta "${f.name}"? Las ${itemWord} seguirán en tus favoritos, solo dejarán de estar en esta carpeta.`;
+      if(!confirm(msg)) return;
+      const parentId = f.parentId || null;
+      // Las subcarpetas de la carpeta borrada suben a su carpeta padre (o a la raíz).
+      const newFolders = folders.filter(x=>x.id!==id).map(x => x.parentId===id ? Object.assign({}, x, {parentId}) : x);
+      const mapField = favMapField_(section);
+      const map = Object.assign({}, (currentCoach[mapField]||{}));
+      Object.keys(map).forEach(itemId=>{
+        let ids = Array.from(new Set((map[itemId]||[]).map(fid=> fid===id ? parentId : fid).filter(Boolean)));
+        if(ids.length) map[itemId]=ids; else delete map[itemId];
       });
-      await saveCoachField_("abpFavFolders", newFolders);
-      await saveCoachField_("favoritePlayFolders", map);
+      await saveCoachField_(favFolderField_(section), newFolders);
+      await saveCoachField_(mapField, map);
     } else {
       f.name = action.trim();
-      await saveCoachField_("abpFavFolders", folders);
+      await saveCoachField_(favFolderField_(section), folders);
     }
-    renderAbpBank();
+    if(section==="tasks") renderTaskBank(); else renderAbpBank();
   }catch(err){ alert("No se ha podido actualizar la carpeta: " + err.message); }
 };
 
@@ -4185,7 +4298,8 @@ window.toggleFavoriteTask = async (id) => {
   if(!currentUser || !currentCoach) return;
   currentCoach.favoriteTaskIds = currentCoach.favoriteTaskIds || [];
   const i = currentCoach.favoriteTaskIds.indexOf(id);
-  if(i>=0) currentCoach.favoriteTaskIds.splice(i,1);
+  const wasFavorite = i>=0;
+  if(wasFavorite) currentCoach.favoriteTaskIds.splice(i,1);
   else currentCoach.favoriteTaskIds.push(id);
   renderTaskList();
   renderSessionTaskBrowser();
@@ -4193,6 +4307,13 @@ window.toggleFavoriteTask = async (id) => {
   try{
     await db.collection("coaches").doc(currentUser.uid).update({ favoriteTaskIds: currentCoach.favoriteTaskIds });
   }catch(e){}
+  if(!wasFavorite && coachFavFolders_("tasks").length>0){
+    openFavFolderPick("tasks", id);
+  } else if(wasFavorite && itemFavFolderIds_("tasks", id).length>0){
+    const map = Object.assign({}, (currentCoach.favoriteTaskFolders || {}));
+    delete map[id];
+    try{ await saveCoachField_("favoriteTaskFolders", map); }catch(e){}
+  }
 };
 window.toggleFavoritePlay = async (id) => {
   if(!currentUser || !currentCoach) return;
@@ -4207,9 +4328,9 @@ window.toggleFavoritePlay = async (id) => {
   try{
     await db.collection("coaches").doc(currentUser.uid).update({ favoritePlayIds: currentCoach.favoritePlayIds });
   }catch(e){}
-  if(!wasFavorite && coachFavFolders().length>0){
-    openFavFolderPick(id);
-  } else if(wasFavorite && playFavFolderIds(id).length>0){
+  if(!wasFavorite && coachFavFolders_("abp").length>0){
+    openFavFolderPick("abp", id);
+  } else if(wasFavorite && itemFavFolderIds_("abp", id).length>0){
     const map = Object.assign({}, (currentCoach.favoritePlayFolders || {}));
     delete map[id];
     try{ await saveCoachField_("favoritePlayFolders", map); }catch(e){}
@@ -4225,11 +4346,24 @@ function renderTaskList(){
   const search = document.getElementById("filterSearch").value.trim().toLowerCase();
   const favOnly = document.getElementById("filterFavOnly").checked;
   const curId = taskCurrentFolder();
+  const inFavRoot = taskBrowserPath.length===1 && taskBrowserPath[0]==="__FAV__";
+  // Dentro de una carpeta personal de favoritos, a cualquier profundidad (curId es el id
+  // de esa carpeta, o "__NONE__" para "sin carpeta").
+  const inFavFolder = taskBrowserPath[0]==="__FAV__" && taskBrowserPath.length>=2;
+  if(inFavRoot && !search){
+    wrap.innerHTML = ""; // en la raíz de Favoritos solo se navega por carpetas personales (arriba)
+    return;
+  }
   let list = tasks.filter(t=>{
     if(search){
       // con texto de búsqueda, se busca en todo el banco, no solo en la carpeta actual
-    } else if(curId === "__FAV__"){
+    } else if(inFavFolder){
       if(!isTaskFavorite(t.id)) return false;
+      if(curId === "__NONE__"){
+        if(!itemHasNoValidFavFolder_("tasks", t.id)) return false;
+      } else {
+        if(!itemFavFolderIds_("tasks", t.id).includes(curId)) return false;
+      }
     } else if(curId === "__NONE__"){
       if(!taskHasNoValidFolder_(t)) return false;
     } else if(curId !== null){
@@ -6924,7 +7058,9 @@ function renderPlayList(){
   const favOnly = document.getElementById("filterAbpFavOnly").checked;
   const curId = abpCurrentFolder();
   const inFavRoot = abpBrowserPath.length===1 && abpBrowserPath[0]==="__FAV__";
-  const inFavSub = abpBrowserPath.length===2 && abpBrowserPath[0]==="__FAV__";
+  // Dentro de una carpeta personal de favoritos, a cualquier profundidad (curId es el id
+  // de esa carpeta, o "__NONE__" para "sin carpeta").
+  const inFavFolder = abpBrowserPath[0]==="__FAV__" && abpBrowserPath.length>=2;
   if(inFavRoot && !search){
     wrap.innerHTML = ""; // en la raíz de Favoritos solo se navega por carpetas personales (arriba)
     return;
@@ -6932,13 +7068,12 @@ function renderPlayList(){
   const list = plays.filter(p=>{
     if(search){
       // con texto de búsqueda, se busca en todo el banco, no solo en la carpeta actual
-    } else if(inFavSub){
+    } else if(inFavFolder){
       if(!isPlayFavorite(p.id)) return false;
-      const favFolderId = abpBrowserPath[1];
-      if(favFolderId === "__NONE__"){
-        if(!playHasNoValidFavFolder_(p.id)) return false;
+      if(curId === "__NONE__"){
+        if(!itemHasNoValidFavFolder_("abp", p.id)) return false;
       } else {
-        if(!playFavFolderIds(p.id).includes(favFolderId)) return false;
+        if(!itemFavFolderIds_("abp", p.id).includes(curId)) return false;
       }
     } else if(curId === "__FAV__"){
       if(!isPlayFavorite(p.id)) return false;
