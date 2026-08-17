@@ -40,6 +40,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1144,6 +1145,15 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
       </div>
     </div>
 
+    <!-- ---------- Jornadas: elegir categoría/subcategoría al añadir un gol marcado/encajado ---------- -->
+    <div id="goalPickerModal" class="modal-bg hidden">
+      <div class="modal">
+        <h2 style="font-size:1.05rem;" id="goalPickerTitle">Añadir gol</h2>
+        <div id="goalPickerBody"></div>
+        <button class="btn ghost" id="btnCloseGoalPicker" style="width:100%;margin-top:14px;">Cerrar</button>
+      </div>
+    </div>
+
     <!-- ---------- Añadir jugada/tarea a una carpeta de equipo (Mi equipo → ABP/Tareas) ---------- -->
     <div id="teamFolderItemPickModal" class="modal-bg hidden">
       <div class="modal">
@@ -1272,7 +1282,22 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
             <button type="button" class="btn ghost small" id="btnStatsBack" style="margin-bottom:10px;">← Volver a jornadas</button>
             <h3 id="matchdayStatsTitle" style="font-size:.95rem;"></h3>
             <div id="matchdayVideoWrap" style="margin-bottom:8px;"></div>
-            <p class="muted" style="margin-top:-6px;">Goles/Encajados: para jugadores son goles marcados; para porteros, goles encajados.</p>
+
+            <div class="row" style="align-items:flex-start;margin-bottom:4px;">
+              <div style="flex:1;min-width:220px;">
+                <h4 style="font-size:.85rem;margin:0 0 6px;">⚽ Goles marcados</h4>
+                <div id="matchdayGoalsForList" style="margin-bottom:6px;"></div>
+                <button type="button" class="btn ghost small" id="btnAddGoalFor">➕ Añadir gol marcado</button>
+              </div>
+              <div style="flex:1;min-width:220px;">
+                <h4 style="font-size:.85rem;margin:0 0 6px;">🥅 Goles encajados</h4>
+                <div id="matchdayGoalsAgainstList" style="margin-bottom:6px;"></div>
+                <button type="button" class="btn ghost small" id="btnAddGoalAgainst">➕ Añadir gol encajado</button>
+              </div>
+            </div>
+            <p id="matchdayGoalsWarning" class="muted" style="font-size:.78rem;margin-top:6px;"></p>
+
+            <p class="muted" style="margin-top:10px;">Goles/Encajados: para jugadores son goles marcados; para porteros, goles encajados.</p>
             <div class="row" style="margin-bottom:8px;">
               <button type="button" class="btn small ghost" id="btnMarkAllStarters">✅ Marcar todos Titular</button>
               <button type="button" class="btn small ghost" id="btnMarkAllUncalled">🚫 Marcar todos No convocado</button>
@@ -2630,6 +2655,7 @@ function attachRealtimeListeners(){
     renderTeamSummary();
     if(statsMatchdayId && !document.getElementById("matchdayStatsView").classList.contains("hidden")){
       renderMatchdayStatsTable();
+      renderMatchdayGoalEvents_();
     }
     renderMiEquipoCalendar_();
   }, err => showSyncError_("jornadas", err));
@@ -5651,6 +5677,7 @@ document.getElementById("btnSaveMatchday").onclick = async () => {
 window.openMatchdayStats = (id) => {
   statsMatchdayId = id;
   renderMatchdayStatsTable();
+  renderMatchdayGoalEvents_();
   renderMatchdaySessionsLink();
   renderMatchdayReport();
   document.getElementById("matchdayStatsMsg").innerHTML = "";
@@ -5779,6 +5806,176 @@ function renderMatchdaySessionsLink(){
     try{ await db.collection("matchdays").doc(statsMatchdayId).update({linkedSessionIds: ids}); }
     catch(err){ alert("No se ha podido guardar: " + err.message); }
   };
+}
+
+/* ---------- Goles marcados/encajados por categoría y subcategoría ----------
+   Cada jornada guarda dos listas independientes ("goalsForEvents"/"goalsAgainstEvents")
+   con un {id, category, subcategory} por cada gol etiquetado. Es un detalle aparte del
+   marcador numérico (mdGoalsFor/mdGoalsAgainst) de la ficha de la jornada: no lo sustituye
+   ni lo recalcula, solo avisa si no coinciden, para no romper jornadas antiguas sin goles
+   etiquetados ni obligar a etiquetarlos todos. ---------- */
+const GOAL_CATEGORIES = [
+  {id:"estrategia", label:"Estrategia", subs:[
+    {id:"corner", label:"Córner"},
+    {id:"banda", label:"Saque de banda"},
+    {id:"falta_directa", label:"Falta directa"},
+    {id:"jugada_falta", label:"Jugada de falta"}
+  ]},
+  {id:"penales", label:"Penales y dobles", subs:[
+    {id:"penalti", label:"Penalti"},
+    {id:"doble_penalti", label:"Doble penalti"}
+  ]},
+  {id:"posicional", label:"Ataque posicional", subs:[
+    {id:"salida_presion_puerta", label:"Salida de presión de puerta"},
+    {id:"salida_presion_banda", label:"Salida de presión de banda"},
+    {id:"ataque_3_1", label:"Ataque 3-1"},
+    {id:"ataque_4_0", label:"Ataque 4-0"},
+    {id:"incorp_portero_dinamica", label:"Incorporación del portero (en dinámica)"},
+    {id:"incorp_portero_bandas", label:"Incorporación del portero (bandas)"}
+  ]},
+  {id:"superioridad", label:"Superioridad (5vs4 - 4vs3)", subs:[
+    {id:"5vs4", label:"5vs4"},
+    {id:"4vs3", label:"4vs3"}
+  ]},
+  {id:"inferioridad", label:"Inferioridad (4vs5 - 3vs4)", subs:[
+    {id:"4vs5", label:"4vs5"},
+    {id:"3vs4", label:"3vs4"}
+  ]},
+  {id:"transicion", label:"Transición", subs:[
+    {id:"transicion", label:"Transición"},
+    {id:"transicion_abp", label:"Transición ABP"},
+    {id:"contra_contra", label:"Contra de la contra"},
+    {id:"robo", label:"Robo"}
+  ]}
+];
+function goalCategoryInfo_(catId){ return GOAL_CATEGORIES.find(c=>c.id===catId) || null; }
+function goalSubInfo_(catId, subId){ const c = goalCategoryInfo_(catId); return c ? (c.subs.find(s=>s.id===subId)||null) : null; }
+function goalCategoryLabel_(catId){ const c = goalCategoryInfo_(catId); return c ? c.label : "Sin categoría"; }
+function goalSubLabel_(catId, subId){ const s = goalSubInfo_(catId, subId); return s ? s.label : ""; }
+
+function renderMatchdayGoalEvents_(){
+  const m = matchdays.find(x=>x.id===statsMatchdayId);
+  const forWrap = document.getElementById("matchdayGoalsForList");
+  const againstWrap = document.getElementById("matchdayGoalsAgainstList");
+  const warnEl = document.getElementById("matchdayGoalsWarning");
+  if(!forWrap || !againstWrap || !warnEl) return;
+  if(!m){ forWrap.innerHTML = ""; againstWrap.innerHTML = ""; warnEl.innerHTML = ""; return; }
+  const forEvents = m.goalsForEvents || [];
+  const againstEvents = m.goalsAgainstEvents || [];
+  forWrap.innerHTML = goalEventsListHtml_("for", forEvents);
+  againstWrap.innerHTML = goalEventsListHtml_("against", againstEvents);
+  const warnings = [];
+  if(m.goalsFor!=null && forEvents.length!==m.goalsFor) warnings.push(`⚠️ Has etiquetado ${forEvents.length} gol(es) marcado(s), pero el marcador dice ${m.goalsFor}.`);
+  if(m.goalsAgainst!=null && againstEvents.length!==m.goalsAgainst) warnings.push(`⚠️ Has etiquetado ${againstEvents.length} gol(es) encajado(s), pero el marcador dice ${m.goalsAgainst}.`);
+  warnEl.innerHTML = warnings.map(w=>`<div>${w}</div>`).join("");
+}
+function goalEventsListHtml_(direction, events){
+  if(events.length===0) return '<p class="muted" style="margin:0;">Todavía no hay goles etiquetados.</p>';
+  return events.map(ev=>`
+    <span class="badge" style="display:inline-flex;align-items:center;gap:6px;margin:0 6px 6px 0;">
+      ${escapeHtml(goalCategoryLabel_(ev.category))} · ${escapeHtml(goalSubLabel_(ev.category, ev.subcategory))}
+      <button type="button" onclick="removeGoalEvent_('${direction}','${ev.id}')" style="background:none;border:none;color:inherit;cursor:pointer;font-size:1em;line-height:1;padding:0;">✕</button>
+    </span>`).join("");
+}
+document.getElementById("btnAddGoalFor").onclick = () => openGoalPicker_("for");
+document.getElementById("btnAddGoalAgainst").onclick = () => openGoalPicker_("against");
+let goalPickerDirection = null; // "for" | "against"
+let goalPickerCategory = null;  // categoría elegida (null = mostrando la lista de categorías)
+function openGoalPicker_(direction){
+  goalPickerDirection = direction;
+  goalPickerCategory = null;
+  document.getElementById("goalPickerTitle").textContent = direction==="for" ? "⚽ Añadir gol marcado" : "🥅 Añadir gol encajado";
+  renderGoalPickerBody_();
+  document.getElementById("goalPickerModal").classList.remove("hidden");
+}
+function renderGoalPickerBody_(){
+  const wrap = document.getElementById("goalPickerBody");
+  if(!goalPickerCategory){
+    wrap.innerHTML = `<p class="muted" style="margin-top:0;">Elige la categoría:</p>` +
+      GOAL_CATEGORIES.map(c=>`<button type="button" class="btn ghost small" style="width:100%;text-align:left;margin-bottom:4px;" onclick="goalPickerChooseCategory_('${c.id}')">${escapeHtml(c.label)}</button>`).join("");
+    return;
+  }
+  const cat = goalCategoryInfo_(goalPickerCategory);
+  wrap.innerHTML = `
+    <button type="button" class="btn ghost small" style="margin-bottom:8px;" onclick="goalPickerBack_()">← ${escapeHtml(cat.label)}</button>
+    <p class="muted" style="margin-top:0;">Elige la subcategoría:</p>` +
+    cat.subs.map(s=>`<button type="button" class="btn ghost small" style="width:100%;text-align:left;margin-bottom:4px;" onclick="goalPickerChooseSub_('${s.id}')">${escapeHtml(s.label)}</button>`).join("");
+}
+window.goalPickerChooseCategory_ = (catId) => { goalPickerCategory = catId; renderGoalPickerBody_(); };
+window.goalPickerBack_ = () => { goalPickerCategory = null; renderGoalPickerBody_(); };
+window.goalPickerChooseSub_ = async (subId) => {
+  const m = matchdays.find(x=>x.id===statsMatchdayId);
+  if(!m) return;
+  const field = goalPickerDirection==="for" ? "goalsForEvents" : "goalsAgainstEvents";
+  const events = [...(m[field]||[]), {id: Date.now().toString(36)+Math.random().toString(36).slice(2,7), category: goalPickerCategory, subcategory: subId}];
+  document.getElementById("goalPickerModal").classList.add("hidden");
+  try{ await db.collection("matchdays").doc(m.id).update({[field]: events}); }
+  catch(err){ alert("No se ha podido guardar el gol: " + err.message); }
+};
+document.getElementById("btnCloseGoalPicker").onclick = () => {
+  document.getElementById("goalPickerModal").classList.add("hidden");
+};
+window.removeGoalEvent_ = async (direction, eventId) => {
+  const m = matchdays.find(x=>x.id===statsMatchdayId);
+  if(!m) return;
+  const field = direction==="for" ? "goalsForEvents" : "goalsAgainstEvents";
+  const events = (m[field]||[]).filter(e=>e.id!==eventId);
+  try{ await db.collection("matchdays").doc(m.id).update({[field]: events}); }
+  catch(err){ alert("No se ha podido eliminar: " + err.message); }
+};
+
+// Agrupa los goles etiquetados de una lista de jornadas (una sola, para el modo "por
+// jornada" de Resumen, o varias, para el modo "temporada") en un array por categoría
+// principal, cada una con el desglose de sus subcategorías (para el tooltip del pastel).
+function aggregateGoalEvents_(mdList, field){
+  const byCat = {};
+  mdList.forEach(m=>{
+    (m[field]||[]).forEach(ev=>{
+      if(!byCat[ev.category]) byCat[ev.category] = {count:0, subs:{}};
+      byCat[ev.category].count++;
+      byCat[ev.category].subs[ev.subcategory] = (byCat[ev.category].subs[ev.subcategory]||0)+1;
+    });
+  });
+  return GOAL_CATEGORIES.filter(c=>byCat[c.id]).map(c=>({
+    id: c.id, label: c.label, count: byCat[c.id].count,
+    subs: c.subs.filter(s=>byCat[c.id].subs[s.id]).map(s=>({label:s.label, count:byCat[c.id].subs[s.id]}))
+  }));
+}
+const GOAL_CHART_PALETTE_ = ["#c0392b","#2f80ed","#27ae60","#f2c94c","#9b59b6","#16a085","#e67e22","#34495e"];
+const goalChartInstances_ = {};
+// Dibuja (o borra si no hay datos) un pastel de Chart.js por categoría principal; el
+// tooltip de cada porción añade el desglose de subcategorías. emptyId es el mensaje
+// "sin goles etiquetados" que se muestra/oculta según haya datos o no.
+function renderGoalCategoryChartBlock_(canvasId, emptyId, aggData){
+  const emptyEl = document.getElementById(emptyId);
+  const canvas = document.getElementById(canvasId);
+  if(emptyEl) emptyEl.classList.toggle("hidden", aggData.length>0);
+  if(canvas) canvas.classList.toggle("hidden", aggData.length===0);
+  if(goalChartInstances_[canvasId]){ goalChartInstances_[canvasId].destroy(); delete goalChartInstances_[canvasId]; }
+  if(!canvas || aggData.length===0 || typeof Chart==="undefined") return;
+  goalChartInstances_[canvasId] = new Chart(canvas.getContext("2d"), {
+    type: "pie",
+    data: {
+      labels: aggData.map(c=>c.label),
+      datasets: [{ data: aggData.map(c=>c.count), backgroundColor: aggData.map((c,i)=>GOAL_CHART_PALETTE_[i%GOAL_CHART_PALETTE_.length]) }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: "bottom", labels: { boxWidth: 12, font: {size: 11} } },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const cat = aggData[ctx.dataIndex];
+              const lines = [`${cat.label}: ${cat.count}`];
+              cat.subs.forEach(s => lines.push(`   ${s.label}: ${s.count}`));
+              return lines;
+            }
+          }
+        }
+      }
+    }
+  });
 }
 
 /* ---------- Informe del partido ---------- */
@@ -6230,6 +6427,19 @@ function renderSeasonSummary_(wrap){
       <div class="badge outline" style="padding:8px 12px;">⚽ Goles a favor: ${sum.goalsFor}</div>
       <div class="badge outline" style="padding:8px 12px;">🥅 Goles en contra: ${sum.goalsAgainst}</div>
     </div>
+    <h3 style="font-size:.9rem;">Goles por categoría (temporada)</h3>
+    <div class="row" style="align-items:flex-start;margin-bottom:12px;">
+      <div style="flex:1;min-width:220px;">
+        <h4 style="font-size:.82rem;margin:0 0 6px;">⚽ Marcados</h4>
+        <div id="summaryGoalsForChartEmpty" class="empty hidden">Sin goles marcados etiquetados por categoría todavía.</div>
+        <div style="max-width:260px;"><canvas id="summaryGoalsForChart"></canvas></div>
+      </div>
+      <div style="flex:1;min-width:220px;">
+        <h4 style="font-size:.82rem;margin:0 0 6px;">🥅 Encajados</h4>
+        <div id="summaryGoalsAgainstChartEmpty" class="empty hidden">Sin goles encajados etiquetados por categoría todavía.</div>
+        <div style="max-width:260px;"><canvas id="summaryGoalsAgainstChart"></canvas></div>
+      </div>
+    </div>
     <h3 style="font-size:.9rem;">Jugadores</h3>
     <div style="overflow-x:auto;">
     <table style="width:100%;border-collapse:collapse;font-size:.85rem;min-width:480px;">
@@ -6272,6 +6482,8 @@ function renderSeasonSummary_(wrap){
       </tbody>
     </table>
     </div>`;
+  renderGoalCategoryChartBlock_("summaryGoalsForChart", "summaryGoalsForChartEmpty", aggregateGoalEvents_(sum.teamMds, "goalsForEvents"));
+  renderGoalCategoryChartBlock_("summaryGoalsAgainstChart", "summaryGoalsAgainstChartEmpty", aggregateGoalEvents_(sum.teamMds, "goalsAgainstEvents"));
 }
 function renderMatchdaySummary_(wrap){
   const m = matchdays.find(x=>x.id===summarySelectedMatchdayId);
@@ -6294,6 +6506,19 @@ function renderMatchdaySummary_(wrap){
     </div>
     <button type="button" class="btn ghost small" onclick="goToMatchdayReport('${m.id}')" style="margin-bottom:12px;">📋 Ir al informe del partido</button>
     ${m.videoUrl ? `<div style="margin-bottom:12px;">${videoEmbedHtml(m.videoUrl)}</div>` : ""}
+    <h3 style="font-size:.9rem;">Goles por categoría (este partido)</h3>
+    <div class="row" style="align-items:flex-start;margin-bottom:12px;">
+      <div style="flex:1;min-width:220px;">
+        <h4 style="font-size:.82rem;margin:0 0 6px;">⚽ Marcados</h4>
+        <div id="mdSummaryGoalsForChartEmpty" class="empty hidden">Sin goles marcados etiquetados por categoría en este partido.</div>
+        <div style="max-width:260px;"><canvas id="mdSummaryGoalsForChart"></canvas></div>
+      </div>
+      <div style="flex:1;min-width:220px;">
+        <h4 style="font-size:.82rem;margin:0 0 6px;">🥅 Encajados</h4>
+        <div id="mdSummaryGoalsAgainstChartEmpty" class="empty hidden">Sin goles encajados etiquetados por categoría en este partido.</div>
+        <div style="max-width:260px;"><canvas id="mdSummaryGoalsAgainstChart"></canvas></div>
+      </div>
+    </div>
     ${linkedSessions.length ? `
       <h3 style="font-size:.9rem;">🔗 Sesiones de entrenamiento de esa semana</h3>
       <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
@@ -6333,6 +6558,8 @@ function renderMatchdaySummary_(wrap){
           ${roster.filter(p=>notes[p.id]).map(p=>`<li><strong>${escapeHtml(p.name)}:</strong> ${escapeHtml(notes[p.id])}</li>`).join("")}
         </ul>` : ""}
     ` : ""}`;
+  renderGoalCategoryChartBlock_("mdSummaryGoalsForChart", "mdSummaryGoalsForChartEmpty", aggregateGoalEvents_([m], "goalsForEvents"));
+  renderGoalCategoryChartBlock_("mdSummaryGoalsAgainstChart", "mdSummaryGoalsAgainstChartEmpty", aggregateGoalEvents_([m], "goalsAgainstEvents"));
 }
 window.goToMatchdayReport = (id) => {
   showPlantillaView("matchdays");
