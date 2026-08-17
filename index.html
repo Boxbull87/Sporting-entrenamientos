@@ -4671,7 +4671,7 @@ function renderMiEquipoSessions(){
   if(!selectedTeamId){ wrap.innerHTML = '<div class="empty">Elige un equipo primero.</div>'; return; }
   const list = sessions.filter(s => sessionTeams_(s).some(t=>t.id===selectedTeamId));
   if(list.length===0){ wrap.innerHTML = '<div class="empty">🗓️ Este equipo todavía no tiene sesiones de entrenamiento guardadas.</div>'; return; }
-  wrap.innerHTML = sessionsByMonthWeekHtml_(list, selectedTeamId);
+  wrap.innerHTML = sessionsByMonthHtml_(list, selectedTeamId);
 }
 
 function renderTeamManageList(){
@@ -6199,33 +6199,19 @@ function sessionMonthLabel(key){
   const [y,m] = key.split("-");
   return `${MONTH_NAMES_ES[Number(m)-1]} ${y}`;
 }
-// Semana DENTRO del mes, según el calendario real (semanas de lunes a domingo, como en
-// cualquier calendario normal). La Semana 1 es la que contiene el día 1 del mes, aunque
-// empiece a mitad de semana; a partir de ahí se cuentan semanas completas de lunes a
-// domingo. La mayoría de meses caen en 4 o 5 semanas (algún caso raro en 6).
-function sessionWeekOfMonth_(s){
-  let d = null;
-  if(s.date){ d = new Date(s.date + "T00:00:00"); }
-  else if(s.createdAt && typeof s.createdAt.seconds === "number"){ d = new Date(s.createdAt.seconds*1000); }
-  if(!d || isNaN(d.getTime())) return null;
-  const day = d.getDate();
-  const firstDay = new Date(d.getFullYear(), d.getMonth(), 1);
-  const firstWeekday = (firstDay.getDay() + 6) % 7; // 0=lunes ... 6=domingo
-  return Math.ceil((day + firstWeekday) / 7);
-}
 // Equipos de una sesión, con compatibilidad hacia atrás para sesiones antiguas
 // que solo tenían un "teamId" único en vez del array "teamIds".
 function sessionTeams_(s){
   const ids = Array.isArray(s.teamIds) && s.teamIds.length ? s.teamIds : (s.teamId ? [s.teamId] : []);
   return ids.map(id=>teams.find(t=>t.id===id)).filter(Boolean);
 }
-// Agrupa una lista PLANA de sesiones (ya filtrada) por mes → semana. Se usa tanto en el
-// listado general de Sesiones (agrupado antes por entrenador → equipo) como en el listado
-// de "Mi equipo" (ya filtrado a un único equipo, sin ese nivel de agrupación previo).
+// Agrupa una lista PLANA de sesiones (ya filtrada) por mes. Se usa tanto en el listado
+// general de Sesiones (agrupado antes por entrenador → equipo) como en el listado de
+// "Mi equipo" (ya filtrado a un único equipo, sin ese nivel de agrupación previo).
 // contextTeamId es el equipo bajo el que se están mostrando estas tarjetas, para que
 // "Editar"/"Borrar" solo afecten a ese equipo cuando la sesión esté compartida con más de
 // uno (ver forkSessionForTeams_).
-function sessionsByMonthWeekHtml_(list, contextTeamId){
+function sessionsByMonthHtml_(list, contextTeamId){
   const monthGroups = {};
   list.forEach(s=>{
     const mk = sessionMonthKey(s);
@@ -6235,37 +6221,13 @@ function sessionsByMonthWeekHtml_(list, contextTeamId){
   const monthKeys = Object.keys(monthGroups).sort((a,b)=> b.localeCompare(a));
   return monthKeys.map((mk, mIdx)=>{
     const mlist = monthGroups[mk].slice().sort((a,b)=> (a.date||"").localeCompare(b.date||""));
-    let innerHtml;
-    if(mk === "0000-00"){
-      // Sesiones sin fecha: no hay día del mes con el que calcular la semana,
-      // así que se listan directamente, sin subdividir en semanas.
-      innerHtml = mlist.map(s => sessionCardHtml(s, contextTeamId)).join("");
-    } else {
-      const weekGroups = {};
-      mlist.forEach(s => {
-        const wk = sessionWeekOfMonth_(s) || 1;
-        if(!weekGroups[wk]) weekGroups[wk] = [];
-        weekGroups[wk].push(s);
-      });
-      const weekKeys = Object.keys(weekGroups).map(Number).sort((a,b)=>a-b);
-      innerHtml = weekKeys.map(wk=>{
-        const wlist = weekGroups[wk];
-        const cardsHtml = wlist.map(s => sessionCardHtml(s, contextTeamId)).join("");
-        return `
-        <details class="week-group" style="margin:6px 0 0 4px;">
-          <summary style="cursor:pointer;font-weight:600;font-size:.8rem;padding:7px 9px;background:#fff;border:1px solid var(--border);border-radius:8px;">
-            📅 Semana ${wk} <span class="muted" style="font-weight:400;">(${wlist.length} sesión${wlist.length===1?"":"es"})</span>
-          </summary>
-          <div style="margin-top:6px;">${cardsHtml}</div>
-        </details>`;
-      }).join("");
-    }
+    const cardsHtml = mlist.map(s => sessionCardHtml(s, contextTeamId)).join("");
     return `
     <details class="month-group" style="margin:8px 0 0 4px;">
       <summary style="cursor:pointer;font-weight:600;font-size:.85rem;padding:8px 10px;background:#faf8f5;border:1px solid var(--border);border-radius:8px;">
         🗓️ ${sessionMonthLabel(mk)} <span class="muted" style="font-weight:400;">(${mlist.length} sesión${mlist.length===1?"":"es"})</span>
       </summary>
-      <div style="margin-top:8px;">${innerHtml}</div>
+      <div style="margin-top:8px;">${cardsHtml}</div>
     </details>`;
   }).join("");
 }
@@ -6322,7 +6284,7 @@ function renderSavedSessions(){
       const grp = teamGroups[tkKey];
       const tlist = grp.sessions;
       const contextTeamId = grp.id; // null cuando es el cajón "Sin equipo"
-      const monthsHtml = sessionsByMonthWeekHtml_(tlist, contextTeamId);
+      const monthsHtml = sessionsByMonthHtml_(tlist, contextTeamId);
       return `
       <details class="team-group" style="margin:8px 0 0 4px;">
         <summary style="cursor:pointer;font-weight:600;padding:9px 11px;background:#f2f6f4;border:1px solid var(--border);border-radius:8px;">
