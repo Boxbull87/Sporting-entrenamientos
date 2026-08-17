@@ -5116,7 +5116,23 @@ function renderTeamFolderItemPickList_(){
   const teamId = selectedTeamId;
   const curId = miEquipoCurrentFolder_(section);
   const wrap = document.getElementById("teamFolderItemPickList");
-  if(!search){ wrap.innerHTML = '<p class="muted" style="padding:10px 0;">Escribe un nombre, o el de una carpeta del banco, para buscar...</p>'; return; }
+  if(!search){
+    // Antes de escribir nada, mostramos ya desplegadas las carpetas del banco general
+    // (Tareas o ABP según toque) para que el entrenador vea de un vistazo qué nombres
+    // puede pulsar/buscar, además del buscador de texto libre de arriba.
+    const rows = [];
+    (function walk(pid, depth){
+      folderChildren_(section, pid).sort((a,b)=>(a.name||"").localeCompare(b.name||"","es")).forEach(f=>{
+        rows.push({id:f.id, name:f.name, depth});
+        walk(f.id, depth+1);
+      });
+    })(null, 0);
+    const foldersHtml = rows.map(r=>`
+      <button type="button" class="btn ghost small" style="width:100%;text-align:left;margin-bottom:4px;padding-left:${10+r.depth*18}px;" onclick="pickTeamFolderItemSearchFolder_('${r.id}')">📁 ${escapeHtml(r.name)}</button>
+    `).join("");
+    wrap.innerHTML = `<p class="muted" style="padding:10px 0 4px;">Escribe un nombre, o el de una carpeta del banco, para buscar. Carpetas del banco de ${section==="tasks"?"tareas":"ABP"}:</p>${foldersHtml || '<p class="muted">No hay carpetas creadas todavía.</p>'}`;
+    return;
+  }
   const source = section==="tasks" ? tasks : plays;
   // Encuentra tanto por el nombre del propio elemento como por el nombre de cualquiera de
   // las carpetas del banco general en las que esté (p. ej. buscar "Córners" encuentra todas
@@ -5141,6 +5157,14 @@ function renderTeamFolderItemPickList_(){
     </div>`;
   }).join("");
 }
+window.pickTeamFolderItemSearchFolder_ = (folderId) => {
+  const section = teamFolderItemPickSection;
+  if(!section) return;
+  const f = folderList_(section).find(x=>x.id===folderId);
+  if(!f) return;
+  document.getElementById("teamFolderItemPickSearch").value = f.name;
+  renderTeamFolderItemPickList_();
+};
 window.addMiEquipoTeamItem = async (section, itemId) => {
   const teamId = selectedTeamId;
   const curId = miEquipoCurrentFolder_(section);
