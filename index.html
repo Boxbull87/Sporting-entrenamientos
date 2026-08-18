@@ -5820,11 +5820,13 @@ document.getElementById("btnDeleteMatchday").onclick = async () => {
 };
 
 /* ---------- Vincular jornada con sesiones de entrenamiento ----------
-   Solo se ofrecen sesiones de "mis equipos" (coachVisibleTeams_: los propios,
-   o todos si gestor/editor) — nunca las de otros entrenadores — agrupadas por
-   equipo y por mes igual que en la pestaña Sesiones, sin límite de fecha: así
-   se puede vincular o desvincular cualquier sesión guardada en cualquier
-   momento, no solo las de los ~10 días antes del partido. ---------- */
+   Solo se ofrecen sesiones de MIS equipos asignados (currentCoach.teamIds) —
+   nunca las de otros entrenadores ni las de equipos que no tengo asignados,
+   sea cual sea mi rol (gestor/editor incluidos) — agrupadas por equipo y por
+   mes igual que en la pestaña Sesiones, sin límite de fecha: así se puede
+   vincular o desvincular cualquier sesión guardada en cualquier momento, no
+   solo las de los ~10 días antes del partido. Los grupos salen colapsados
+   por defecto para no soltar de golpe todas las sesiones al entrar. ---------- */
 function matchdaySessionCheckboxesByMonth_(list, linked){
   const monthGroups = {};
   list.forEach(s=>{ const mk = sessionMonthKey(s); (monthGroups[mk] = monthGroups[mk] || []).push(s); });
@@ -5832,7 +5834,7 @@ function matchdaySessionCheckboxesByMonth_(list, linked){
   return monthKeys.map(mk=>{
     const mlist = monthGroups[mk].slice().sort((a,b)=> (a.date||"").localeCompare(b.date||""));
     return `
-    <details class="month-group" open style="margin:6px 0 0 4px;">
+    <details class="month-group" style="margin:6px 0 0 4px;">
       <summary style="cursor:pointer;font-weight:600;font-size:.85rem;padding:8px 10px;background:#faf8f5;border:1px solid var(--border);border-radius:8px;">
         🗓️ ${sessionMonthLabel(mk)} <span class="muted" style="font-weight:400;">(${mlist.length} sesión${mlist.length===1?"":"es"})</span>
       </summary>
@@ -5853,8 +5855,11 @@ function renderMatchdaySessionsLink(){
   const m = matchdays.find(x=>x.id===statsMatchdayId);
   if(!m){ wrap.innerHTML = ""; return; }
   const linked = new Set(m.linkedSessionIds || []);
-  const myTeams = coachVisibleTeams_();
-  const myTeamIds = new Set(myTeams.map(t=>t.id));
+  // Equipos ASIGNADOS a mí (currentCoach.teamIds), no coachVisibleTeams_(): aquí queremos
+  // solo mis equipos aunque sea gestor/editor, no "todos los equipos" como en otras vistas.
+  const myTeamIdsList = (currentCoach && Array.isArray(currentCoach.teamIds)) ? currentCoach.teamIds : [];
+  const myTeams = teams.filter(t=>myTeamIdsList.includes(t.id));
+  const myTeamIds = new Set(myTeamIdsList);
   // Sesiones de mis equipos, más las ya vinculadas aunque su equipo ya no esté entre los míos
   // (p.ej. si se me quitó ese equipo después de vincularla), para no perderlas de vista.
   const candidates = sessions.filter(s => linked.has(s.id) || sessionTeams_(s).some(t=>myTeamIds.has(t.id)));
@@ -5877,7 +5882,7 @@ function renderMatchdaySessionsLink(){
     bodyHtml = teamKeys.map(tk=>{
       const grp = teamGroups[tk];
       return `
-      <details class="team-group" open style="margin:8px 0 0 4px;">
+      <details class="team-group" style="margin:8px 0 0 4px;">
         <summary style="cursor:pointer;font-weight:600;padding:9px 11px;background:#f2f6f4;border:1px solid var(--border);border-radius:8px;">
           👕 ${escapeHtml(grp.name)} <span class="muted" style="font-weight:400;">(${grp.sessions.length} sesión${grp.sessions.length===1?"":"es"})</span>
         </summary>
