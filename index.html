@@ -4716,10 +4716,27 @@ function renderCoachList(){
         ${c.active
           ? `<button class="btn small danger" ${isMe?"disabled":""} onclick="setCoachActive('${c.id}', false)">Dar de baja</button>`
           : `<button class="btn small accent" onclick="setCoachActive('${c.id}', true)">Activar</button>`}
+        ${(!c.active && !isMe) ? `<button class="btn small danger" onclick="deleteCoach('${c.id}')">🗑️ Eliminar</button>` : ""}
       </div>
     </div>`;
   }).join("");
 }
+// Solo gestores (única forma de llegar aquí, la pestaña "Entrenadores" ya está oculta para
+// cualquier otro rol) y solo sobre entrenadores dados de baja: pensado para limpiar el
+// perfil de Firestore de alguien ya borrado a mano en Firebase Authentication, que si no
+// se queda huérfano en esta lista para siempre. No toca la cuenta de acceso en sí (eso se
+// gestiona desde la consola de Firebase), solo el documento coaches/{id}.
+window.deleteCoach = async (id) => {
+  const c = coaches.find(x=>x.id===id);
+  if(!c) return;
+  if(c.id === currentUser.uid){ alert("No puedes eliminarte a ti mismo."); return; }
+  if(c.active){ alert("Solo se pueden eliminar entrenadores dados de baja (no activos). Dale de baja primero."); return; }
+  const typed = prompt(`Esto eliminará DEFINITIVAMENTE a "${c.name}" de la lista de entrenadores (no borra ninguna cuenta de acceso, solo este perfil). No se puede deshacer.\n\nEscribe BORRAR para confirmar:`);
+  if(typed === null) return;
+  if(typed.trim().toUpperCase() !== "BORRAR"){ alert('No se ha eliminado: tenías que escribir exactamente "BORRAR".'); return; }
+  try{ await db.collection("coaches").doc(id).delete(); }
+  catch(err){ alert("No se ha podido eliminar: " + err.message); }
+};
 window.openTeamAssignPrompt = async (coachId) => {
   if(teams.length===0){ alert('Todavía no hay equipos creados. Créalos primero en la pestaña "Plantilla".'); return; }
   const c = coaches.find(x=>x.id===coachId);
