@@ -6051,6 +6051,11 @@ const goalCenterTextPlugin_ = {
   afterDraw(chart){
     const opts = chart.config.options.plugins && chart.config.options.plugins.goalCenterText;
     if(!opts) return;
+    // El donut es pequeño: el tooltip que aparece al pasar el ratón por una porción cae
+    // justo encima del hueco central y se solapaba con el "TOTAL X GOLES". Mientras el
+    // tooltip esté visible (fade-in incluido) no dibujamos el texto central — el propio
+    // tooltip ya dice de qué categoría se trata, así que no hace falta duplicarlo ahí.
+    if(chart.tooltip && chart.tooltip.opacity > 0) return;
     const {ctx, chartArea:{left,right,top,bottom}} = chart;
     const cx = (left+right)/2, cy = (top+bottom)/2;
     ctx.save();
