@@ -541,7 +541,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
     <button class="tab" data-tab="sessions">Sesiones</button>
     <button class="tab" data-tab="modelo">Modelo de juego</button>
     <button class="tab" data-tab="abp">ABP</button>
-    <button class="tab" data-tab="miequipo">🎽 Mi equipo</button>
+    <button class="tab" data-tab="miequipo"><img src="icon-512.png" alt="" style="height:1.1em;width:1.1em;object-fit:contain;vertical-align:-0.2em;"> Mi equipo</button>
     <button class="tab" data-tab="plantilla">👕 Plantilla</button>
     <button class="tab hidden" id="tabCoachesBtn" data-tab="coaches">Entrenadores</button>
     <button class="tab hidden" id="tabPapeleraBtn" data-tab="papelera">🗑️ Papelera</button>
@@ -578,7 +578,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
           <span class="home-card-desc">Jugadas a balón parado</span>
         </button>
         <button type="button" class="home-card" data-goto="miequipo">
-          <span class="home-card-icon">🎽</span>
+          <span class="home-card-icon"><img src="icon-512.png" alt="" style="width:1em;height:1em;object-fit:contain;display:inline-block;vertical-align:-0.15em;"></span>
           <span class="home-card-label">Mi equipo</span>
           <span class="home-card-desc">Tu plantilla, jornadas y resumen</span>
         </button>
@@ -1077,7 +1077,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
     <div id="tab-miequipo" class="hidden">
       <div id="miEquipoTeamsView">
         <div class="card">
-          <h2 style="font-size:1.05rem;">🎽 Mi equipo</h2>
+          <h2 style="font-size:1.05rem;"><img src="icon-512.png" alt="" style="height:1.1em;width:1.1em;object-fit:contain;vertical-align:-0.2em;"> Mi equipo</h2>
           <p class="muted">Elige uno de tus equipos asignados para ver su plantilla, sus jornadas y su resumen.</p>
           <div id="miEquipoTeamsList" class="home-grid" style="margin-top:10px;"></div>
         </div>
@@ -1085,7 +1085,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
       <div id="miEquipoMenuView" class="hidden">
         <button type="button" class="btn ghost small" id="miEquipoMenuBack" style="margin-bottom:10px;">← Volver</button>
         <div class="card">
-          <h2 style="font-size:1.05rem;" id="miEquipoMenuTitle">🎽 Mi equipo</h2>
+          <h2 style="font-size:1.05rem;" id="miEquipoMenuTitle"><img src="icon-512.png" alt="" style="height:1.1em;width:1.1em;object-fit:contain;vertical-align:-0.2em;"> Mi equipo</h2>
           <div class="home-grid" style="margin-top:10px;">
             <button type="button" class="home-card" id="miEquipoGoPlantillaMenu">
               <span class="home-card-icon">👕</span>
@@ -4920,7 +4920,7 @@ function renderMiEquipoTeams(){
   }
   wrap.innerHTML = myTeams.map(t=>`
     <button type="button" class="home-card" onclick="openMiEquipoTeam('${t.id}')">
-      <span class="home-card-icon">🎽</span>
+      <span class="home-card-icon"><img src="icon-512.png" alt="" style="width:1em;height:1em;object-fit:contain;display:inline-block;vertical-align:-0.15em;"></span>
       <span class="home-card-label">${escapeHtml(t.name)}</span>
       <span class="home-card-desc">Ver plantilla y sesiones</span>
     </button>`).join("");
@@ -4933,7 +4933,8 @@ window.openMiEquipoTeam = (teamId) => {
   selectedSeason = null;
   applySelectedTeamChange_();
   const t = teams.find(x=>x.id===teamId);
-  document.getElementById("miEquipoMenuTitle").textContent = "🎽 " + (t ? t.name : "Mi equipo");
+  document.getElementById("miEquipoMenuTitle").innerHTML =
+    '<img src="icon-512.png" alt="" style="height:1.1em;width:1.1em;object-fit:contain;vertical-align:-0.2em;"> ' + escapeHtml(t ? t.name : "Mi equipo");
   document.getElementById("miEquipoPlantillaMenuTitle").textContent = "👕 Plantilla de " + (t ? t.name : "");
   document.getElementById("miEquipoAbpTitle").textContent = "🎯 ABP de " + (t ? t.name : "");
   document.getElementById("miEquipoTaskTitle").textContent = "📋 Tareas de " + (t ? t.name : "");
