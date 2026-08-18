@@ -259,14 +259,22 @@ textarea{resize:vertical;min-height:70px;}
 .task-actions{display:flex;gap:6px;flex-shrink:0;}
 
 /* Icono de camiseta junto al nombre de un jugador: verde para portero, roja/blanca para
-   jugador de campo (ver jerseyIconHtml_). Las imágenes originales son cuadradas con las
-   esquinas en negro (estilo icono de app); se recortan con zoom vía CSS para mostrar solo
-   la tela de la camiseta, sin tener que tocar los ficheros. */
+   jugador de campo (ver jerseyIconHtml_/jerseyNameHtml_). Las imágenes originales son
+   cuadradas con las esquinas en negro (estilo icono de app); se recortan con zoom vía CSS
+   para mostrar solo la tela de la camiseta, sin tener que tocar los ficheros.
+   jerseyNameHtml_ envuelve icono+nombre en una fila flex (no solo texto suelto): así, en
+   pantallas estrechas (Android) un nombre largo hace salto de línea a la DERECHA del
+   icono en vez de "romperse" justo después del icono y dejarlo solo arriba con el nombre
+   entero debajo — eso pasaba porque un inline-block admite un punto de corte de línea
+   justo después de sí mismo aunque no haya espacio en blanco. */
 .jersey-icon{
   display:inline-block;width:1.15em;height:1.15em;border-radius:50%;overflow:hidden;
   vertical-align:-0.2em;flex:0 0 auto;margin-right:3px;background:#eee;
 }
 .jersey-icon img{width:150%;height:150%;margin:-25%;object-fit:cover;display:block;}
+.jersey-name-row{display:inline-flex;align-items:flex-start;gap:3px;max-width:100%;}
+.jersey-name-row .jersey-icon{margin-top:.15em;margin-right:0;}
+.jersey-name-row .jn-name{min-width:0;overflow-wrap:break-word;}
 
 /* filters */
 .filterbar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
@@ -5561,6 +5569,14 @@ function jerseyIconHtml_(position){
   const src = isGk ? "portero.png.jpeg" : "Jugador.png.jpeg";
   return `<span class="jersey-icon" title="${isGk?"Portero":"Jugador"}"><img src="${src}" alt=""></span>`;
 }
+// Igual que jerseyIconHtml_, pero envolviendo icono+nombre (nameHtml ya viene con su propio
+// escapeHtml aplicado) en una fila flex: evita que en pantallas estrechas el icono quede
+// solo en su propia línea y el nombre entero salte a la siguiente (ver comentario CSS de
+// .jersey-name-row). Úsalo siempre que el icono vaya pegado a un nombre, en vez de
+// concatenar jerseyIconHtml_ + texto suelto.
+function jerseyNameHtml_(position, nameHtml){
+  return `<span class="jersey-name-row">${jerseyIconHtml_(position)}<span class="jn-name">${nameHtml}</span></span>`;
+}
 function renderPlayersList(){
   const wrap = document.getElementById("playersList");
   if(!wrap) return;
@@ -5573,7 +5589,8 @@ function renderPlayersList(){
   const list = players.filter(p=>p.teamId===selectedTeamId).sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
   if(list.length===0){ wrap.innerHTML = '<div class="empty">Todavía no hay jugadores en este equipo.</div>'; return; }
   wrap.innerHTML = `
-    <table style="width:100%;border-collapse:collapse;">
+    <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;min-width:420px;">
       <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
         <th style="padding:6px;">Dorsal</th><th style="padding:6px;">Nombre y apellidos</th><th style="padding:6px;">Posición</th><th></th>
       </tr></thead>
@@ -5581,7 +5598,7 @@ function renderPlayersList(){
       ${list.map(p=>`
         <tr style="border-bottom:1px solid var(--border);">
           <td style="padding:6px;">${p.dorsal!=null ? p.dorsal : "-"}</td>
-          <td style="padding:6px;">${jerseyIconHtml_(p.position)}${escapeHtml(p.name)}</td>
+          <td style="padding:6px;">${jerseyNameHtml_(p.position, escapeHtml(p.name))}</td>
           <td style="padding:6px;">${escapeHtml(p.position||"")}</td>
           <td style="padding:6px;text-align:right;white-space:nowrap;">
             <button class="btn ghost small" onclick="openPlayerProfile('${p.id}')">📊</button>
@@ -5590,7 +5607,8 @@ function renderPlayersList(){
           </td>
         </tr>`).join("")}
       </tbody>
-    </table>`;
+    </table>
+    </div>`;
 }
 document.getElementById("btnAddPlayer").onclick = async () => {
   const msgEl = document.getElementById("playersMsg");
@@ -5784,7 +5802,7 @@ function renderMatchdayStatsTable(){
       const goalsShown = isGk ? s.goalsConceded : s.goals;
       return `
       <tr data-player-id="${p.id}" data-is-gk="${isGk?"1":"0"}" style="border-bottom:1px solid var(--border);">
-        <td style="padding:4px;white-space:nowrap;">${jerseyIconHtml_(p.position)}${p.dorsal!=null?escapeHtml(String(p.dorsal))+". ":""}${escapeHtml(p.name)}</td>
+        <td style="padding:4px;">${jerseyNameHtml_(p.position, (p.dorsal!=null?escapeHtml(String(p.dorsal))+". ":"")+escapeHtml(p.name))}</td>
         <td style="padding:4px;">
           <select class="md-status">
             <option value="Titular" ${s.status==="Titular"?"selected":""}>Titular</option>
@@ -6223,7 +6241,7 @@ function renderMatchdayReport(){
   wrap.innerHTML = roster.map(p=>`
     <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:6px;">
       <div style="flex:1;">
-        <label style="font-size:.8rem;color:var(--muted-fg,#666);">${jerseyIconHtml_(p.position)}${p.dorsal!=null?escapeHtml(String(p.dorsal))+". ":""}${escapeHtml(p.name)}</label>
+        <label style="font-size:.8rem;color:var(--muted-fg,#666);">${jerseyNameHtml_(p.position, (p.dorsal!=null?escapeHtml(String(p.dorsal))+". ":"")+escapeHtml(p.name))}</label>
         <input type="text" class="md-player-note" data-player-id="${p.id}" value="${escapeHtml(notes[p.id]||"")}" placeholder="Nota sobre este jugador en el partido..." style="width:100%;">
       </div>
       <div style="width:70px;">
@@ -6686,7 +6704,7 @@ function renderSeasonSummary_(wrap){
       <tbody>
       ${outfield.length ? outfield.map(s=>`
         <tr style="border-bottom:1px solid var(--border);">
-          <td style="padding:5px;">${jerseyIconHtml_(s.player.position)}${s.player.dorsal!=null?escapeHtml(String(s.player.dorsal))+". ":""}${escapeHtml(s.player.name)}</td>
+          <td style="padding:5px;">${jerseyNameHtml_(s.player.position, (s.player.dorsal!=null?escapeHtml(String(s.player.dorsal))+". ":"")+escapeHtml(s.player.name))}</td>
           <td style="padding:5px;">${s.played}</td>
           <td style="padding:5px;">${s.starts}</td>
           <td style="padding:5px;">${s.subs}</td>
@@ -6708,7 +6726,7 @@ function renderSeasonSummary_(wrap){
       <tbody>
       ${gks.length ? gks.map(s=>`
         <tr style="border-bottom:1px solid var(--border);">
-          <td style="padding:5px;">${jerseyIconHtml_(s.player.position)}${s.player.dorsal!=null?escapeHtml(String(s.player.dorsal))+". ":""}${escapeHtml(s.player.name)}</td>
+          <td style="padding:5px;">${jerseyNameHtml_(s.player.position, (s.player.dorsal!=null?escapeHtml(String(s.player.dorsal))+". ":"")+escapeHtml(s.player.name))}</td>
           <td style="padding:5px;">${s.gkMatches}</td>
           <td style="padding:5px;">${s.goalsConceded}</td>
           <td style="padding:5px;">${s.cleanSheets}</td>
@@ -6767,7 +6785,7 @@ function renderMatchdaySummary_(wrap){
         const goalsShown = isGk ? s.goalsConceded : s.goals;
         return `
         <tr style="border-bottom:1px solid var(--border);">
-          <td style="padding:5px;">${jerseyIconHtml_(p.position)}${p.dorsal!=null?escapeHtml(String(p.dorsal))+". ":""}${escapeHtml(p.name)}</td>
+          <td style="padding:5px;">${jerseyNameHtml_(p.position, (p.dorsal!=null?escapeHtml(String(p.dorsal))+". ":"")+escapeHtml(p.name))}</td>
           <td style="padding:5px;">${escapeHtml(s.status||"No convocado")}</td>
           <td style="padding:5px;">${escapeHtml(s.reason||"")}</td>
           <td style="padding:5px;">${goalsShown!=null?goalsShown:"-"}</td>
@@ -6786,7 +6804,7 @@ function renderMatchdaySummary_(wrap){
       ${Object.keys(notes).length ? `
         <h4 style="font-size:.85rem;margin:8px 0 2px 0;">Notas de jugadores</h4>
         <ul style="margin:0 0 0 18px;padding:0;font-size:.85rem;">
-          ${roster.filter(p=>notes[p.id]).map(p=>`<li>${jerseyIconHtml_(p.position)}<strong>${escapeHtml(p.name)}:</strong> ${escapeHtml(notes[p.id])}</li>`).join("")}
+          ${roster.filter(p=>notes[p.id]).map(p=>`<li>${jerseyNameHtml_(p.position, `<strong>${escapeHtml(p.name)}:</strong> ${escapeHtml(notes[p.id])}`)}</li>`).join("")}
         </ul>` : ""}
     ` : ""}`;
   renderGoalDonutChart_("mdSummaryGoalsForChart", forAgg);
@@ -6803,7 +6821,7 @@ window.openPlayerProfile = (id) => {
   const p = players.find(x=>x.id===id);
   if(!p) return;
   document.getElementById("playerProfileTitle").innerHTML =
-    `${jerseyIconHtml_(p.position)}${p.dorsal!=null ? escapeHtml(String(p.dorsal))+". " : ""}${escapeHtml(p.name)}`;
+    jerseyNameHtml_(p.position, (p.dorsal!=null ? escapeHtml(String(p.dorsal))+". " : "")+escapeHtml(p.name));
   const wrap = document.getElementById("playerProfileContent");
   const team = teams.find(t=>t.id===p.teamId);
   const teamMds = matchdays.filter(m=>m.teamId===p.teamId && matchdaySeason_(m, team)===selectedSeason).sort((a,b)=>(a.number||0)-(b.number||0));
