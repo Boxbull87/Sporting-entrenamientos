@@ -950,6 +950,10 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
           <p class="muted" style="margin-top:-4px;">Esta jugada se archivará automáticamente en la carpeta "📁 Categorías" del Banco de ABP, dentro de cada categoría del rango elegido.</p>
           <label style="margin-top:10px;">Observaciones</label>
           <textarea id="playObservations" placeholder="Claves de la jugada, roles, variantes..."></textarea>
+          <label style="margin-top:10px;display:flex;align-items:center;gap:8px;text-transform:none;font-family:inherit;font-weight:400;">
+            <input type="checkbox" id="playPublic" style="width:auto;">
+            Permitir enlace público (visible por cualquiera, sin iniciar sesión)
+          </label>
 
           <h3 style="margin-top:16px;font-size:.95rem;">🎯 Pizarra táctica</h3>
           <div id="abpBoardAnchor"></div>
@@ -1929,8 +1933,15 @@ function friendlyAuthError(err){
   return map[err.code] || "Ha ocurrido un error. Inténtalo de nuevo.";
 }
 
-const PUBLIC_MATCH = location.hash.match(/public=([^&]+)/);
-if(PUBLIC_MATCH){
+// #publicplay=<id> comparte UNA jugada suelta del banco de ABP; #public=<id> comparte una
+// sesión de ABP entera. Se comprueba primero "publicplay=" para no depender de que las dos
+// regex sean mutuamente excluyentes si el formato del hash cambiara en el futuro.
+const PUBLIC_PLAY_MATCH = location.hash.match(/publicplay=([^&]+)/);
+const PUBLIC_MATCH = PUBLIC_PLAY_MATCH ? null : location.hash.match(/public=([^&]+)/);
+if(PUBLIC_PLAY_MATCH){
+  document.getElementById("authScreen").classList.add("hidden");
+  loadPublicPlay(decodeURIComponent(PUBLIC_PLAY_MATCH[1]));
+} else if(PUBLIC_MATCH){
   document.getElementById("authScreen").classList.add("hidden");
   loadPublicPlaySession(decodeURIComponent(PUBLIC_MATCH[1]));
 } else {
@@ -7863,9 +7874,14 @@ document.getElementById("playForm").onsubmit = async (e) => {
   const payload = {
     title: document.getElementById("playTitle").value.trim(),
     categoryIds,
+    // Nombres de carpeta "congelados" en el momento de guardar, igual que ya se hace con
+    // item.categoryName en las sesiones de ABP: el enlace público no tiene sesión iniciada,
+    // así que no puede leer la colección "abpCategories" para resolver los ids en vivo.
+    categoryNames: categoryIds.map(abpCatName_).filter(Boolean),
     levelFrom, levelTo,
     videoUrl: document.getElementById("playVideoUrl").value.trim(),
     observations: document.getElementById("playObservations").value.trim(),
+    public: document.getElementById("playPublic").checked,
     animation: { frames: frames },
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   };
@@ -7900,6 +7916,7 @@ function resetPlayForm(){
   renderPlayFolderLabel();
   document.getElementById("playLevelFrom").value = "";
   document.getElementById("playLevelTo").value = "";
+  document.getElementById("playPublic").checked = false;
   tokens = []; frames = []; arrows = []; texts = []; shapes = []; paths = [];
   tokenSeq = 0; arrowSeq = 0; textSeq = 0; shapeSeq = 0; pathSeq = 0;
   historyStack = []; undoStack = []; redoStack = []; selected = null; dragObj = null;
@@ -7920,6 +7937,7 @@ window.editPlay = (id) => {
   document.getElementById("playLevelTo").value = p.levelTo || "";
   document.getElementById("playVideoUrl").value = p.videoUrl || "";
   document.getElementById("playObservations").value = p.observations || "";
+  document.getElementById("playPublic").checked = !!p.public;
   frames = (p.animation && p.animation.frames) ? JSON.parse(JSON.stringify(p.animation.frames)) : [];
   tokens = frames.length ? JSON.parse(JSON.stringify(frameTokens(frames[frames.length-1]))) : [];
   arrows = frames.length ? JSON.parse(JSON.stringify(frameArrows(frames[frames.length-1]))) : [];
@@ -8052,8 +8070,9 @@ function renderPlayList(){
   }
   wrap.innerHTML = list.map(p=>{
     const frameCount = (p.animation && p.animation.frames) ? p.animation.frames.length : 0;
+    const publicUrl = location.origin + location.pathname + "#publicplay=" + p.id;
     return `
-    <div class="task-item">
+    <div class="task-item" style="flex-wrap:wrap;">
       <div>
         <h4>${escapeHtml(p.title)}${isItemUnread("plays",p) ? '<span class="card-dot"></span>' : ""}</h4>
         <div class="task-meta">
@@ -8061,6 +8080,11 @@ function renderPlayList(){
           ${p.videoUrl ? `<span class="badge outline b-duration">▶ Vídeo</span>` : ""}
           ${frameCount ? `<span class="badge outline">🎯 ${frameCount} fotog.</span>`:""}
         </div>
+        ${p.public ? `
+        <div class="row" style="margin-top:6px;">
+          <input type="text" readonly value="${escapeHtml(publicUrl)}" onclick="this.select()" style="font-size:.78rem;">
+          <button type="button" class="btn small ghost" style="flex:0 0 auto;" onclick="copyPublicPlayLink('${p.id}')">🔗 Copiar enlace</button>
+        </div>` : `<p class="muted" style="font-size:.78rem;margin-top:4px;">Enlace público desactivado para esta jugada.</p>`}
       </div>
       <div class="task-actions">
         <button type="button" class="star-btn ${isPlayFavorite(p.id)?"active":""}" onclick="toggleFavoritePlay('${p.id}')" title="${isPlayFavorite(p.id)?"Quitar de favoritas":"Añadir a favoritas"}">${isPlayFavorite(p.id)?"★":"☆"}</button>
@@ -8350,6 +8374,14 @@ window.copyPublicLink = (id) => {
     prompt("Copia este enlace:", url);
   });
 };
+window.copyPublicPlayLink = (id) => {
+  const url = location.origin + location.pathname + "#publicplay=" + id;
+  navigator.clipboard.writeText(url).then(()=>{
+    alert("Enlace copiado al portapapeles.");
+  }).catch(()=>{
+    prompt("Copia este enlace:", url);
+  });
+};
 
 function renderSavedPlaySessions(){
   const wrap = document.getElementById("playSessionsSaved");
@@ -8489,6 +8521,36 @@ async function loadPublicPlaySession(id){
     });
   }catch(err){
     wrap.innerHTML = '<div class="empty">No se ha podido cargar esta sesión: '+escapeHtml(err.message)+'</div>';
+  }
+}
+/* ---------- Enlace público de UNA jugada individual (mismo mecanismo, distinta
+   colección: "plays" en vez de "playSessions", y hash #publicplay= en vez de
+   #public= para no confundir los dos tipos de enlace). ---------- */
+async function loadPublicPlay(id){
+  document.getElementById("publicScreen").classList.remove("hidden");
+  const wrap = document.getElementById("publicWrap");
+  try{
+    const snap = await db.collection("plays").doc(id).get();
+    if(!snap.exists || !snap.data().public){
+      wrap.innerHTML = '<div class="empty">Este enlace no existe o ya no está disponible públicamente.</div>';
+      return;
+    }
+    const p = { id: snap.id, ...snap.data() };
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <h2 style="font-size:1.1rem;">${escapeHtml(p.title||"Jugada de ABP")}</h2>
+      ${(p.categoryNames||[]).map(n=>`<span class="badge">${escapeHtml(n)}</span>`).join("")}
+      <div class="public-video" style="margin-top:8px;"></div>
+      ${p.observations ? `<p style="white-space:pre-wrap;margin-top:8px;">${escapeHtml(p.observations)}</p>` : ""}
+      <div class="public-board" style="margin-top:8px;"></div>
+    `;
+    wrap.innerHTML = "";
+    wrap.appendChild(card);
+    card.querySelector(".public-video").innerHTML = videoEmbedHtml(p.videoUrl);
+    renderBoardViewer(card.querySelector(".public-board"), (p.animation && p.animation.frames) || []);
+  }catch(err){
+    wrap.innerHTML = '<div class="empty">No se ha podido cargar esta jugada: '+escapeHtml(err.message)+'</div>';
   }
 }
 
@@ -8730,7 +8792,7 @@ service cloud.firestore {
       allow write: if isEditor();
     }
     match /plays/{playId} {
-      allow read: if isActive();
+      allow read: if isActive() || resource.data.public == true;
       allow write: if isEditor();
     }
     match /playSessions/{sessionId} {
