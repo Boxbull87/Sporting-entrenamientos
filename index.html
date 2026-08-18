@@ -181,15 +181,26 @@ input,select,textarea{font-family:inherit;}
 
 .goal-chart-card{background:#fff;border-radius:12px;overflow:hidden;border:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:10px;}
 .goal-chart-header{background:#12224f;color:#fff;font-family:'Oswald',sans-serif;text-transform:uppercase;letter-spacing:.03em;font-weight:600;font-size:.78rem;padding:10px 12px;}
-.goal-chart-body{display:flex;flex-wrap:wrap;gap:14px;align-items:center;padding:14px;}
+.goal-chart-body{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start;padding:14px;}
 .goal-chart-donut-wrap{width:140px;height:140px;flex:0 0 auto;position:relative;margin:0 auto;}
-.goal-chart-legend{flex:1;min-width:170px;}
-.goal-chart-legend-row{display:grid;grid-template-columns:12px 1fr auto auto;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:.76rem;}
-.goal-chart-legend-row:last-child{border-bottom:none;}
+.goal-chart-legend{flex:1;min-width:0;}
+.goal-chart-legend-item{border-bottom:1px solid var(--border);}
+.goal-chart-legend-item:last-child{border-bottom:none;}
+/* minmax(0,1fr) en vez de 1fr: sin esto, un nombre de categoría largo y sin espacios para
+   partir (p. ej. "SUPERIORIDAD (5VS4 - 4VS3)") hace que la columna crezca a su ancho de
+   contenido y empuje el recuento/porcentaje fuera de la tarjeta, donde overflow:hidden los
+   recorta. Con minmax(0,1fr) la columna puede encogerse y el texto envuelve en su sitio. */
+.goal-chart-legend-row{display:grid;grid-template-columns:12px minmax(0,1fr) auto auto;gap:8px;align-items:center;padding:6px 2px;font-size:.76rem;cursor:pointer;border-radius:6px;}
+.goal-chart-legend-row:hover{background:rgba(0,0,0,.04);}
 .goal-chart-legend-dot{width:12px;height:12px;border-radius:50%;flex:0 0 auto;}
-.goal-chart-legend-label{font-weight:600;text-transform:uppercase;font-size:.68rem;color:#1a1a1a;}
+.goal-chart-legend-label{font-weight:600;text-transform:uppercase;font-size:.68rem;color:#1a1a1a;overflow-wrap:break-word;}
 .goal-chart-legend-count{font-weight:700;color:#1a1a1a;text-align:right;}
-.goal-chart-legend-pct{color:#666;text-align:right;min-width:30px;}
+.goal-chart-legend-pct{color:#666;text-align:right;min-width:38px;display:flex;align-items:center;justify-content:flex-end;gap:3px;}
+.goal-chart-legend-caret{font-size:.6rem;display:inline-block;transition:transform .15s ease;}
+.goal-chart-legend-row--open .goal-chart-legend-caret{transform:rotate(180deg);}
+.goal-chart-legend-sub{padding:0 4px 8px 26px;}
+.goal-chart-legend-sub.hidden{display:none;}
+.goal-chart-sub-row{display:flex;justify-content:space-between;gap:8px;font-size:.7rem;color:#666;padding:2px 0;}
 .goal-chart-total{background:#12224f;color:#fff;text-align:center;font-family:'Oswald',sans-serif;font-weight:600;letter-spacing:.03em;padding:8px 16px;font-size:.78rem;border-radius:999px;margin:0 14px 14px;}
 
 .card{
@@ -6000,13 +6011,21 @@ function goalChartCardHtml_(title, canvasId, aggData){
     </div>`;
   }
   const total = goalChartTotal_(aggData);
-  const legendRows = aggData.map(c=>{
+  // Cada fila de la leyenda es clicable: despliega debajo el desglose de subcategorías de
+  // esa categoría (además del tooltip al pasar el cursor sobre la porción del donut), para
+  // que también funcione bien al tocar en móvil.
+  const legendRows = aggData.map((c,i)=>{
     const pct = total ? Math.round(c.count/total*100) : 0;
-    return `<div class="goal-chart-legend-row">
-      <span class="goal-chart-legend-dot" style="background:${GOAL_CATEGORY_COLORS_[c.id]||"#999"};"></span>
-      <span class="goal-chart-legend-label">${escapeHtml(c.label)}</span>
-      <span class="goal-chart-legend-count">${c.count}</span>
-      <span class="goal-chart-legend-pct">${pct}%</span>
+    const subId = `${canvasId}-sub-${i}`;
+    const subRows = c.subs.map(s=>`<div class="goal-chart-sub-row"><span>${escapeHtml(s.label)}</span><span>${s.count}</span></div>`).join("");
+    return `<div class="goal-chart-legend-item">
+      <div class="goal-chart-legend-row" onclick="toggleGoalLegendSub_(this,'${subId}')">
+        <span class="goal-chart-legend-dot" style="background:${GOAL_CATEGORY_COLORS_[c.id]||"#999"};"></span>
+        <span class="goal-chart-legend-label">${escapeHtml(c.label)}</span>
+        <span class="goal-chart-legend-count">${c.count}</span>
+        <span class="goal-chart-legend-pct">${pct}% <span class="goal-chart-legend-caret">▾</span></span>
+      </div>
+      <div class="goal-chart-legend-sub hidden" id="${subId}">${subRows}</div>
     </div>`;
   }).join("");
   return `<div class="goal-chart-card">
@@ -6018,6 +6037,13 @@ function goalChartCardHtml_(title, canvasId, aggData){
     <div class="goal-chart-total">TOTAL: ${total} GOL${total===1?"":"ES"}</div>
   </div>`;
 }
+window.toggleGoalLegendSub_ = (rowEl, subId) => {
+  const el = document.getElementById(subId);
+  if(!el) return;
+  const opening = el.classList.contains("hidden");
+  el.classList.toggle("hidden");
+  rowEl.classList.toggle("goal-chart-legend-row--open", opening);
+};
 // Plugin de Chart.js casero (sin librería aparte) para escribir "TOTAL / nº / GOLES" en
 // el hueco central del donut, como en un informe de analítica.
 const goalCenterTextPlugin_ = {
@@ -6067,6 +6093,16 @@ function renderGoalDonutChart_(canvasId, aggData){
         legend: { display: false },
         goalCenterText: { total, label1: "TOTAL", label2: total===1?"GOL":"GOLES" },
         tooltip: {
+          // Fondo sólido (no el rgba(0,0,0,.8) translúcido por defecto): al caer justo
+          // encima de una porción de color vivo del donut, la transparencia por defecto
+          // dejaba el color de fondo asomando y costaba leer el texto encima.
+          backgroundColor: "#12224f",
+          titleColor: "#ffffff",
+          bodyColor: "#ffffff",
+          displayColors: false,
+          padding: 10,
+          cornerRadius: 8,
+          titleFont: { weight: "bold" },
           callbacks: {
             label: (ctx) => {
               const cat = aggData[ctx.dataIndex];
