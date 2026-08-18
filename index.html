@@ -1289,7 +1289,9 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
               <div><label>Rival</label><input type="text" id="mdRival"></div>
             </div>
             <div class="row" style="margin-top:8px;">
-              <div><label>Competición</label><input type="text" id="mdCompetition" placeholder="Liga, Copa..."></div>
+              <div><label>Competición</label><input type="text" id="mdCompetition" list="competitionSuggestions" placeholder="Liga, Copa, Amistoso...">
+                <datalist id="competitionSuggestions"><option value="Liga"><option value="Copa"><option value="Amistoso"></datalist>
+              </div>
               <div><label>Condición</label>
                 <select id="mdHomeAway"><option value="Local">Local</option><option value="Visitante">Visitante</option></select>
               </div>
@@ -1372,6 +1374,8 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
           </div>
           <p class="muted" style="margin:-4px 0 4px 0;font-size:.8rem;">Filtrar por dificultad del rival:</p>
           <div id="summaryDifficultyFilterRow" style="margin-bottom:10px;display:flex;flex-wrap:wrap;"></div>
+          <p class="muted" id="summaryCompetitionFilterLabel" style="margin:-4px 0 4px 0;font-size:.8rem;">Filtrar por competición:</p>
+          <div id="summaryCompetitionFilterRow" style="margin-bottom:10px;display:flex;flex-wrap:wrap;gap:6px;"></div>
           <div id="teamSummaryContent"><div class="empty">Elige un equipo arriba.</div></div>
           <div class="row" style="margin-top:12px;">
             <button type="button" class="btn ghost small" id="btnExportSummaryPDF">🖨️ Exportar PDF</button>
@@ -6360,7 +6364,7 @@ document.getElementById("btnExportSummaryPDF").onclick = () => {
     return;
   }
   const team = teams.find(t=>t.id===selectedTeamId);
-  const sum = computeTeamSummary_(selectedTeamId, selectedSeason, summaryDifficultyFilter);
+  const sum = computeTeamSummary_(selectedTeamId, selectedSeason, summaryDifficultyFilter, summaryCompetitionFilter);
   const outfield = sum.stats.filter(s=>s.player.position!=="Portero").sort((a,b)=> b.goals-a.goals || b.played-a.played);
   const gks = sum.stats.filter(s=>s.player.position==="Portero").sort((a,b)=> b.cleanSheets-a.cleanSheets || a.goalsConceded-b.goalsConceded);
   const { jsPDF } = window.jspdf;
@@ -6431,7 +6435,7 @@ document.getElementById("btnExportSummaryExcel").onclick = () => {
   if(!selectedTeamId){ alert("Elige primero un equipo."); return; }
   if(!window.XLSX){ alert("No se ha podido cargar el generador de Excel. Comprueba tu conexión e inténtalo de nuevo."); return; }
   const team = teams.find(t=>t.id===selectedTeamId);
-  const sum = computeTeamSummary_(selectedTeamId, selectedSeason, summaryDifficultyFilter);
+  const sum = computeTeamSummary_(selectedTeamId, selectedSeason, summaryDifficultyFilter, summaryCompetitionFilter);
   const outfield = sum.stats.filter(s=>s.player.position!=="Portero").sort((a,b)=> b.goals-a.goals || b.played-a.played);
   const gks = sum.stats.filter(s=>s.player.position==="Portero").sort((a,b)=> b.cleanSheets-a.cleanSheets || a.goalsConceded-b.goalsConceded);
 
@@ -6452,10 +6456,10 @@ document.getElementById("btnExportSummaryExcel").onclick = () => {
 };
 
 /* ---------- Resumen automático ---------- */
-function computeTeamSummary_(teamId, season, difficultyFilter){
+function computeTeamSummary_(teamId, season, difficultyFilter, competitionFilter){
   const roster = players.filter(p=>p.teamId===teamId);
   const team = teams.find(t=>t.id===teamId);
-  const teamMds = matchdays.filter(m=>m.teamId===teamId && (!season || matchdaySeason_(m, team)===season) && (!difficultyFilter || m.difficulty===difficultyFilter));
+  const teamMds = matchdays.filter(m=>m.teamId===teamId && (!season || matchdaySeason_(m, team)===season) && (!difficultyFilter || m.difficulty===difficultyFilter) && (!competitionFilter || (m.competition||"").trim()===competitionFilter));
   const stats = {};
   roster.forEach(p=>{
     stats[p.id] = {
@@ -6496,6 +6500,7 @@ function computeTeamSummary_(teamId, season, difficultyFilter){
 let summaryMode = "season"; // "season" | "matchday"
 let summarySelectedMatchdayId = null;
 let summaryDifficultyFilter = null; // null = todas
+let summaryCompetitionFilter = null; // null = todas (Liga/Copa/Amistoso/lo que el entrenador haya escrito)
 document.getElementById("summaryModeSeasonBtn").onclick = () => {
   summaryMode = "season";
   document.getElementById("summaryModeSeasonBtn").classList.remove("ghost");
@@ -6533,14 +6538,47 @@ function renderSummaryDifficultyFilter(){
     };
   });
 }
+function summaryAvailableCompetitions_(){
+  if(!selectedTeamId) return [];
+  const team = teams.find(t=>t.id===selectedTeamId);
+  const set = new Set();
+  matchdays.filter(m=>m.teamId===selectedTeamId && matchdaySeason_(m, team)===selectedSeason).forEach(m=>{
+    const c = (m.competition||"").trim();
+    if(c) set.add(c);
+  });
+  return Array.from(set).sort((a,b)=>a.localeCompare(b,"es"));
+}
+function renderSummaryCompetitionFilter_(){
+  const wrap = document.getElementById("summaryCompetitionFilterRow");
+  const label = document.getElementById("summaryCompetitionFilterLabel");
+  if(!wrap) return;
+  const options = summaryAvailableCompetitions_();
+  if(summaryCompetitionFilter && !options.includes(summaryCompetitionFilter)) summaryCompetitionFilter = null;
+  if(options.length < 2){ wrap.innerHTML = ""; wrap.style.display = "none"; if(label) label.style.display = "none"; return; }
+  wrap.style.display = "flex"; wrap.style.gap = "6px"; wrap.style.flexWrap = "wrap";
+  if(label) label.style.display = "";
+  const allSelected = !summaryCompetitionFilter;
+  const pillStyle = (selected) => `cursor:pointer;padding:5px 10px;border:1.5px solid ${selected?"var(--accent)":"var(--border)"};background:${selected?"var(--accent)":"transparent"};color:${selected?"#fff":"inherit"};border-radius:20px;font-size:.78rem;`;
+  wrap.innerHTML = `<button type="button" data-comp-filter="" style="${pillStyle(allSelected)}">Todas</button>` +
+    options.map(c=>`<button type="button" data-comp-filter="${escapeHtml(c)}" style="${pillStyle(summaryCompetitionFilter===c)}">${escapeHtml(c)}</button>`).join("");
+  wrap.querySelectorAll("[data-comp-filter]").forEach(btn=>{
+    btn.onclick = () => {
+      summaryCompetitionFilter = btn.dataset.compFilter || null;
+      summarySelectedMatchdayId = null;
+      renderSummaryCompetitionFilter_();
+      renderTeamSummary();
+    };
+  });
+}
 function renderTeamSummary(){
   const wrap = document.getElementById("teamSummaryContent");
   const mdSel = document.getElementById("summaryMatchdaySelect");
   if(!wrap) return;
   renderSummaryDifficultyFilter();
+  renderSummaryCompetitionFilter_();
   if(!selectedTeamId){ wrap.innerHTML = '<div class="empty">Elige un equipo arriba.</div>'; mdSel.innerHTML = ""; return; }
   const team = teams.find(t=>t.id===selectedTeamId);
-  const teamMds = matchdays.filter(m=>m.teamId===selectedTeamId && matchdaySeason_(m, team)===selectedSeason && (!summaryDifficultyFilter || m.difficulty===summaryDifficultyFilter)).sort((a,b)=>(a.number||0)-(b.number||0));
+  const teamMds = matchdays.filter(m=>m.teamId===selectedTeamId && matchdaySeason_(m, team)===selectedSeason && (!summaryDifficultyFilter || m.difficulty===summaryDifficultyFilter) && (!summaryCompetitionFilter || (m.competition||"").trim()===summaryCompetitionFilter)).sort((a,b)=>(a.number||0)-(b.number||0));
   const prevSel = summarySelectedMatchdayId;
   mdSel.innerHTML = teamMds.length
     ? teamMds.map(m=>`<option value="${m.id}">Jornada ${m.number} — vs ${escapeHtml(m.rival||"?")}</option>`).join("")
@@ -6554,13 +6592,13 @@ function renderTeamSummary(){
   else renderSeasonSummary_(wrap);
 }
 function renderSeasonSummary_(wrap){
-  const sum = computeTeamSummary_(selectedTeamId, selectedSeason, summaryDifficultyFilter);
+  const sum = computeTeamSummary_(selectedTeamId, selectedSeason, summaryDifficultyFilter, summaryCompetitionFilter);
   const outfield = sum.stats.filter(s=>s.player.position!=="Portero").sort((a,b)=> b.goals-a.goals || b.played-a.played);
   const gks = sum.stats.filter(s=>s.player.position==="Portero").sort((a,b)=> b.cleanSheets-a.cleanSheets || a.goalsConceded-b.goalsConceded);
   const forAgg = aggregateGoalEvents_(sum.teamMds, "goalsForEvents");
   const againstAgg = aggregateGoalEvents_(sum.teamMds, "goalsAgainstEvents");
   wrap.innerHTML = `
-    <p class="muted" style="margin-top:-6px;">Temporada: ${escapeHtml(selectedSeason||"-")}</p>
+    <p class="muted" style="margin-top:-6px;">Temporada: ${escapeHtml(selectedSeason||"-")}${summaryCompetitionFilter?` · Competición: ${escapeHtml(summaryCompetitionFilter)}`:""}</p>
     <div class="row" style="margin-bottom:12px;">
       <div class="badge outline" style="padding:8px 12px;">🗓️ Jornadas jugadas: ${sum.played}</div>
       <div class="badge outline" style="padding:8px 12px;">⚽ Goles a favor: ${sum.goalsFor}</div>
