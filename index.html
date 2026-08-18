@@ -1338,8 +1338,8 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
             </div>
             <div id="matchdayStatsMsg"></div>
 
-            <h3 style="margin-top:18px;font-size:.9rem;">🔗 Sesiones de entrenamiento de esa semana</h3>
-            <p class="muted" style="margin-top:-6px;">Marca las sesiones que preparasteis antes de este partido, para tener el enlace guardado.</p>
+            <h3 style="margin-top:18px;font-size:.9rem;">🔗 Sesiones de entrenamiento vinculadas</h3>
+            <p class="muted" style="margin-top:-6px;">Marca las sesiones de tus equipos que quieras vincular a este partido (o desmárcalas para desvincularlas) y guarda.</p>
             <div id="matchdaySessionsLink"></div>
 
             <h3 style="margin-top:18px;font-size:.9rem;">📋 Informe del partido</h3>
@@ -5819,41 +5819,76 @@ document.getElementById("btnDeleteMatchday").onclick = async () => {
   }catch(err){ alert("No se ha podido eliminar: " + err.message); }
 };
 
-/* ---------- Vincular jornada con sesiones de entrenamiento ---------- */
+/* ---------- Vincular jornada con sesiones de entrenamiento ----------
+   Solo se ofrecen sesiones de "mis equipos" (coachVisibleTeams_: los propios,
+   o todos si gestor/editor) — nunca las de otros entrenadores — agrupadas por
+   equipo y por mes igual que en la pestaña Sesiones, sin límite de fecha: así
+   se puede vincular o desvincular cualquier sesión guardada en cualquier
+   momento, no solo las de los ~10 días antes del partido. ---------- */
+function matchdaySessionCheckboxesByMonth_(list, linked){
+  const monthGroups = {};
+  list.forEach(s=>{ const mk = sessionMonthKey(s); (monthGroups[mk] = monthGroups[mk] || []).push(s); });
+  const monthKeys = Object.keys(monthGroups).sort((a,b)=> b.localeCompare(a));
+  return monthKeys.map(mk=>{
+    const mlist = monthGroups[mk].slice().sort((a,b)=> (a.date||"").localeCompare(b.date||""));
+    return `
+    <details class="month-group" open style="margin:6px 0 0 4px;">
+      <summary style="cursor:pointer;font-weight:600;font-size:.85rem;padding:8px 10px;background:#faf8f5;border:1px solid var(--border);border-radius:8px;">
+        🗓️ ${sessionMonthLabel(mk)} <span class="muted" style="font-weight:400;">(${mlist.length} sesión${mlist.length===1?"":"es"})</span>
+      </summary>
+      <div style="margin-top:8px;">${mlist.map(s=>`
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 0;">
+          <label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer;">
+            <input type="checkbox" class="md-session-link" value="${s.id}" ${linked.has(s.id)?"checked":""}>
+            <span>${escapeHtml(s.date||"")} — ${escapeHtml(s.name||"(sin título)")}</span>
+          </label>
+          <button type="button" class="btn ghost small" onclick="viewLinkedSession('${s.id}')">👁️ Ver</button>
+        </div>`).join("")}</div>
+    </details>`;
+  }).join("");
+}
 function renderMatchdaySessionsLink(){
   const wrap = document.getElementById("matchdaySessionsLink");
   if(!wrap) return;
   const m = matchdays.find(x=>x.id===statsMatchdayId);
   if(!m){ wrap.innerHTML = ""; return; }
   const linked = new Set(m.linkedSessionIds || []);
-  let candidates = sessions.slice();
-  if(m.date){
-    const matchDate = new Date(m.date);
-    if(!isNaN(matchDate)){
-      candidates = sessions.filter(s=>{
-        if(!s.date) return false;
-        const sd = new Date(s.date);
-        if(isNaN(sd)) return false;
-        const diffDays = (matchDate - sd) / (1000*60*60*24);
-        return diffDays >= 0 && diffDays <= 10; // sesiones de los ~10 días previos al partido
+  const myTeams = coachVisibleTeams_();
+  const myTeamIds = new Set(myTeams.map(t=>t.id));
+  // Sesiones de mis equipos, más las ya vinculadas aunque su equipo ya no esté entre los míos
+  // (p.ej. si se me quitó ese equipo después de vincularla), para no perderlas de vista.
+  const candidates = sessions.filter(s => linked.has(s.id) || sessionTeams_(s).some(t=>myTeamIds.has(t.id)));
+  if(candidates.length===0){ wrap.innerHTML = '<p class="muted">Todavía no hay sesiones de entrenamiento guardadas en tus equipos.</p>'; return; }
+
+  let bodyHtml;
+  if(myTeams.length < 2){
+    bodyHtml = matchdaySessionCheckboxesByMonth_(candidates, linked);
+  } else {
+    const teamGroups = {};
+    candidates.forEach(s=>{
+      const sTeams = sessionTeams_(s).filter(t=>myTeamIds.has(t.id));
+      const entries = sTeams.length ? sTeams : [{id:"__otro__", name:"Otro equipo"}];
+      entries.forEach(t=>{
+        if(!teamGroups[t.id]) teamGroups[t.id] = {name:t.name, sessions:[]};
+        teamGroups[t.id].sessions.push(s);
       });
-    }
+    });
+    const teamKeys = Object.keys(teamGroups).sort((a,b)=>teamGroups[a].name.localeCompare(teamGroups[b].name,'es'));
+    bodyHtml = teamKeys.map(tk=>{
+      const grp = teamGroups[tk];
+      return `
+      <details class="team-group" open style="margin:8px 0 0 4px;">
+        <summary style="cursor:pointer;font-weight:600;padding:9px 11px;background:#f2f6f4;border:1px solid var(--border);border-radius:8px;">
+          👕 ${escapeHtml(grp.name)} <span class="muted" style="font-weight:400;">(${grp.sessions.length} sesión${grp.sessions.length===1?"":"es"})</span>
+        </summary>
+        <div style="margin-top:8px;">${matchdaySessionCheckboxesByMonth_(grp.sessions, linked)}</div>
+      </details>`;
+    }).join("");
   }
-  candidates = candidates.sort((a,b)=> new Date(b.date||0) - new Date(a.date||0)).slice(0, 30);
-  // Aseguramos que las ya vinculadas salgan aunque estén fuera del rango de fechas
-  sessions.forEach(s=>{ if(linked.has(s.id) && !candidates.some(c=>c.id===s.id)) candidates.push(s); });
-  if(candidates.length===0){ wrap.innerHTML = '<p class="muted">No hay sesiones de entrenamiento cerca de la fecha de este partido.</p>'; return; }
-  wrap.innerHTML = candidates.map(s=>`
-    <div style="display:flex;align-items:center;gap:8px;padding:4px 0;">
-      <label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer;">
-        <input type="checkbox" class="md-session-link" value="${s.id}" ${linked.has(s.id)?"checked":""}>
-        <span>${escapeHtml(s.date||"")} — ${escapeHtml(s.name||"(sin título)")}</span>
-      </label>
-      <button type="button" class="btn ghost small" onclick="viewLinkedSession('${s.id}')">👁️ Ver</button>
-    </div>`).join("") +
+  wrap.innerHTML = bodyHtml +
     `<button type="button" class="btn ghost small" id="btnSaveMatchdaySessions" style="margin-top:8px;">💾 Guardar sesiones vinculadas</button>`;
   document.getElementById("btnSaveMatchdaySessions").onclick = async () => {
-    const ids = Array.from(document.querySelectorAll(".md-session-link:checked")).map(el=>el.value);
+    const ids = Array.from(new Set(Array.from(document.querySelectorAll(".md-session-link:checked")).map(el=>el.value)));
     try{ await db.collection("matchdays").doc(statsMatchdayId).update({linkedSessionIds: ids}); }
     catch(err){ alert("No se ha podido guardar: " + err.message); }
   };
