@@ -6051,10 +6051,8 @@ const goalCenterTextPlugin_ = {
   afterDraw(chart){
     const opts = chart.config.options.plugins && chart.config.options.plugins.goalCenterText;
     if(!opts) return;
-    // El donut es pequeño: el tooltip que aparece al pasar el ratón por una porción cae
-    // justo encima del hueco central y se solapaba con el "TOTAL X GOLES". Mientras el
-    // tooltip esté visible (fade-in incluido) no dibujamos el texto central — el propio
-    // tooltip ya dice de qué categoría se trata, así que no hace falta duplicarlo ahí.
+    // Red de seguridad: si algún día se reactiva el tooltip del donut, que no se dibuje el
+    // texto central mientras esté visible (el hueco central es pequeño y se solapaban).
     if(chart.tooltip && chart.tooltip.opacity > 0) return;
     const {ctx, chartArea:{left,right,top,bottom}} = chart;
     const cx = (left+right)/2, cy = (top+bottom)/2;
@@ -6097,26 +6095,13 @@ function renderGoalDonutChart_(canvasId, aggData){
       plugins: {
         legend: { display: false },
         goalCenterText: { total, label1: "TOTAL", label2: total===1?"GOL":"GOLES" },
-        tooltip: {
-          // Fondo sólido (no el rgba(0,0,0,.8) translúcido por defecto): al caer justo
-          // encima de una porción de color vivo del donut, la transparencia por defecto
-          // dejaba el color de fondo asomando y costaba leer el texto encima.
-          backgroundColor: "#12224f",
-          titleColor: "#ffffff",
-          bodyColor: "#ffffff",
-          displayColors: false,
-          padding: 10,
-          cornerRadius: 8,
-          titleFont: { weight: "bold" },
-          callbacks: {
-            label: (ctx) => {
-              const cat = aggData[ctx.dataIndex];
-              const lines = [`${cat.label}: ${cat.count}`];
-              cat.subs.forEach(s => lines.push(`   ${s.label}: ${s.count}`));
-              return lines;
-            }
-          }
-        },
+        // El donut mide solo 140×140px: un tooltip con el nombre de la categoría (a veces
+        // largo, p. ej. "Superioridad (5vs4 - 4vs3)") más el desglose de subcategorías no
+        // cabía ahí dentro y se veía cortado. Esa misma información ya está siempre visible
+        // sin necesidad de tooltip: el valor y el % van escritos sobre cada porción
+        // (datalabels de abajo), el nombre completo está en la leyenda, y pulsando la fila
+        // de la leyenda se despliega el desglose de subcategorías sin límite de tamaño.
+        tooltip: { enabled: false },
         datalabels: {
           color: "#ffffff",
           font: { weight: "bold", size: 12 },
