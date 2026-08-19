@@ -8752,6 +8752,15 @@ function reviveTimestamps(obj){
   return obj;
 }
 
+// Restaura documento a documento (no en batches atómicos de Firestore): un batch.commit()
+// es todo-o-nada, así que UN solo documento problemático (p.ej. un entrenador borrado cuyo
+// perfil ya no existe, y que las reglas de Firestore solo dejan CREAR con su propio uid, ni
+// siquiera siendo gestor) podía tirar abajo los otros ~400 documentos de su mismo bloque y
+// abortar el resto de colecciones pendientes, dejando una restauración a medias sin más
+// aviso que un error genérico. Escribiendo cada documento por separado (en tandas
+// concurrentes solo por no ir de uno en uno), si alguno falla no afecta a los demás, y al
+// final se muestra un informe con cuántos han ido bien y el detalle de los que no.
+const RESTORE_CONCURRENCY = 25;
 document.getElementById("btnRestoreBackup").onclick = async () => {
   const msgEl = document.getElementById("backupRestoreMsg");
   msgEl.innerHTML = "";
@@ -8766,23 +8775,39 @@ document.getElementById("btnRestoreBackup").onclick = async () => {
       .filter(col => backup.collections[col])
       .map(col => `${(backup.collections[col]||[]).length} en "${col}"`)
       .join(", ");
-    const confirmMsg = `Vas a restaurar: ${summary}.\n\nEsto SOBRESCRIBIRÁ los datos actuales que tengan el mismo identificador. ¿Continuar?`;
+    const confirmMsg = `Vas a restaurar: ${summary}.\n\nEsto SOBRESCRIBIRÁ los datos actuales que tengan el mismo identificador. Cada documento se restaura por separado: si alguno falla no afecta a los demás, y al final verás un informe de qué ha ido bien y qué no.\n\n¿Continuar?`;
     if(!confirm(confirmMsg)) return;
 
-    msgEl.innerHTML = '<p class="muted">Restaurando... no cierres esta pantalla.</p>';
+    const report = [];
     for(const col of BACKUP_COLLECTIONS){
       const docs = backup.collections[col];
       if(!docs || docs.length===0) continue;
-      for(let i=0; i<docs.length; i+=400){
-        const chunk = docs.slice(i, i+400);
-        const batch = db.batch();
-        chunk.forEach(({id, data}) => {
-          batch.set(db.collection(col).doc(id), reviveTimestamps(data));
+      let ok = 0;
+      const errors = [];
+      for(let i=0; i<docs.length; i+=RESTORE_CONCURRENCY){
+        const chunk = docs.slice(i, i+RESTORE_CONCURRENCY);
+        msgEl.innerHTML = `<p class="muted">Restaurando "${col}"... ${i}/${docs.length} — no cierres esta pantalla.</p>`;
+        const results = await Promise.allSettled(
+          chunk.map(({id, data}) => db.collection(col).doc(id).set(reviveTimestamps(data)))
+        );
+        results.forEach((r, idx) => {
+          if(r.status === "fulfilled") ok++;
+          else errors.push({ id: chunk[idx].id, message: (r.reason && r.reason.message) || String(r.reason) });
         });
-        await batch.commit();
       }
+      report.push({ col, total: docs.length, ok, errors });
     }
-    msgEl.innerHTML = '<p class="ok-msg">Restauración completada correctamente.</p>';
+    const totalErrors = report.reduce((n,r)=>n+r.errors.length, 0);
+    const reportHtml = report.map(r => {
+      const errDetail = r.errors.length
+        ? `<ul style="margin:2px 0 6px 18px;font-size:.78rem;color:#a33;">${r.errors.slice(0,10).map(e=>`<li>${escapeHtml(e.id)}: ${escapeHtml(e.message)}</li>`).join("")}${r.errors.length>10?`<li>... y ${r.errors.length-10} más</li>`:""}</ul>`
+        : "";
+      return `<p style="margin:2px 0;">${r.errors.length?"⚠️":"✅"} <strong>${escapeHtml(r.col)}</strong>: ${r.ok}/${r.total} restaurados${r.errors.length?` (${r.errors.length} con error)`:""}</p>${errDetail}`;
+    }).join("");
+    msgEl.innerHTML = (totalErrors===0
+      ? '<p class="ok-msg">Restauración completada correctamente.</p>'
+      : `<p class="error-msg">Restauración terminada con ${totalErrors} error(es) — mira el detalle abajo. El resto de documentos SÍ se ha restaurado con normalidad.</p>`
+    ) + reportHtml;
     fileInput.value = "";
   }catch(err){
     msgEl.innerHTML = '<p class="error-msg">Error al restaurar: '+err.message+'</p>';
@@ -8811,7 +8836,11 @@ service cloud.firestore {
 
     match /coaches/{coachId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.auth.uid == coachId;
+      // isGestor() se añade aquí (además del alta normal por registro, uid propio) para que
+      // la restauración de una copia de seguridad pueda recrear el perfil de un entrenador
+      // que ya no existe (p.ej. borrado con "Eliminar" en Entrenadores) sin que las reglas
+      // lo rechacen — antes solo "update" tenía este permiso, "create" no.
+      allow create: if isGestor() || (isSignedIn() && request.auth.uid == coachId);
       allow update: if isGestor() || (isSignedIn() && request.auth.uid == coachId && request.resource.data.role == resource.data.role && request.resource.data.active == resource.data.active);
       allow delete: if isGestor();
     }
