@@ -276,6 +276,16 @@ textarea{resize:vertical;min-height:70px;}
 .jersey-name-row .jersey-icon{margin-top:.15em;margin-right:0;}
 .jersey-name-row .jn-name{min-width:0;overflow-wrap:break-word;}
 
+/* Icono de la sección Entrenadores (Entrenadores.png.jpeg): mismo recorte con zoom vía CSS
+   que .jersey-icon, para quitar las esquinas negras del cuadrado original sin tocar el
+   archivo. Se escala con "em" para adaptarse igual dentro de una tarjeta de inicio
+   (contexto font-size:2rem) que dentro de una cabecera de sección (font-size normal). */
+.coach-icon{
+  display:inline-block;width:1em;height:1em;border-radius:50%;overflow:hidden;
+  vertical-align:-0.15em;background:#eee;
+}
+.coach-icon img{width:150%;height:150%;margin:-25%;object-fit:cover;display:block;}
+
 /* filters */
 .filterbar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
 .notif-badge{
@@ -588,7 +598,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
           <span class="home-card-desc">Jugadores, jornadas y estadísticas</span>
         </button>
         <button type="button" class="home-card hidden" id="homeCoachesBtn" data-goto="coaches">
-          <span class="home-card-icon">👥</span>
+          <span class="home-card-icon"><span class="coach-icon"><img src="Entrenadores.png.jpeg" alt=""></span></span>
           <span class="home-card-label">Entrenadores</span>
           <span class="home-card-desc">Gestiona el equipo técnico</span>
         </button>
@@ -1423,7 +1433,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
 
     <div id="tab-coaches" class="hidden">
       <div class="card">
-        <h2 style="font-size:1.05rem;">👥 Entrenadores del club</h2>
+        <h2 style="font-size:1.05rem;"><span class="coach-icon"><img src="Entrenadores.png.jpeg" alt=""></span> Entrenadores del club</h2>
         <p class="muted">Aprueba altas nuevas, cambia el rol o da de baja a un entrenador.</p>
         <div id="coachList"><div class="empty">Cargando entrenadores...</div></div>
       </div>
