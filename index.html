@@ -276,15 +276,19 @@ textarea{resize:vertical;min-height:70px;}
 .jersey-name-row .jersey-icon{margin-top:.15em;margin-right:0;}
 .jersey-name-row .jn-name{min-width:0;overflow-wrap:break-word;}
 
-/* Icono de la sección Entrenadores (Entrenadores.png.jpeg): mismo recorte con zoom vía CSS
-   que .jersey-icon, para quitar las esquinas negras del cuadrado original sin tocar el
-   archivo. Se escala con "em" para adaptarse igual dentro de una tarjeta de inicio
-   (contexto font-size:2rem) que dentro de una cabecera de sección (font-size normal). */
+/* Icono de la sección Entrenadores (Entrenadores.png.jpeg): recorte con zoom vía CSS para
+   quitar las esquinas negras del cuadrado original sin tocar el archivo, igual que
+   .jersey-icon, pero aquí el recorte NO es centrado: la cabeza del entrenador está más
+   arriba que el centro de la imagen, así que un recorte centrado (como el de .jersey-icon)
+   le cortaba parte de la cabeza. Se desplaza el zoom hacia arriba para encuadrar cabeza y
+   hombros en vez del centro geométrico del cuadrado. Se escala con "em" para adaptarse
+   igual dentro de una tarjeta de inicio (contexto font-size:2rem) que dentro de una
+   cabecera de sección (font-size normal). */
 .coach-icon{
   display:inline-block;width:1em;height:1em;border-radius:50%;overflow:hidden;
-  vertical-align:-0.15em;background:#eee;
+  vertical-align:-0.15em;background:#eee;position:relative;
 }
-.coach-icon img{width:150%;height:150%;margin:-25%;object-fit:cover;display:block;}
+.coach-icon img{position:absolute;width:147%;height:147%;top:-4.4%;left:-23.5%;object-fit:cover;display:block;}
 
 /* filters */
 .filterbar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
