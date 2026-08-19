@@ -290,6 +290,19 @@ textarea{resize:vertical;min-height:70px;}
 }
 .coach-icon img{position:absolute;width:147%;height:147%;top:-4.4%;left:-23.5%;object-fit:cover;display:block;}
 
+/* Icono de la sección Tareas (Tareas.jpeg): a diferencia de .jersey-icon/.coach-icon, aquí
+   NO hace falta zoom extra — el dibujo (pizarra + mano) ya llega prácticamente hasta los
+   bordes del cuadrado por su composición en diagonal, así que cualquier zoom recortaría
+   parte del contenido. El propio recorte circular (border-radius:50%) ya basta para
+   eliminar las esquinas negras del cuadrado original: un círculo inscrito en un cuadrado
+   no llega a tocar sus esquinas, así que no hace falta agrandar la imagen (comprobado
+   píxel a píxel: con la imagen al 100%, ningún punto del borde del círculo cae en negro). */
+.tasks-icon{
+  display:inline-block;width:1em;height:1em;border-radius:50%;overflow:hidden;
+  vertical-align:-0.15em;background:#eee;
+}
+.tasks-icon img{width:100%;height:100%;object-fit:cover;display:block;}
+
 /* filters */
 .filterbar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
 .notif-badge{
@@ -572,7 +585,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
       </div>
       <div class="home-grid">
         <button type="button" class="home-card" data-goto="tasks">
-          <span class="home-card-icon">📋</span>
+          <span class="home-card-icon"><span class="tasks-icon"><img src="Tareas.jpeg" alt=""></span></span>
           <span class="home-card-label">Tareas <span id="homeDotTasks" class="card-dot hidden"></span></span>
           <span class="home-card-desc">Crea y consulta ejercicios</span>
         </button>
