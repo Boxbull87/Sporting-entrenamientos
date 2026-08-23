@@ -1257,6 +1257,16 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
       </div>
     </div>
 
+    <!-- ---------- Jornadas: Cronología del partido (minuto + jugadores en el campo en cada gol),
+         apartado independiente de las estadísticas de categoría/subcategoría de arriba ---------- -->
+    <div id="timelinePickerModal" class="modal-bg hidden">
+      <div class="modal">
+        <h2 style="font-size:1.05rem;" id="timelinePickerTitle">Añadir gol a la cronología</h2>
+        <div id="timelinePickerBody"></div>
+        <button class="btn ghost" id="btnCloseTimelinePicker" style="width:100%;margin-top:14px;">Cerrar</button>
+      </div>
+    </div>
+
     <!-- ---------- Añadir jugada/tarea a una carpeta de equipo (Mi equipo → ABP/Tareas) ---------- -->
     <div id="teamFolderItemPickModal" class="modal-bg hidden">
       <div class="modal">
@@ -1401,6 +1411,15 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
               </div>
             </div>
             <p id="matchdayGoalsWarning" class="muted" style="font-size:.78rem;margin-top:6px;"></p>
+
+            <h3 style="margin-top:18px;font-size:.9rem;">🕒 Cronología del partido</h3>
+            <p class="muted" style="margin-top:-6px;">Apartado independiente de las estadísticas de arriba: aquí registras, gol a gol, en qué minuto aproximado ha sido y qué jugadores había en el campo en ese momento.</p>
+            <div id="matchdayTimelineList" style="margin-bottom:6px;"></div>
+            <p id="matchdayTimelineWarning" class="muted" style="font-size:.78rem;"></p>
+            <div class="row" style="margin-bottom:6px;">
+              <button type="button" class="btn ghost small" id="btnAddTimelineFor">➕ Gol a favor</button>
+              <button type="button" class="btn ghost small" id="btnAddTimelineAgainst">➕ Gol en contra</button>
+            </div>
 
             <p class="muted" style="margin-top:10px;">Goles/Encajados: para jugadores son goles marcados; para porteros, goles encajados.</p>
             <div class="row" style="margin-bottom:8px;">
@@ -2791,6 +2810,7 @@ function attachRealtimeListeners(){
     if(statsMatchdayId && !document.getElementById("matchdayStatsView").classList.contains("hidden")){
       renderMatchdayStatsTable();
       renderMatchdayGoalEvents_();
+      renderMatchdayTimeline_();
     }
     renderMiEquipoCalendar_();
   }, err => showSyncError_("jornadas", err));
@@ -5868,6 +5888,7 @@ window.openMatchdayStats = (id) => {
   statsMatchdayId = id;
   renderMatchdayStatsTable();
   renderMatchdayGoalEvents_();
+  renderMatchdayTimeline_();
   renderMatchdaySessionsLink();
   renderMatchdayReport();
   document.getElementById("matchdayStatsMsg").innerHTML = "";
@@ -6151,6 +6172,152 @@ window.removeGoalEvent_ = async (direction, eventId) => {
   const field = direction==="for" ? "goalsForEvents" : "goalsAgainstEvents";
   const events = (m[field]||[]).filter(e=>e.id!==eventId);
   try{ await db.collection("matchdays").doc(m.id).update({[field]: events}); }
+  catch(err){ alert("No se ha podido eliminar: " + err.message); }
+};
+
+/* ============================================================
+   JORNADAS · CRONOLOGÍA DEL PARTIDO
+   Apartado independiente de "Goles marcados/encajados" (esa parte de arriba solo etiqueta
+   la categoría/subcategoría táctica del gol). Aquí, gol a gol, se registra el minuto
+   aproximado y qué jugadores de la plantilla de este equipo había en el campo (hasta 5,
+   el número de jugadores en pista en fútbol sala), marcando con "P" al portero. Se guarda
+   en el campo "timeline" de la jornada: [{id, direction:"for"|"against", minute,
+   playersOnField:[playerId,...]}].
+============================================================= */
+// isScorer resalta el chip del jugador que ha marcado (badge relleno en vez de outline,
+// con el balón delante) para que se distinga de un vistazo entre el resto de la alineación.
+function goalPlayerChip_(p, isScorer){
+  return `<span class="badge${isScorer?"":" outline"}" style="margin:0 4px 4px 0;">${isScorer?"⚽ ":""}${escapeHtml(p.name)}${p.position==="Portero"?' <strong>P</strong>':""}</span>`;
+}
+// Orden cronológico de los goles de una jornada: por minuto (los que no tienen minuto, al
+// final, en el orden en que se añadieron). Se usa tanto para la cronología editable (dentro
+// de la propia jornada) como para su versión de solo lectura en Estadísticas.
+function matchdayTimelineSorted_(m){
+  const timeline = (m && m.timeline) || [];
+  return timeline.map((ev,i)=>({ev,i})).sort((a,b)=>{
+    const ma = a.ev.minute, mb = b.ev.minute;
+    if(ma==null && mb==null) return a.i-b.i;
+    if(ma==null) return 1;
+    if(mb==null) return -1;
+    return ma-mb || a.i-b.i;
+  }).map(x=>x.ev);
+}
+// HTML de la cronología completa, calculando el marcador acumulado gol a gol. "editable"
+// añade el botón de quitar (solo tiene sentido dentro de la propia jornada, no en el
+// resumen de solo lectura de Estadísticas).
+function matchdayTimelineListHtml_(m, editable){
+  const sorted = matchdayTimelineSorted_(m);
+  if(sorted.length===0) return '<p class="muted" style="margin:0;">Todavía no hay ningún gol en la cronología.</p>';
+  let goalsFor = 0, goalsAgainst = 0;
+  return sorted.map(ev=>{
+    if(ev.direction==="for") goalsFor++; else goalsAgainst++;
+    const minuteLabel = ev.minute!=null ? `${ev.minute}'` : "min. ?";
+    const onField = (ev.playersOnField||[]).map(pid=>players.find(p=>p.id===pid)).filter(Boolean);
+    const scorer = ev.direction==="for" && ev.scorer ? players.find(p=>p.id===ev.scorer) : null;
+    return `
+    <div style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;margin-bottom:6px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <span style="font-size:.85rem;">${ev.direction==="for"?"⚽":"🥅"} <strong>${minuteLabel}</strong> — marcador ${goalsFor}-${goalsAgainst}${scorer?` · Marca: ${escapeHtml(scorer.name)}`:""}</span>
+        ${editable ? `<button type="button" onclick="removeTimelineEvent_('${ev.id}')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:1em;line-height:1;padding:0;flex:0 0 auto;">✕</button>` : ""}
+      </div>
+      ${onField.length ? `<div style="margin-top:4px;">${onField.map(p=>goalPlayerChip_(p, p.id===ev.scorer)).join("")}</div>` : '<p class="muted" style="margin:4px 0 0;font-size:.75rem;">Sin jugadores marcados.</p>'}
+    </div>`;
+  }).join("");
+}
+function renderMatchdayTimeline_(){
+  const m = matchdays.find(x=>x.id===statsMatchdayId);
+  const wrap = document.getElementById("matchdayTimelineList");
+  const warnEl = document.getElementById("matchdayTimelineWarning");
+  if(!wrap || !warnEl) return;
+  if(!m){ wrap.innerHTML = ""; warnEl.innerHTML = ""; return; }
+  const timeline = m.timeline || [];
+  wrap.innerHTML = matchdayTimelineListHtml_(m, true);
+  const warnings = [];
+  const timelineFor = timeline.filter(e=>e.direction==="for").length;
+  const timelineAgainst = timeline.filter(e=>e.direction==="against").length;
+  if(m.goalsFor!=null && timelineFor!==m.goalsFor) warnings.push(`⚠️ Has añadido a la cronología ${timelineFor} gol(es) a favor, pero el marcador dice ${m.goalsFor}.`);
+  if(m.goalsAgainst!=null && timelineAgainst!==m.goalsAgainst) warnings.push(`⚠️ Has añadido a la cronología ${timelineAgainst} gol(es) en contra, pero el marcador dice ${m.goalsAgainst}.`);
+  warnEl.innerHTML = warnings.map(w=>`<div>${w}</div>`).join("");
+}
+document.getElementById("btnAddTimelineFor").onclick = () => openTimelinePicker_("for");
+document.getElementById("btnAddTimelineAgainst").onclick = () => openTimelinePicker_("against");
+let timelineDirection = null; // "for" | "against"
+let timelineMinute = null;
+let timelinePlayers = [];     // ids de jugadores en el campo (hasta 5)
+let timelineScorer = null;    // id del jugador que ha marcado (solo goles a favor, opcional)
+function openTimelinePicker_(direction){
+  timelineDirection = direction;
+  timelineMinute = null;
+  timelinePlayers = [];
+  timelineScorer = null;
+  document.getElementById("timelinePickerTitle").textContent = direction==="for" ? "⚽ Añadir gol a favor a la cronología" : "🥅 Añadir gol en contra a la cronología";
+  renderTimelinePickerBody_();
+  document.getElementById("timelinePickerModal").classList.remove("hidden");
+}
+function renderTimelinePickerBody_(){
+  const wrap = document.getElementById("timelinePickerBody");
+  const m = matchdays.find(x=>x.id===statsMatchdayId);
+  const roster = (m ? players.filter(p=>p.teamId===m.teamId) : []).slice().sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
+  wrap.innerHTML = `
+    <label>Minuto aproximado</label>
+    <input type="number" min="0" max="60" value="${timelineMinute!=null?timelineMinute:""}" oninput="timelineSetMinute_(this.value)" placeholder="Ej: 23">
+    <p class="muted" style="margin-top:10px;margin-bottom:4px;">¿Qué jugadores había en el campo? (hasta 5) — <strong>${timelinePlayers.length}/5</strong></p>
+    <div style="max-height:240px;overflow-y:auto;">
+      ${roster.length===0 ? '<p class="muted">Este equipo todavía no tiene jugadores en la plantilla.</p>' : roster.map(p=>`
+        <label style="display:flex;align-items:center;gap:8px;padding:4px 0;text-transform:none;font-family:inherit;font-weight:400;">
+          <input type="checkbox" style="width:auto;" ${timelinePlayers.includes(p.id)?"checked":""} onchange="timelineTogglePlayer_('${p.id}')">
+          ${escapeHtml(p.name)}${p.position==="Portero"?' <span class="badge outline">P</span>':""}
+        </label>`).join("")}
+    </div>
+    ${timelineDirection==="for" ? `
+      <p class="muted" style="margin-top:10px;margin-bottom:4px;">¿Quién ha marcado? (opcional)</p>
+      ${timelinePlayers.length===0 ? '<p class="muted" style="font-size:.78rem;margin:0;">Marca antes a los jugadores que había en el campo.</p>' : timelinePlayers.map(pid=>{
+        const p = players.find(x=>x.id===pid);
+        if(!p) return "";
+        return `<label style="display:flex;align-items:center;gap:8px;padding:4px 0;text-transform:none;font-family:inherit;font-weight:400;">
+          <input type="radio" name="timelineScorer" style="width:auto;" ${timelineScorer===pid?"checked":""} onchange="timelineSetScorer_('${pid}')">
+          ${escapeHtml(p.name)}${p.position==="Portero"?' <span class="badge outline">P</span>':""}
+        </label>`;
+      }).join("")}
+    ` : ""}
+    <button type="button" class="btn accent" style="width:100%;margin-top:10px;" onclick="timelineSave_()">💾 Guardar gol</button>
+  `;
+}
+window.timelineSetMinute_ = (val) => { timelineMinute = val!=="" ? Number(val) : null; };
+window.timelineSetScorer_ = (playerId) => { timelineScorer = playerId; };
+window.timelineTogglePlayer_ = (playerId) => {
+  const i = timelinePlayers.indexOf(playerId);
+  if(i>=0){
+    timelinePlayers.splice(i,1);
+    if(timelineScorer===playerId) timelineScorer = null;
+  } else {
+    if(timelinePlayers.length>=5){ alert("Ya has seleccionado 5 jugadores. Quita uno antes de añadir otro."); renderTimelinePickerBody_(); return; }
+    timelinePlayers.push(playerId);
+  }
+  renderTimelinePickerBody_();
+};
+window.timelineSave_ = async () => {
+  const m = matchdays.find(x=>x.id===statsMatchdayId);
+  if(!m) return;
+  const timeline = [...(m.timeline||[]), {
+    id: Date.now().toString(36)+Math.random().toString(36).slice(2,7),
+    direction: timelineDirection,
+    minute: timelineMinute,
+    playersOnField: [...timelinePlayers],
+    scorer: timelineDirection==="for" ? timelineScorer : null
+  }];
+  document.getElementById("timelinePickerModal").classList.add("hidden");
+  try{ await db.collection("matchdays").doc(m.id).update({timeline}); }
+  catch(err){ alert("No se ha podido guardar el gol: " + err.message); }
+};
+document.getElementById("btnCloseTimelinePicker").onclick = () => {
+  document.getElementById("timelinePickerModal").classList.add("hidden");
+};
+window.removeTimelineEvent_ = async (eventId) => {
+  const m = matchdays.find(x=>x.id===statsMatchdayId);
+  if(!m) return;
+  const timeline = (m.timeline||[]).filter(e=>e.id!==eventId);
+  try{ await db.collection("matchdays").doc(m.id).update({timeline}); }
   catch(err){ alert("No se ha podido eliminar: " + err.message); }
 };
 
@@ -6861,6 +7028,10 @@ function renderMatchdaySummary_(wrap){
       <div style="flex:1;min-width:260px;">${goalChartCardHtml_("⚽ Goles marcados", "mdSummaryGoalsForChart", forAgg)}</div>
       <div style="flex:1;min-width:260px;">${goalChartCardHtml_("🥅 Goles encajados", "mdSummaryGoalsAgainstChart", againstAgg)}</div>
     </div>
+    ${(m.timeline||[]).length ? `
+      <h3 style="font-size:.9rem;">🕒 Cronología del partido</h3>
+      <div>${matchdayTimelineListHtml_(m, false)}</div>
+    ` : ""}
     ${linkedSessions.length ? `
       <h3 style="font-size:.9rem;">🔗 Sesiones de entrenamiento de esa semana</h3>
       <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
