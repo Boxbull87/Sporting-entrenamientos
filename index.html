@@ -1144,7 +1144,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
           <h2 style="font-size:1.05rem;" id="miEquipoMenuTitle"><img src="icon-512.png" alt="" style="height:1.1em;width:1.1em;object-fit:contain;vertical-align:-0.2em;"> Mi equipo</h2>
           <div class="home-grid" style="margin-top:10px;">
             <button type="button" class="home-card" id="miEquipoGoPlantillaMenu">
-              <span class="home-card-icon">👕</span>
+              <span class="home-card-icon"><span class="plantilla-icon"><img src="plantilla.jpeg" alt=""></span></span>
               <span class="home-card-label">Plantilla</span>
               <span class="home-card-desc">Jugadores y jornadas</span>
             </button>
@@ -1154,7 +1154,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
               <span class="home-card-desc">Tus carpetas de jugadas para este equipo</span>
             </button>
             <button type="button" class="home-card" id="miEquipoGoTasks">
-              <span class="home-card-icon">📋</span>
+              <span class="home-card-icon"><span class="tasks-icon"><img src="Tareas.jpeg" alt=""></span></span>
               <span class="home-card-label">Tareas</span>
               <span class="home-card-desc">Tus carpetas de tareas para este equipo</span>
             </button>
@@ -1183,7 +1183,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
       <div id="miEquipoPlantillaMenuView" class="hidden">
         <button type="button" class="btn ghost small" id="miEquipoPlantillaMenuBack" style="margin-bottom:10px;">← Volver</button>
         <div class="card">
-          <h2 style="font-size:1.05rem;" id="miEquipoPlantillaMenuTitle">👕 Plantilla</h2>
+          <h2 style="font-size:1.05rem;" id="miEquipoPlantillaMenuTitle"><span class="plantilla-icon"><img src="plantilla.jpeg" alt=""></span> Plantilla</h2>
           <div class="home-grid" style="margin-top:10px;">
             <button type="button" class="home-card" id="miEquipoGoRoster">
               <span class="home-card-icon">👥</span>
@@ -1215,7 +1215,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
       <div id="miEquipoTaskView" class="hidden">
         <button type="button" class="btn ghost small" id="miEquipoTaskBack" style="margin-bottom:10px;">← Volver</button>
         <div class="card">
-          <h2 style="font-size:1.05rem;" id="miEquipoTaskTitle">📋 Tareas</h2>
+          <h2 style="font-size:1.05rem;" id="miEquipoTaskTitle"><span class="tasks-icon"><img src="Tareas.jpeg" alt=""></span> Tareas</h2>
           <p class="muted" style="margin-top:-6px;">Tus propias carpetas para este equipo. Crea carpetas (y subcarpetas) y mete en ellas las tareas del banco que quieras tener a mano para este equipo.</p>
           <div id="miEquipoTaskBreadcrumb" class="breadcrumb"></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
@@ -5025,9 +5025,11 @@ window.openMiEquipoTeam = (teamId) => {
   const t = teams.find(x=>x.id===teamId);
   document.getElementById("miEquipoMenuTitle").innerHTML =
     '<img src="icon-512.png" alt="" style="height:1.1em;width:1.1em;object-fit:contain;vertical-align:-0.2em;"> ' + escapeHtml(t ? t.name : "Mi equipo");
-  document.getElementById("miEquipoPlantillaMenuTitle").textContent = "👕 Plantilla de " + (t ? t.name : "");
+  document.getElementById("miEquipoPlantillaMenuTitle").innerHTML =
+    '<span class="plantilla-icon"><img src="plantilla.jpeg" alt=""></span> Plantilla de ' + escapeHtml(t ? t.name : "");
   document.getElementById("miEquipoAbpTitle").textContent = "🎯 ABP de " + (t ? t.name : "");
-  document.getElementById("miEquipoTaskTitle").textContent = "📋 Tareas de " + (t ? t.name : "");
+  document.getElementById("miEquipoTaskTitle").innerHTML =
+    '<span class="tasks-icon"><img src="Tareas.jpeg" alt=""></span> Tareas de ' + escapeHtml(t ? t.name : "");
   document.getElementById("miEquipoSessionsTitle").textContent = "🗓️ Sesiones de " + (t ? t.name : "");
   showMiEquipoView("menu");
   renderMiEquipoCalendar_();
