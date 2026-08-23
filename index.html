@@ -834,6 +834,11 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
             <span class="home-card-label">Sesiones creadas</span>
             <span class="home-card-desc">Agrupadas por entrenador</span>
           </button>
+          <button type="button" class="home-card" id="sessionsGoLoads">
+            <span class="home-card-icon">📊</span>
+            <span class="home-card-label">Cargas de trabajo</span>
+            <span class="home-card-desc">Encuestas de los jugadores por sesión</span>
+          </button>
         </div>
       </div>
 
@@ -860,6 +865,10 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
         <textarea id="sessionObjectives" placeholder="- Objetivo 1&#10;- Objetivo 2&#10;- Objetivo 3"></textarea>
         <label style="margin-top:10px;">Notas</label>
         <textarea id="sessionNotes" placeholder="Observaciones para el equipo técnico..."></textarea>
+        <label style="margin-top:10px;display:flex;align-items:center;gap:8px;text-transform:none;font-family:inherit;font-weight:400;">
+          <input type="checkbox" id="sessionSurveyPublic" style="width:auto;">
+          Activar encuesta para jugadores (enlace público, sin iniciar sesión, para valorar la sesión)
+        </label>
 
         <h3 style="margin-top:14px;font-size:.9rem;">🎯 Sesiones de ABP vinculadas</h3>
         <p class="muted" style="font-size:.78rem;margin-top:-4px;">Puedes enlazar jugadas a balón parado ya creadas para trabajarlas en esta sesión.</p>
@@ -910,6 +919,16 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
         <div class="card">
           <h2 style="font-size:1.05rem;">Sesiones guardadas</h2>
           <div id="sessionsSaved"><div class="empty">Cargando sesiones...</div></div>
+        </div>
+      </div>
+
+      <!-- ---------- SESIONES: Cargas de trabajo (resultados de las encuestas) ---------- -->
+      <div id="sessionsLoadsView" class="hidden">
+        <button type="button" class="btn ghost small" id="sessionsLoadsBack" style="margin-bottom:10px;">← Volver</button>
+        <div class="card">
+          <h2 style="font-size:1.05rem;">📊 Cargas de trabajo</h2>
+          <p class="muted" style="font-size:.82rem;margin-top:-4px;">Resultados de las encuestas que rellenan los jugadores tras cada sesión: valoración de cada tarea y control diario de cargas.</p>
+          <div id="sessionsLoadsWrap"><div class="empty">Cargando...</div></div>
         </div>
       </div>
     </div>
@@ -1805,6 +1824,7 @@ let playSessions = [];
 let gameModelFiles = [];
 let teams = [];
 let players = [];
+let sessionSurveys = []; // respuestas a la encuesta de "Cargas de trabajo" (ver más abajo)
 let selectedTeamId = null;
 let selectedSeason = null;
 let matchdays = [];
@@ -1993,12 +2013,19 @@ function friendlyAuthError(err){
 // regex sean mutuamente excluyentes si el formato del hash cambiara en el futuro.
 const PUBLIC_PLAY_MATCH = location.hash.match(/publicplay=([^&]+)/);
 const PUBLIC_MATCH = PUBLIC_PLAY_MATCH ? null : location.hash.match(/public=([^&]+)/);
+// #survey=<id> abre la encuesta pública de "Cargas de trabajo" de una sesión de
+// entrenamiento (se comprueba la última de las tres para no depender de que las regex
+// sean mutuamente excluyentes si el formato del hash cambiara en el futuro).
+const SURVEY_MATCH = (PUBLIC_PLAY_MATCH || PUBLIC_MATCH) ? null : location.hash.match(/survey=([^&]+)/);
 if(PUBLIC_PLAY_MATCH){
   document.getElementById("authScreen").classList.add("hidden");
   loadPublicPlay(decodeURIComponent(PUBLIC_PLAY_MATCH[1]));
 } else if(PUBLIC_MATCH){
   document.getElementById("authScreen").classList.add("hidden");
   loadPublicPlaySession(decodeURIComponent(PUBLIC_MATCH[1]));
+} else if(SURVEY_MATCH){
+  document.getElementById("authScreen").classList.add("hidden");
+  loadSurveyForm(decodeURIComponent(SURVEY_MATCH[1]));
 } else {
   auth.onAuthStateChanged(async (user) => {
     currentUser = user;
@@ -2620,11 +2647,15 @@ function showSessionsView(view){
   document.getElementById("sessionsHome").classList.toggle("hidden", view!=="home");
   document.getElementById("sessionsNewView").classList.toggle("hidden", view!=="new");
   document.getElementById("sessionsSavedView").classList.toggle("hidden", view!=="saved");
+  document.getElementById("sessionsLoadsView").classList.toggle("hidden", view!=="loads");
+  if(view==="loads") renderSessionLoads_();
 }
 document.getElementById("sessionsGoNew").onclick = () => showSessionsView("new");
 document.getElementById("sessionsGoSaved").onclick = () => showSessionsView("saved");
+document.getElementById("sessionsGoLoads").onclick = () => showSessionsView("loads");
 document.getElementById("sessionsNewBack").onclick = () => showSessionsView("home");
 document.getElementById("sessionsSavedBack").onclick = () => showSessionsView("home");
+document.getElementById("sessionsLoadsBack").onclick = () => showSessionsView("home");
 
 document.querySelectorAll(".home-card[data-goto]").forEach(card=>{
   card.onclick = () => {
@@ -2746,6 +2777,11 @@ function attachRealtimeListeners(){
     renderPlayersList();
     renderTeamSummary();
   }, err => showSyncError_("plantilla de jugadores", err));
+
+  db.collection("sessionSurveys").orderBy("submittedAt","desc").onSnapshot(snap=>{
+    sessionSurveys = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    renderSessionLoads_();
+  }, err => showSyncError_("cargas de trabajo", err));
 
   db.collection("matchdays").orderBy("number").onSnapshot(snap=>{
     matchdays = snap.docs.map(d=>({id:d.id, ...d.data()}));
@@ -7117,6 +7153,22 @@ window.moveSessionTask = (block, i, dir) => {
 };
 window.removeSessionTask = (block, i) => { sessionBlocks[block].splice(i,1); renderSessionTaskList(); renderSessionTaskBrowser(); };
 
+// Guarda un "recorte" mínimo (id + título) de una tarea, tal como está en el momento de
+// guardar la sesión. Se usa para poder mostrar el título de cada tarea en la encuesta
+// pública de "Cargas de trabajo" (#survey=...) sin tener que dar lectura pública a todo
+// el banco de tareas (que sí es contenido interno del club).
+function taskSnapshotItem_(id){
+  const t = tasks.find(x=>x.id===id);
+  return {id, title: t ? t.title : "(tarea eliminada)"};
+}
+function sessionBlocksSnapshot_(blocks){
+  return {
+    calentamiento: (blocks.calentamiento||[]).map(taskSnapshotItem_),
+    principal: (blocks.principal||[]).map(taskSnapshotItem_),
+    vuelta: (blocks.vuelta||[]).map(taskSnapshotItem_)
+  };
+}
+
 document.getElementById("btnSaveSession").onclick = async () => {
   const msgEl = document.getElementById("sessionMsg");
   const name = document.getElementById("sessionName").value.trim();
@@ -7124,6 +7176,11 @@ document.getElementById("btnSaveSession").onclick = async () => {
   if(!name){ msgEl.innerHTML = '<p class="error-msg">Ponle un nombre a la sesión.</p>'; return; }
   if(sessionTeamIds.length===0){ msgEl.innerHTML = '<p class="error-msg">Elige al menos un equipo para la sesión.</p>'; return; }
   if(flatIds.length===0){ msgEl.innerHTML = '<p class="error-msg">Añade al menos una tarea.</p>'; return; }
+  const blocks = {
+    calentamiento: [...sessionBlocks.calentamiento],
+    principal: [...sessionBlocks.principal],
+    vuelta: [...sessionBlocks.vuelta]
+  };
   const payload = {
     name,
     teamIds: [...sessionTeamIds],
@@ -7132,11 +7189,9 @@ document.getElementById("btnSaveSession").onclick = async () => {
     notes: document.getElementById("sessionNotes").value.trim(),
     linkedPlaySessionIds: [...sessionLinkedPlayIds],
     taskIds: flatIds,
-    blocks: {
-      calentamiento: [...sessionBlocks.calentamiento],
-      principal: [...sessionBlocks.principal],
-      vuelta: [...sessionBlocks.vuelta]
-    }
+    blocks,
+    surveyPublic: document.getElementById("sessionSurveyPublic").checked,
+    blocksSnapshot: sessionBlocksSnapshot_(blocks)
   };
   try{
     if(editingSessionId){
@@ -7164,6 +7219,7 @@ function resetSessionForm(){
   document.getElementById("sessionNotes").value = "";
   sessionBlocks = { calentamiento: [], principal: [], vuelta: [] };
   document.getElementById("sessionAddSearch").value = "";
+  document.getElementById("sessionSurveyPublic").checked = false;
   sessionLinkedPlayIds = [];
   renderSessionPlayLinkChips();
   updateSessionAddFolderOptions();
@@ -7196,6 +7252,8 @@ async function forkSessionForTeams_(s, teamIdsToFork){
       principal: [...(s.blocks.principal||[])],
       vuelta: [...(s.blocks.vuelta||[])]
     } : null,
+    surveyPublic: !!s.surveyPublic,
+    blocksSnapshot: s.blocksSnapshot || null,
     postObservationsByCoach: myObs ? {[currentUser.uid]: myObs} : {},
     createdBy: currentUser.uid,
     createdByName: currentCoach.name || "",
@@ -7256,6 +7314,7 @@ function populateSessionEditor(id, s){
   renderSessionTeamChips();
   document.getElementById("sessionObjectives").value = s.objectives || "";
   document.getElementById("sessionNotes").value = s.notes || "";
+  document.getElementById("sessionSurveyPublic").checked = !!s.surveyPublic;
   sessionLinkedPlayIds = [...(s.linkedPlaySessionIds||[])];
   renderSessionPlayLinkChips();
   if(s.blocks){
@@ -7371,6 +7430,7 @@ function sessionCardHtml(s, contextTeamId){
     ${(canManage && sTeams.length>1 && contextTeamId) ? `<p class="muted" style="font-size:.72rem;margin:4px 0 0 0;">ℹ️ Esta sesión se comparte con más equipos: al editar o borrar aquí se creará una copia independiente solo para ${escapeHtml((teams.find(t=>t.id===contextTeamId)||{}).name || "este equipo")}, sin tocar a los demás.</p>` : ""}
     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
       <button class="btn ghost small" onclick="exportSessionPDF('${s.id}')">📄 Exportar a PDF</button>
+      ${s.surveyPublic ? `<button type="button" class="btn ghost small" onclick="copySurveyLink('${s.id}')">🔗 Copiar enlace de encuesta</button>` : ""}
       ${canAddObs ? `<button class="btn ghost small" onclick="openSessionObservations('${s.id}')">📝 Observaciones</button>` : ""}
       ${canManage ? `<button class="btn ghost small" onclick="editSession('${s.id}'${contextTeamId?`,'${contextTeamId}'`:''})">✏️ Editar sesión</button>` : ""}
       ${(!canManage && sharedWithMe) ? `<button class="btn ghost small" onclick="forkAndEditSession('${s.id}')">✏️ Editar sesión</button>` : ""}
@@ -7495,6 +7555,97 @@ function renderSavedSessions(){
     </details>`;
   }).join("");
 }
+
+/* ---------- Cargas de trabajo: resultados de la encuesta pública post-sesión ---------- */
+function renderSessionLoads_(){
+  const wrap = document.getElementById("sessionsLoadsWrap");
+  if(!wrap) return;
+  const surveySessions = sessions.filter(s=>s.surveyPublic);
+  if(surveySessions.length===0){
+    wrap.innerHTML = '<div class="empty">Todavía no has activado la encuesta en ninguna sesión. Actívala desde "✏️ Editar sesión" → "Activar encuesta para jugadores".</div>';
+    return;
+  }
+  // Mismo patrón de agrupación equipo → mes que el resto de listados de sesiones.
+  const teamGroups = {};
+  surveySessions.forEach(s=>{
+    const sTeams = sessionTeams_(s);
+    const entries = sTeams.length ? sTeams.map(t=>({id:t.id, name:t.name})) : [{id:null, name:"Sin equipo"}];
+    entries.forEach(e=>{
+      const key = e.id || ("none:"+e.name);
+      if(!teamGroups[key]) teamGroups[key] = {id:e.id, name:e.name, sessions:[]};
+      teamGroups[key].sessions.push(s);
+    });
+  });
+  const teamKeys = Object.keys(teamGroups).sort((a,b)=>teamGroups[a].name.localeCompare(teamGroups[b].name,'es'));
+  wrap.innerHTML = teamKeys.map(tk=>{
+    const grp = teamGroups[tk];
+    return `
+    <details class="team-group" style="margin:8px 0 0 4px;">
+      <summary style="cursor:pointer;font-weight:600;padding:9px 11px;background:#f2f6f4;border:1px solid var(--border);border-radius:8px;">
+        👕 ${escapeHtml(grp.name)} <span class="muted" style="font-weight:400;">(${grp.sessions.length} sesión${grp.sessions.length===1?"":"es"})</span>
+      </summary>
+      <div style="margin-top:8px;">${sessionLoadsByMonthHtml_(grp.sessions)}</div>
+    </details>`;
+  }).join("");
+}
+function sessionLoadsByMonthHtml_(list){
+  const monthGroups = {};
+  list.forEach(s=>{
+    const mk = sessionMonthKey(s);
+    if(!monthGroups[mk]) monthGroups[mk] = [];
+    monthGroups[mk].push(s);
+  });
+  const monthKeys = Object.keys(monthGroups).sort((a,b)=> b.localeCompare(a));
+  return monthKeys.map(mk=>{
+    const mlist = monthGroups[mk].slice().sort((a,b)=> (a.date||"").localeCompare(b.date||""));
+    return `
+    <details class="month-group" style="margin:8px 0 0 4px;">
+      <summary style="cursor:pointer;font-weight:600;font-size:.85rem;padding:8px 10px;background:#faf8f5;border:1px solid var(--border);border-radius:8px;">
+        🗓️ ${sessionMonthLabel(mk)} <span class="muted" style="font-weight:400;">(${mlist.length} sesión${mlist.length===1?"":"es"})</span>
+      </summary>
+      <div style="margin-top:8px;">${mlist.map(sessionLoadCardHtml_).join("")}</div>
+    </details>`;
+  }).join("");
+}
+function sessionLoadCardHtml_(s){
+  const responses = sessionSurveys.filter(r=>r.sessionId===s.id).slice().sort((a,b)=>(a.playerName||"").localeCompare(b.playerName||"",'es'));
+  const canManage = currentCoach && (currentCoach.role===ROLE_GESTOR || s.createdBy===currentUser.uid);
+  const rows = responses.map(r=>{
+    const taskCells = (r.taskSnapshot||[]).map(t=>
+      `<span class="badge outline" style="margin:2px 4px 2px 0;">${escapeHtml(t.title)}: ${t.rating}</span>`
+    ).join("");
+    return `
+    <div style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-top:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+        <strong>${jerseyNameHtml_(r.playerPosition, escapeHtml(r.playerName))}</strong>
+        ${canManage ? `<button type="button" class="btn danger small" onclick="deleteSessionSurvey_('${r.id}')">🗑️</button>` : ""}
+      </div>
+      <div style="margin-top:4px;">${taskCells}</div>
+      <div style="margin-top:6px;font-size:.85rem;display:flex;flex-wrap:wrap;gap:10px;">
+        <span>💥 Dureza sesión: <strong>${r.rpe}</strong>/10</span>
+        <span>😣 Molestias: <strong>${r.pain ? "Sí" : "No"}</strong>${r.pain && r.painDetail ? " ("+escapeHtml(r.painDetail)+")" : ""}</span>
+        <span>😴 Cansancio antes: <strong>${r.fatigueBefore}</strong>/10</span>
+        <span>😴 Cansancio después: <strong>${r.fatigueAfter}</strong>/10</span>
+      </div>
+    </div>`;
+  }).join("");
+  return `
+  <div class="card" style="margin-bottom:10px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <h3 style="font-size:.95rem;">${escapeHtml(s.name)}</h3>
+      <span class="muted">${s.date||""}</span>
+    </div>
+    <p class="muted" style="font-size:.8rem;margin-top:-2px;">${responses.length} respuesta${responses.length===1?"":"s"}</p>
+    <button type="button" class="btn ghost small" onclick="copySurveyLink('${s.id}')">🔗 Copiar enlace de encuesta</button>
+    ${rows || '<p class="muted" style="margin-top:8px;">Todavía no hay respuestas.</p>'}
+  </div>`;
+}
+window.deleteSessionSurvey_ = async (id) => {
+  if(!confirm("¿Eliminar esta respuesta de la encuesta?")) return;
+  try{ await db.collection("sessionSurveys").doc(id).delete(); }
+  catch(err){ alert("No se ha podido eliminar: " + err.message); }
+};
+
 // contextTeamId: el equipo bajo el que se está borrando (si viene de la lista agrupada
 // por equipo). Si la sesión está compartida con MÁS equipos aparte de ese, en vez de
 // borrar el documento entero se desdobla una copia independiente solo para ese equipo y
@@ -8472,6 +8623,14 @@ window.copyPublicPlayLink = (id) => {
     prompt("Copia este enlace:", url);
   });
 };
+window.copySurveyLink = (id) => {
+  const url = location.origin + location.pathname + "#survey=" + id;
+  navigator.clipboard.writeText(url).then(()=>{
+    alert("Enlace copiado al portapapeles.");
+  }).catch(()=>{
+    prompt("Copia este enlace:", url);
+  });
+};
 
 function renderSavedPlaySessions(){
   const wrap = document.getElementById("playSessionsSaved");
@@ -8643,6 +8802,197 @@ async function loadPublicPlay(id){
     wrap.innerHTML = '<div class="empty">No se ha podido cargar esta jugada: '+escapeHtml(err.message)+'</div>';
   }
 }
+
+/* ---------- Encuesta pública de "Cargas de trabajo" (sin login, #survey=<sessionId>) ----------
+   El jugador se busca a sí mismo entre TODOS los jugadores del club (para que sirva también
+   a juveniles que suben a entrenar con otro equipo), valora del 1 al 10 la dureza de cada
+   tarea de la sesión, y responde el control diario de cargas. Cada jugador solo puede tener
+   una respuesta por sesión: el id del documento es "{sessionId}_{playerId}", así que volver
+   a enviarla simplemente sustituye la anterior (permite corregirla). ---------- */
+let SURVEY_STATE = null;
+async function loadSurveyForm(sessionId){
+  document.getElementById("publicScreen").classList.remove("hidden");
+  const wrap = document.getElementById("publicWrap");
+  wrap.innerHTML = '<div class="empty">Cargando encuesta...</div>';
+  try{
+    const snap = await db.collection("sessions").doc(sessionId).get();
+    if(!snap.exists || snap.data().surveyPublic !== true){
+      wrap.innerHTML = '<div class="empty">Este enlace no existe o la encuesta ya no está disponible.</div>';
+      return;
+    }
+    const session = snap.data();
+    const playersSnap = await db.collection("players").orderBy("name").get();
+    const allPlayers = playersSnap.docs.map(d=>({id:d.id, ...d.data()}));
+    SURVEY_STATE = {
+      sessionId, session, allPlayers,
+      selectedPlayer: null,
+      ratings: {}, rpe: null, pain: null, painDetail: "", fatigueBefore: null, fatigueAfter: null,
+      submitting: false, done: false
+    };
+    renderSurveyForm_();
+  }catch(err){
+    wrap.innerHTML = '<div class="empty">No se ha podido cargar la encuesta: '+escapeHtml(err.message)+'</div>';
+  }
+}
+function surveyTaskGroups_(){
+  const bs = SURVEY_STATE.session.blocksSnapshot || {calentamiento:[],principal:[],vuelta:[]};
+  return Object.keys(SESSION_BLOCKS).map(block=>({block, items: bs[block]||[]})).filter(g=>g.items.length);
+}
+function renderSurveyForm_(){
+  const wrap = document.getElementById("publicWrap");
+  const st = SURVEY_STATE;
+  const s = st.session;
+  if(st.done){
+    wrap.innerHTML = `
+      <div class="card">
+        <h2 style="font-size:1.1rem;">✅ ¡Gracias, ${escapeHtml(st.selectedPlayer.name)}!</h2>
+        <p>Tu encuesta se ha enviado correctamente.</p>
+        <button type="button" class="btn ghost small" onclick="surveySendAnother_()">✏️ Enviar otra respuesta</button>
+      </div>`;
+    return;
+  }
+  const groups = surveyTaskGroups_();
+  const playerPickHtml = st.selectedPlayer
+    ? `<p style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><strong>Jugador/a:</strong> ${jerseyNameHtml_(st.selectedPlayer.position, escapeHtml(st.selectedPlayer.name))} <button type="button" class="btn ghost small" onclick="surveyChangePlayer_()">Cambiar</button></p>`
+    : `
+      <label style="margin-top:10px;">Escribe tu nombre y selecciónalo de la lista</label>
+      <input type="text" id="surveyPlayerSearch" placeholder="🔍 Buscar mi nombre..." autocomplete="off">
+      <div id="surveyPlayerResults" style="margin-top:6px;max-height:260px;overflow-y:auto;"></div>
+    `;
+  const tasksHtml = groups.map(g=>`
+      <h4 style="margin:12px 0 4px 0;font-size:.85rem;color:var(--accent);">${SESSION_BLOCKS[g.block]}</h4>
+      ${g.items.map(t=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);">
+          <span style="flex:1;">${escapeHtml(t.title)}</span>
+          <select style="width:66px;flex:0 0 auto;" onchange="surveySetRating_('${t.id}', this.value)">
+            <option value="">–</option>
+            ${[1,2,3,4,5,6,7,8,9,10].map(n=>`<option value="${n}" ${st.ratings[t.id]==n?"selected":""}>${n}</option>`).join("")}
+          </select>
+        </div>`).join("")}
+    `).join("");
+  const scaleOptions_ = (field, min, max) => `
+    <select onchange="surveySetField_('${field}', this.value)">
+      <option value="">Selecciona...</option>
+      ${Array.from({length:max-min+1}, (_,i)=>min+i).map(n=>`<option value="${n}" ${st[field]==n?"selected":""}>${n}</option>`).join("")}
+    </select>`;
+  const controlHtml = `
+    <h3 style="margin-top:16px;font-size:.95rem;">📋 Control diario de cargas</h3>
+    <label style="margin-top:8px;">¿Cómo ha sido de duro el entrenamiento? (0-10)</label>
+    ${scaleOptions_('rpe', 0, 10)}
+    <label style="margin-top:10px;">¿Has sentido molestias durante la sesión?</label>
+    <div style="display:flex;gap:8px;">
+      <button type="button" class="btn ${st.pain===true?"accent":"ghost"} small" onclick="surveySetPain_(true)">Sí</button>
+      <button type="button" class="btn ${st.pain===false?"accent":"ghost"} small" onclick="surveySetPain_(false)">No</button>
+    </div>
+    ${st.pain===true ? `<textarea id="surveyPainDetail" placeholder="¿Dónde o qué tipo de molestia? (opcional)" style="margin-top:8px;" oninput="SURVEY_STATE.painDetail=this.value;">${escapeHtml(st.painDetail||"")}</textarea>` : ""}
+    <label style="margin-top:10px;">Nivel de cansancio ANTES de la sesión (0-10)</label>
+    ${scaleOptions_('fatigueBefore', 0, 10)}
+    <label style="margin-top:10px;">Nivel de cansancio DESPUÉS de la sesión (0-10)</label>
+    ${scaleOptions_('fatigueAfter', 0, 10)}
+    <div id="surveyMsg" style="margin-top:10px;"></div>
+    <button type="button" class="btn accent" style="margin-top:10px;" onclick="submitSurvey_()">Enviar encuesta</button>
+  `;
+  wrap.innerHTML = `
+    <div class="card">
+      <h2 style="font-size:1.1rem;">📋 Encuesta de sesión: ${escapeHtml(s.name||"")}</h2>
+      ${s.date ? `<p class="muted">${escapeHtml(s.date)}</p>` : ""}
+      ${playerPickHtml}
+    </div>
+    ${st.selectedPlayer ? `<div class="card"><h3 style="font-size:.95rem;">💪 Valora la dureza de cada tarea (1-10)</h3>${tasksHtml}</div>` : ""}
+    ${st.selectedPlayer ? `<div class="card">${controlHtml}</div>` : ""}
+  `;
+  if(!st.selectedPlayer){
+    const input = document.getElementById("surveyPlayerSearch");
+    input.oninput = () => renderSurveyPlayerResults_(input.value);
+    input.focus();
+  }
+}
+function renderSurveyPlayerResults_(query){
+  const box = document.getElementById("surveyPlayerResults");
+  if(!box) return;
+  const q = query.trim().toLowerCase();
+  if(q.length < 2){ box.innerHTML = '<p class="muted" style="font-size:.8rem;">Escribe al menos 2 letras...</p>'; return; }
+  const matches = SURVEY_STATE.allPlayers.filter(p=>(p.name||"").toLowerCase().includes(q)).slice(0,25);
+  if(matches.length===0){ box.innerHTML = '<p class="muted" style="font-size:.8rem;">No se ha encontrado ningún jugador con ese nombre.</p>'; return; }
+  box.innerHTML = matches.map(p=>`
+    <div class="btn ghost small" style="display:flex;justify-content:space-between;align-items:center;width:100%;margin-top:4px;text-align:left;" onclick="surveyPickPlayer_('${p.id}')">
+      ${jerseyNameHtml_(p.position, escapeHtml(p.name))}
+      <span class="muted" style="font-size:.75rem;flex:0 0 auto;">${p.dorsal!=null?("nº"+p.dorsal):""}</span>
+    </div>`).join("");
+}
+window.surveyPickPlayer_ = (id) => {
+  const p = SURVEY_STATE.allPlayers.find(x=>x.id===id);
+  if(!p) return;
+  SURVEY_STATE.selectedPlayer = p;
+  renderSurveyForm_();
+};
+window.surveyChangePlayer_ = () => {
+  SURVEY_STATE.selectedPlayer = null;
+  renderSurveyForm_();
+};
+window.surveySetRating_ = (taskId, val) => {
+  SURVEY_STATE.ratings[taskId] = val ? Number(val) : null;
+};
+window.surveySetField_ = (field, val) => {
+  SURVEY_STATE[field] = val === "" ? null : Number(val);
+};
+window.surveySetPain_ = (val) => {
+  SURVEY_STATE.pain = val;
+  renderSurveyForm_();
+};
+window.surveySendAnother_ = () => {
+  const {sessionId, session, allPlayers} = SURVEY_STATE;
+  SURVEY_STATE = {
+    sessionId, session, allPlayers,
+    selectedPlayer: null, ratings: {}, rpe: null, pain: null, painDetail: "",
+    fatigueBefore: null, fatigueAfter: null, submitting: false, done: false
+  };
+  renderSurveyForm_();
+};
+window.submitSurvey_ = async () => {
+  const st = SURVEY_STATE;
+  const msgEl = document.getElementById("surveyMsg");
+  const groups = surveyTaskGroups_();
+  const allTaskIds = groups.flatMap(g=>g.items.map(t=>t.id));
+  if(allTaskIds.some(id => !st.ratings[id])){ msgEl.innerHTML = '<p class="error-msg">Valora todas las tareas antes de enviar.</p>'; return; }
+  if(st.rpe===null){ msgEl.innerHTML = '<p class="error-msg">Indica cómo ha sido de duro el entrenamiento.</p>'; return; }
+  if(st.pain===null){ msgEl.innerHTML = '<p class="error-msg">Indica si has sentido molestias durante la sesión.</p>'; return; }
+  if(st.fatigueBefore===null){ msgEl.innerHTML = '<p class="error-msg">Indica tu nivel de cansancio antes de la sesión.</p>'; return; }
+  if(st.fatigueAfter===null){ msgEl.innerHTML = '<p class="error-msg">Indica tu nivel de cansancio después de la sesión.</p>'; return; }
+  if(st.submitting) return;
+  st.submitting = true;
+  msgEl.innerHTML = '<p class="muted">Enviando...</p>';
+  try{
+    const taskRatings = {};
+    const taskSnapshot = [];
+    groups.forEach(g=>g.items.forEach(t=>{
+      taskRatings[t.id] = st.ratings[t.id];
+      taskSnapshot.push({id:t.id, title:t.title, block:g.block, rating: st.ratings[t.id]});
+    }));
+    const surveyId = st.sessionId + "_" + st.selectedPlayer.id;
+    await db.collection("sessionSurveys").doc(surveyId).set({
+      sessionId: st.sessionId,
+      sessionName: st.session.name || "",
+      playerId: st.selectedPlayer.id,
+      playerName: st.selectedPlayer.name || "",
+      playerPosition: st.selectedPlayer.position || "Jugador",
+      playerTeamId: st.selectedPlayer.teamId || null,
+      taskRatings,
+      taskSnapshot,
+      rpe: st.rpe,
+      pain: st.pain,
+      painDetail: st.pain ? (st.painDetail||"").trim() : "",
+      fatigueBefore: st.fatigueBefore,
+      fatigueAfter: st.fatigueAfter,
+      submittedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    st.done = true;
+    renderSurveyForm_();
+  }catch(err){
+    st.submitting = false;
+    msgEl.innerHTML = '<p class="error-msg">No se ha podido enviar: '+escapeHtml(err.message)+'</p>';
+  }
+};
 
 /* ============================================================
    PAPELERA (borrado suave con restauración y purga automática)
@@ -8890,7 +9240,11 @@ service cloud.firestore {
       allow write: if isEditor();
     }
     match /sessions/{sessionId} {
-      allow read: if isActive();
+      // "|| resource.data.surveyPublic == true" abre lectura pública SOLO cuando el coach ha
+      // marcado "Activar encuesta para jugadores" en esa sesión (mismo mecanismo que "plays"
+      // y "playSessions" con su campo "public"): permite que la encuesta de Cargas de trabajo
+      // (#survey=<id>) cargue el nombre/fecha/tareas de la sesión sin que el jugador tenga cuenta.
+      allow read: if isActive() || resource.data.surveyPublic == true;
       allow create: if isActive();
       allow update: if isActive() && (
         resource.data.createdBy == request.auth.uid || isGestor()
@@ -8933,13 +9287,33 @@ service cloud.firestore {
       allow write: if isEditor();
     }
     match /players/{playerId} {
-      allow read: if isActive();
+      // Lectura pública (sin isActive()) a propósito: la encuesta de Cargas de trabajo
+      // (#survey=<sessionId>) necesita que un jugador sin cuenta pueda buscarse a sí mismo
+      // entre TODOS los jugadores del club (no solo los de un equipo), por ejemplo un
+      // juvenil que sube a entrenar con otro equipo. Solo expone nombre/dorsal/posición/
+      // equipo, nada sensible.
+      allow read: if true;
       allow create: if isActive() && (isGestor() || (myCoach().data.teamIds is list && request.resource.data.teamId in myCoach().data.teamIds));
       allow update, delete: if isActive() && (isGestor() || (myCoach().data.teamIds is list && resource.data.teamId in myCoach().data.teamIds));
     }
     match /matchdays/{matchdayId} {
       allow read: if isActive();
       allow write: if isActive();
+    }
+    match /sessionSurveys/{surveyId} {
+      // Respuestas (sin login) a la encuesta de "Cargas de trabajo" de una sesión. El id del
+      // documento es "{sessionId}_{playerId}" (se valida aquí), así que reenviar la encuesta
+      // simplemente sustituye la respuesta anterior de ese jugador para esa sesión. Solo se
+      // puede escribir si la sesión referenciada tiene la encuesta activada
+      // (surveyPublic == true) y el jugador existe de verdad en la plantilla. La lectura (para
+      // ver los resultados en "Cargas de trabajo") solo la tienen los entrenadores.
+      allow read: if isActive();
+      allow create, update: if request.resource.data.sessionId is string
+        && request.resource.data.playerId is string
+        && surveyId == request.resource.data.sessionId + '_' + request.resource.data.playerId
+        && get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.surveyPublic == true
+        && exists(/databases/$(database)/documents/players/$(request.resource.data.playerId));
+      allow delete: if isActive() && (isGestor() || get(/databases/$(database)/documents/sessions/$(resource.data.sessionId)).data.createdBy == request.auth.uid);
     }
   }
 }
