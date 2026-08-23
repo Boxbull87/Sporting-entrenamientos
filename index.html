@@ -8821,10 +8821,14 @@ async function loadSurveyForm(sessionId){
       return;
     }
     const session = snap.data();
-    const playersSnap = await db.collection("players").orderBy("name").get();
+    const [playersSnap, teamsSnap] = await Promise.all([
+      db.collection("players").orderBy("name").get(),
+      db.collection("teams").orderBy("name").get()
+    ]);
     const allPlayers = playersSnap.docs.map(d=>({id:d.id, ...d.data()}));
+    const allTeams = teamsSnap.docs.map(d=>({id:d.id, ...d.data()}));
     SURVEY_STATE = {
-      sessionId, session, allPlayers,
+      sessionId, session, allPlayers, allTeams,
       selectedPlayer: null,
       ratings: {}, rpe: null, pain: null, painDetail: "", fatigueBefore: null, fatigueAfter: null,
       submitting: false, done: false
@@ -8853,7 +8857,7 @@ function renderSurveyForm_(){
   }
   const groups = surveyTaskGroups_();
   const playerPickHtml = st.selectedPlayer
-    ? `<p style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><strong>Jugador/a:</strong> ${jerseyNameHtml_(st.selectedPlayer.position, escapeHtml(st.selectedPlayer.name))} <button type="button" class="btn ghost small" onclick="surveyChangePlayer_()">Cambiar</button></p>`
+    ? `<p style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><strong>Jugador/a:</strong> ${jerseyNameHtml_(st.selectedPlayer.position, escapeHtml(st.selectedPlayer.name) + " " + escapeHtml(surveyTeamLabel_(st.selectedPlayer.teamId)))} <button type="button" class="btn ghost small" onclick="surveyChangePlayer_()">Cambiar</button></p>`
     : `
       <label style="margin-top:10px;">Escribe tu nombre y selecciónalo de la lista</label>
       <input type="text" id="surveyPlayerSearch" placeholder="🔍 Buscar mi nombre..." autocomplete="off">
@@ -8907,6 +8911,12 @@ function renderSurveyForm_(){
     input.focus();
   }
 }
+// Nombre del equipo entre paréntesis, para distinguir jugadores homónimos de equipos
+// distintos (p.ej. dos "Antonio García" en categorías diferentes).
+function surveyTeamLabel_(teamId){
+  const t = (SURVEY_STATE.allTeams||[]).find(x=>x.id===teamId);
+  return t ? `(${t.name})` : "";
+}
 function renderSurveyPlayerResults_(query){
   const box = document.getElementById("surveyPlayerResults");
   if(!box) return;
@@ -8916,7 +8926,7 @@ function renderSurveyPlayerResults_(query){
   if(matches.length===0){ box.innerHTML = '<p class="muted" style="font-size:.8rem;">No se ha encontrado ningún jugador con ese nombre.</p>'; return; }
   box.innerHTML = matches.map(p=>`
     <div class="btn ghost small" style="display:flex;justify-content:space-between;align-items:center;width:100%;margin-top:4px;text-align:left;" onclick="surveyPickPlayer_('${p.id}')">
-      ${jerseyNameHtml_(p.position, escapeHtml(p.name))}
+      ${jerseyNameHtml_(p.position, escapeHtml(p.name) + (surveyTeamLabel_(p.teamId) ? " <span class=\"muted\">"+escapeHtml(surveyTeamLabel_(p.teamId))+"</span>" : ""))}
       <span class="muted" style="font-size:.75rem;flex:0 0 auto;">${p.dorsal!=null?("nº"+p.dorsal):""}</span>
     </div>`).join("");
 }
@@ -8941,9 +8951,9 @@ window.surveySetPain_ = (val) => {
   renderSurveyForm_();
 };
 window.surveySendAnother_ = () => {
-  const {sessionId, session, allPlayers} = SURVEY_STATE;
+  const {sessionId, session, allPlayers, allTeams} = SURVEY_STATE;
   SURVEY_STATE = {
-    sessionId, session, allPlayers,
+    sessionId, session, allPlayers, allTeams,
     selectedPlayer: null, ratings: {}, rpe: null, pain: null, painDetail: "",
     fatigueBefore: null, fatigueAfter: null, submitting: false, done: false
   };
@@ -9283,7 +9293,11 @@ service cloud.firestore {
       allow update, delete: if isEditor();
     }
     match /teams/{teamId} {
-      allow read: if isActive();
+      // Lectura pública (sin isActive()) a propósito: en la encuesta de Cargas de trabajo
+      // (#survey=<sessionId>) se muestra el nombre del equipo junto al del jugador en la
+      // búsqueda, para distinguir jugadores con el mismo nombre en equipos distintos. Solo
+      // expone el nombre del equipo, nada sensible.
+      allow read: if true;
       allow write: if isEditor();
     }
     match /players/{playerId} {
