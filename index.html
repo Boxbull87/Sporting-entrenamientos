@@ -9557,6 +9557,15 @@ service cloud.firestore {
       allow read: if isActive();
       allow write: if isActive();
     }
+    // Paneles de categorías de Scouting FS (sus botones/teclas de marcaje, guardados
+    // por entrenador). A diferencia de partidos_scouting/eventos_scouting, aquí sí se
+    // restringe la escritura al propio dueño (coachUid) — es su configuración personal,
+    // no algo que otro entrenador deba poder tocar. Sporting no los usa para nada.
+    match /paneles_scouting/{id} {
+      allow read: if isActive();
+      allow create: if isActive() && request.resource.data.coachUid == request.auth.uid;
+      allow update, delete: if isActive() && resource.data.coachUid == request.auth.uid;
+    }
     match /sessionSurveys/{surveyId} {
       // Respuestas (sin login) a la encuesta de "Cargas de trabajo" de una sesión. El id del
       // documento es "{sessionId}_{playerId}" (se valida aquí), así que reenviar la encuesta
