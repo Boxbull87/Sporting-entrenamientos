@@ -1398,6 +1398,8 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
             <h3 id="matchdayStatsTitle" style="font-size:.95rem;"></h3>
             <div id="matchdayVideoWrap" style="margin-bottom:8px;"></div>
 
+            <div id="matchdayScoutingWrap" style="margin-bottom:14px;"></div>
+
             <div class="row" style="align-items:flex-start;margin-bottom:4px;">
               <div style="flex:1;min-width:220px;">
                 <h4 style="font-size:.85rem;margin:0 0 6px;">⚽ Goles marcados</h4>
@@ -5891,9 +5893,65 @@ window.openMatchdayStats = (id) => {
   renderMatchdayTimeline_();
   renderMatchdaySessionsLink();
   renderMatchdayReport();
+  renderMatchdayScouting_();
   document.getElementById("matchdayStatsMsg").innerHTML = "";
   showMatchdaySub("stats");
 };
+
+// Lectura de solo consulta de los datos marcados en Scouting FS (app hermana, mismo proyecto
+// Firebase) para esta jornada. Scouting FS escribe en partidos_scouting/eventos_scouting;
+// aquí nunca se escribe en esas colecciones, solo se leen para mostrarlas.
+async function renderMatchdayScouting_(){
+  const wrap = document.getElementById("matchdayScoutingWrap");
+  if(!wrap) return;
+  const m = matchdays.find(x=>x.id===statsMatchdayId);
+  if(!m){ wrap.innerHTML = ""; return; }
+  wrap.innerHTML = '<p class="muted">Buscando datos de Scouting FS…</p>';
+  try{
+    const snap = await db.collection("partidos_scouting").where("partidoSportingId","==",m.id).limit(1).get();
+    if(snap.empty){
+      wrap.innerHTML = '<p class="muted">🎥 Sin datos de <a href="https://boxbull87.github.io/Sporting-Scout/" target="_blank" rel="noopener">Scouting FS</a> vinculados a esta jornada todavía.</p>';
+      return;
+    }
+    const scoutDoc = snap.docs[0];
+    const scout = scoutDoc.data();
+    const categorias = Array.isArray(scout.categorias) ? scout.categorias : [];
+    const evSnap = await db.collection("eventos_scouting").where("partidoId","==",scoutDoc.id).get();
+    const eventos = evSnap.docs.map(d=>d.data());
+
+    const catsStats = categorias.filter(c=>c.stats!==false);
+    const contar = equipo => catsStats.map(c=>eventos.filter(e=>e.tipo===c.id && e.equipo===equipo).length);
+    const propio = contar("propio"), rival = contar("rival");
+
+    const filas = catsStats.map((c,i)=>`
+      <tr>
+        <td style="padding:3px;"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${escapeHtml(c.color||"#888")};margin-right:5px;"></span>${escapeHtml(c.nom)}</td>
+        <td style="padding:3px;text-align:center;">${propio[i]}</td>
+        <td style="padding:3px;text-align:center;">${rival[i]}</td>
+      </tr>`).join("");
+
+    wrap.innerHTML = `
+      <div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;">
+        <div class="row" style="align-items:center;justify-content:space-between;">
+          <h4 style="margin:0;font-size:.85rem;">🎥 Scouting FS · ${eventos.length} evento${eventos.length===1?"":"s"} marcado${eventos.length===1?"":"s"}</h4>
+          <button type="button" class="btn ghost small" id="btnRefreshScouting">🔄 Actualizar</button>
+        </div>
+        ${catsStats.length ? `
+        <table style="width:100%;border-collapse:collapse;font-size:.82rem;margin-top:8px;">
+          <thead><tr style="text-align:left;border-bottom:1px solid var(--border);">
+            <th style="padding:3px;">Categoría</th>
+            <th style="padding:3px;text-align:center;">${escapeHtml(scout.equipoPropio||"Propio")}</th>
+            <th style="padding:3px;text-align:center;">${escapeHtml(scout.equipoRival||"Rival")}</th>
+          </tr></thead>
+          <tbody>${filas}</tbody>
+        </table>` : '<p class="muted">No hay categorías marcadas para aparecer en estadísticas.</p>'}
+        <p class="muted" style="margin:8px 0 0;font-size:.75rem;">Datos de solo lectura, marcados en la app Scouting FS — para editarlos, hazlo allí.</p>
+      </div>`;
+    document.getElementById("btnRefreshScouting").onclick = renderMatchdayScouting_;
+  }catch(err){
+    wrap.innerHTML = '<p class="error-msg">No se pudieron cargar los datos de Scouting FS: '+escapeHtml(err.message)+'</p>';
+  }
+}
 function renderMatchdayStatsTable(){
   const m = matchdays.find(x=>x.id===statsMatchdayId);
   const wrap = document.getElementById("matchdayStatsTable");
