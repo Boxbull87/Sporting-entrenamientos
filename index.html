@@ -9545,6 +9545,18 @@ service cloud.firestore {
       allow read: if isActive();
       allow write: if isActive();
     }
+    // Colecciones propias de la app hermana Scouting FS (mismo proyecto Firebase, repo aparte:
+    // github.com/Boxbull87/Sporting-Scout). Sporting nunca escribe aquí, solo lee (ver
+    // renderMatchdayScouting_ en la vista de Jornada) para mostrar los eventos marcados de un
+    // partido vinculado. Mismo criterio de acceso que matchdays, por ser datos del mismo ámbito.
+    match /partidos_scouting/{id} {
+      allow read: if isActive();
+      allow write: if isActive();
+    }
+    match /eventos_scouting/{id} {
+      allow read: if isActive();
+      allow write: if isActive();
+    }
     match /sessionSurveys/{surveyId} {
       // Respuestas (sin login) a la encuesta de "Cargas de trabajo" de una sesión. El id del
       // documento es "{sessionId}_{playerId}" (se valida aquí), así que reenviar la encuesta
