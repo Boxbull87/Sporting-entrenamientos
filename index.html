@@ -229,6 +229,20 @@ input,select,textarea{font-family:inherit;}
 .goal-chart-sub-row{display:flex;justify-content:space-between;gap:8px;font-size:.7rem;color:#666;padding:2px 0;}
 .goal-chart-total{background:#12224f;color:#fff;text-align:center;font-family:'Oswald',sans-serif;font-weight:600;letter-spacing:.03em;padding:8px 16px;font-size:.78rem;border-radius:999px;margin:0 14px 14px;}
 
+/* ---------- Acordeones de secciones (Jornada, etc.): <details class="acc"> plegable, varios
+   pueden estar abiertos a la vez (comportamiento nativo de <details>, sin JS extra). ---------- */
+details.acc{border:1px solid var(--border);border-radius:8px;margin-top:12px;overflow:hidden;}
+details.acc>summary{
+  list-style:none;cursor:pointer;padding:10px 12px;font-size:.9rem;font-weight:600;
+  display:flex;align-items:center;justify-content:space-between;background:rgba(0,0,0,.02);
+  user-select:none;
+}
+details.acc>summary::-webkit-details-marker{display:none;}
+details.acc>summary::after{content:"▸";color:var(--muted);font-size:.75rem;transition:transform .15s ease;}
+details.acc[open]>summary::after{transform:rotate(90deg);}
+details.acc>summary:hover{background:rgba(0,0,0,.045);}
+details.acc>.acc-body{padding:12px;border-top:1px solid var(--border);}
+
 .card{
   background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
   padding:16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.04);
@@ -1489,58 +1503,72 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
 
             <div id="matchdayScoutingWrap" style="margin-bottom:14px;"></div>
 
-            <div class="row" style="align-items:flex-start;margin-bottom:4px;">
-              <div style="flex:1;min-width:220px;">
-                <h4 style="font-size:.85rem;margin:0 0 6px;">⚽ Goles marcados</h4>
-                <div id="matchdayGoalsForList" style="margin-bottom:6px;"></div>
-                <button type="button" class="btn ghost small" id="btnAddGoalFor">➕ Añadir gol marcado</button>
+            <details class="acc" id="accMatchdayGoles">
+              <summary>⚽ Goles del partido</summary>
+              <div class="acc-body">
+                <div class="row" style="align-items:flex-start;margin-bottom:4px;">
+                  <div style="flex:1;min-width:220px;">
+                    <h4 style="font-size:.85rem;margin:0 0 6px;">⚽ Goles marcados</h4>
+                    <div id="matchdayGoalsForList" style="margin-bottom:6px;"></div>
+                    <button type="button" class="btn ghost small" id="btnAddGoalFor">➕ Añadir gol marcado</button>
+                  </div>
+                  <div style="flex:1;min-width:220px;">
+                    <h4 style="font-size:.85rem;margin:0 0 6px;">🥅 Goles encajados</h4>
+                    <div id="matchdayGoalsAgainstList" style="margin-bottom:6px;"></div>
+                    <button type="button" class="btn ghost small" id="btnAddGoalAgainst">➕ Añadir gol encajado</button>
+                  </div>
+                </div>
+                <p id="matchdayGoalsWarning" class="muted" style="font-size:.78rem;margin-top:6px;"></p>
+
+                <h4 style="margin-top:18px;font-size:.85rem;">🕒 Cronología del partido</h4>
+                <p class="muted" style="margin-top:-6px;">Apartado independiente de las estadísticas de arriba: aquí registras, gol a gol, en qué minuto aproximado ha sido y qué jugadores había en el campo en ese momento.</p>
+                <div id="matchdayTimelineList" style="margin-bottom:6px;"></div>
+                <p id="matchdayTimelineWarning" class="muted" style="font-size:.78rem;"></p>
+                <div class="row" style="margin-bottom:6px;">
+                  <button type="button" class="btn ghost small" id="btnAddTimelineFor">➕ Gol a favor</button>
+                  <button type="button" class="btn ghost small" id="btnAddTimelineAgainst">➕ Gol en contra</button>
+                </div>
               </div>
-              <div style="flex:1;min-width:220px;">
-                <h4 style="font-size:.85rem;margin:0 0 6px;">🥅 Goles encajados</h4>
-                <div id="matchdayGoalsAgainstList" style="margin-bottom:6px;"></div>
-                <button type="button" class="btn ghost small" id="btnAddGoalAgainst">➕ Añadir gol encajado</button>
+            </details>
+
+            <details class="acc" id="accMatchdayConvocatoria" open>
+              <summary>📋 Convocatoria y estadísticas de jugadores</summary>
+              <div class="acc-body">
+                <p class="muted" style="margin-top:0;">Goles/Encajados: para jugadores son goles marcados; para porteros, goles encajados.</p>
+                <div class="row" style="margin-bottom:8px;">
+                  <button type="button" class="btn small ghost" id="btnMarkAllStarters">✅ Marcar todos Titular</button>
+                  <button type="button" class="btn small ghost" id="btnMarkAllUncalled">🚫 Marcar todos No convocado</button>
+                </div>
+                <div id="matchdayStatsTable" style="overflow-x:auto;"></div>
+                <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+                  <button class="btn accent" id="btnSaveMatchdayStats">💾 Guardar convocatoria</button>
+                  <button class="btn ghost" id="btnExportConvocatoriaPDF">🖨️ Exportar informe del partido (PDF)</button>
+                  <p class="muted" style="margin:2px 0 0;font-size:.78rem;">Incluye convocatoria, informe, notas de jugadores y las sesiones marcadas como vinculadas abajo.</p>
+                  <button class="btn danger" id="btnDeleteMatchday">🗑️ Eliminar jornada</button>
+                </div>
+                <div id="matchdayStatsMsg"></div>
               </div>
-            </div>
-            <p id="matchdayGoalsWarning" class="muted" style="font-size:.78rem;margin-top:6px;"></p>
+            </details>
 
-            <h3 style="margin-top:18px;font-size:.9rem;">🕒 Cronología del partido</h3>
-            <p class="muted" style="margin-top:-6px;">Apartado independiente de las estadísticas de arriba: aquí registras, gol a gol, en qué minuto aproximado ha sido y qué jugadores había en el campo en ese momento.</p>
-            <div id="matchdayTimelineList" style="margin-bottom:6px;"></div>
-            <p id="matchdayTimelineWarning" class="muted" style="font-size:.78rem;"></p>
-            <div class="row" style="margin-bottom:6px;">
-              <button type="button" class="btn ghost small" id="btnAddTimelineFor">➕ Gol a favor</button>
-              <button type="button" class="btn ghost small" id="btnAddTimelineAgainst">➕ Gol en contra</button>
-            </div>
+            <details class="acc" id="accMatchdayInforme">
+              <summary>📝 Informe del partido</summary>
+              <div class="acc-body">
+                <p class="muted" style="margin-top:0;">Dificultad del rival:</p>
+                <div id="matchdayDifficultyPicker" style="margin-bottom:10px;display:flex;flex-wrap:wrap;"></div>
+                <label style="font-size:.85rem;font-weight:600;">Informe / texto libre</label>
+                <textarea id="mdReportText" rows="5" style="width:100%;margin-bottom:10px;" placeholder="Escribe aquí lo que quieras sobre el partido..."></textarea>
+                <label style="font-size:.85rem;font-weight:600;">Observaciones</label>
+                <textarea id="mdReportObservations" rows="3" style="width:100%;margin-bottom:10px;" placeholder="Observaciones adicionales..."></textarea>
+                <label style="font-size:.85rem;font-weight:600;">Notas de jugadores</label>
+                <div id="matchdayPlayerNotes" style="margin-bottom:10px;"></div>
+                <button class="btn accent" id="btnSaveMatchdayReport">💾 Guardar informe</button>
+                <div id="matchdayReportMsg"></div>
 
-            <p class="muted" style="margin-top:10px;">Goles/Encajados: para jugadores son goles marcados; para porteros, goles encajados.</p>
-            <div class="row" style="margin-bottom:8px;">
-              <button type="button" class="btn small ghost" id="btnMarkAllStarters">✅ Marcar todos Titular</button>
-              <button type="button" class="btn small ghost" id="btnMarkAllUncalled">🚫 Marcar todos No convocado</button>
-            </div>
-            <div id="matchdayStatsTable" style="overflow-x:auto;"></div>
-            <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
-              <button class="btn accent" id="btnSaveMatchdayStats">💾 Guardar convocatoria</button>
-              <button class="btn ghost" id="btnExportConvocatoriaPDF">🖨️ Exportar informe del partido (PDF)</button>
-              <p class="muted" style="margin:2px 0 0;font-size:.78rem;">Incluye convocatoria, informe, notas de jugadores y las sesiones marcadas como vinculadas abajo.</p>
-              <button class="btn danger" id="btnDeleteMatchday">🗑️ Eliminar jornada</button>
-            </div>
-            <div id="matchdayStatsMsg"></div>
-
-            <h3 style="margin-top:18px;font-size:.9rem;">🔗 Sesiones de entrenamiento vinculadas</h3>
-            <p class="muted" style="margin-top:-6px;">Marca las sesiones de tus equipos que quieras vincular a este partido (o desmárcalas para desvincularlas) y guarda.</p>
-            <div id="matchdaySessionsLink"></div>
-
-            <h3 style="margin-top:18px;font-size:.9rem;">📋 Informe del partido</h3>
-            <p class="muted" style="margin-top:-6px;">Dificultad del rival:</p>
-            <div id="matchdayDifficultyPicker" style="margin-bottom:10px;display:flex;flex-wrap:wrap;"></div>
-            <label style="font-size:.85rem;font-weight:600;">Informe / texto libre</label>
-            <textarea id="mdReportText" rows="5" style="width:100%;margin-bottom:10px;" placeholder="Escribe aquí lo que quieras sobre el partido..."></textarea>
-            <label style="font-size:.85rem;font-weight:600;">Observaciones</label>
-            <textarea id="mdReportObservations" rows="3" style="width:100%;margin-bottom:10px;" placeholder="Observaciones adicionales..."></textarea>
-            <label style="font-size:.85rem;font-weight:600;">Notas de jugadores</label>
-            <div id="matchdayPlayerNotes" style="margin-bottom:10px;"></div>
-            <button class="btn accent" id="btnSaveMatchdayReport">💾 Guardar informe</button>
-            <div id="matchdayReportMsg"></div>
+                <h4 style="margin-top:18px;font-size:.85rem;">🔗 Sesiones de entrenamiento vinculadas</h4>
+                <p class="muted" style="margin-top:-6px;">Marca las sesiones de tus equipos que quieras vincular a este partido (o desmárcalas para desvincularlas) y guarda.</p>
+                <div id="matchdaySessionsLink"></div>
+              </div>
+            </details>
           </div>
         </div>
 
