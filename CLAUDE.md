@@ -58,7 +58,8 @@ Defined ~line 1544 area (search `ROLE_GESTOR`): `ROLE_GESTOR` ("gestor"), `ROLE_
 Collections: `coaches`, `categories` (task folders), `tasks`, `sessions`, `abpCategories` (ABP
 folders), `plays` (ABP set-piece plays), `playSessions` (ABP sessions, can be public via a
 `#public=<id>` link), `playSessionFolders`, `gameModelFiles` (external doc links), `teams`,
-`players`, `matchdays` (jornadas + per-match stats).
+`players`, `matchdays` (jornadas + per-match stats), `mesociclos`/`microciclos` (periodización:
+fases de temporada y sus semanas, ver "Mi equipo" más abajo).
 
 Most collections use **soft delete** (`deleted:true`, `deletedAt`, `deletedBy`) instead of a
 real delete. The gestor-only **Papelera** tab (~line 7891) restores or purges them.
@@ -132,6 +133,16 @@ All inside `index.html` — search for these comment banners to jump around:
     orphaned items' (now-empty) map entry so they show under "Sin carpeta" — don't
     accidentally revert that to `delete map[itemId]`, that was a real bug once already.
   - **Sesiones** → training sessions filtered to just that team (`renderMiEquipoSessions`).
+  - **Mesociclos** → season periodization. A mesociclo (`mesociclos` collection) is a
+    date-ranged phase (name, color, `objetivos`/`marcadoresExito`/`evaluacion` free text);
+    a microciclo (`microciclos`) is the same shape but always belongs to one mesociclo
+    (`mesocicloId`) and its dates must fall inside the parent's range. Shown as a Gantt-style
+    timeline (`renderMesociclosTimeline_`); no soft delete, same as `matchdays`. The team's
+    calendar (`renderMiEquipoCalendar_`, below) colors each day's top half by its mesociclo
+    and bottom half by its microciclo (`mesocicloEnFecha_`/`microcicloEnFecha_`).
+  - **Calendario** (bottom of the "Mi equipo" menu screen, not a separate submenu):
+    `renderMiEquipoCalendar_` — month grid of that team's sessions/matchdays, click a day to
+    create one; see Mesociclos above for the day-cell coloring.
 - **Plantilla** (`EQUIPOS Y PLANTILLA DE JUGADORES` ~4623): teams, players, matchdays (jornadas)
   and per-match player stats; also a team-comparison view ("Comparar equipos").
 - **Entrenadores** (`COACHES MANAGEMENT` ~4567, gestor-only): approve/activate coaches, assign

@@ -169,15 +169,41 @@ input,select,textarea{font-family:inherit;}
 .mi-equipo-cal-weekdays{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;font-size:.72rem;font-weight:600;color:var(--muted);text-align:center;margin-bottom:4px;}
 .mi-equipo-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
 .mi-equipo-cal-day{
-  min-height:52px;border:1px solid var(--border);border-radius:8px;padding:4px;cursor:pointer;
-  display:flex;flex-direction:column;justify-content:space-between;background:var(--card);
-  transition:background .15s ease;
+  min-height:52px;border:1px solid var(--border);border-radius:8px;cursor:pointer;overflow:hidden;
+  display:flex;flex-direction:column;background:var(--card);
 }
-.mi-equipo-cal-day:hover{background:rgba(192,57,41,.08);}
+.mi-equipo-cal-day:hover{outline:2px solid rgba(192,57,41,.35);outline-offset:-2px;}
+/* Mitad superior = color del mesociclo de ese día; mitad inferior = color del microciclo.
+   Cada una lleva su propio fondo (puesto inline por renderMiEquipoCalendar_), por eso van
+   en divs separados en vez de en el propio .mi-equipo-cal-day. */
+.mi-equipo-cal-top{flex:1;padding:4px 4px 2px;display:flex;align-items:flex-start;}
+.mi-equipo-cal-bottom{flex:1;padding:2px 4px 4px;display:flex;align-items:flex-end;}
 .mi-equipo-cal-daynum{font-size:.76rem;color:var(--ink);}
-.mi-equipo-cal-today{border-color:var(--accent,#c0392b);}
-.mi-equipo-cal-today .mi-equipo-cal-daynum{font-weight:700;color:var(--accent,#c0392b);}
+.mi-equipo-cal-today{border-color:var(--accent,#c0392b);border-width:2px;}
+.mi-equipo-cal-today .mi-equipo-cal-daynum{font-weight:700;}
 .mi-equipo-cal-marks{font-size:.72rem;display:flex;gap:3px;flex-wrap:wrap;}
+
+.color-input{width:44px;height:37px;padding:2px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:#fff;}
+
+/* ---------- Mesociclos/microciclos: línea de tiempo tipo Gantt ---------- */
+.meso-timeline{overflow-x:auto;padding-bottom:4px;}
+.meso-months-row{display:flex;gap:8px;min-width:560px;}
+.meso-months{position:relative;flex:1;height:18px;}
+.meso-months span{position:absolute;top:0;font-size:.68rem;color:var(--muted);white-space:nowrap;}
+.meso-row{display:flex;align-items:center;gap:8px;margin-top:10px;min-width:560px;}
+.meso-row-label{width:150px;flex:0 0 150px;font-size:.78rem;cursor:pointer;}
+.meso-row-label b{display:block;}
+.meso-row-label span{color:var(--muted);font-size:.68rem;}
+.meso-track{position:relative;flex:1;height:28px;background:rgba(0,0,0,.03);border-radius:6px;}
+.meso-bar{
+  position:absolute;top:2px;bottom:2px;border-radius:5px;cursor:pointer;display:flex;align-items:center;
+  padding:0 8px;font-size:.72rem;font-weight:600;overflow:hidden;white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,.15);
+}
+.micro-row{display:flex;align-items:center;gap:8px;margin-top:4px;min-width:560px;}
+.micro-row-label{width:150px;flex:0 0 150px;}
+.micro-track{position:relative;flex:1;height:16px;}
+.micro-bar{position:absolute;top:0;bottom:0;border-radius:4px;cursor:pointer;opacity:.9;}
+.micro-bar:hover{opacity:1;box-shadow:0 0 0 2px rgba(0,0,0,.2);}
 
 .goal-chart-card{background:#fff;border-radius:12px;overflow:hidden;border:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:10px;}
 .goal-chart-header{background:#12224f;color:#fff;font-family:'Oswald',sans-serif;text-transform:uppercase;letter-spacing:.03em;font-weight:600;font-size:.78rem;padding:10px 12px;}
@@ -1168,6 +1194,11 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
               <span class="home-card-label">Estadísticas</span>
               <span class="home-card-desc">Resultados y goles por categoría</span>
             </button>
+            <button type="button" class="home-card" id="miEquipoGoMesociclos">
+              <span class="home-card-icon">🧩</span>
+              <span class="home-card-label">Mesociclos</span>
+              <span class="home-card-desc">Fases de temporada y microciclos</span>
+            </button>
           </div>
         </div>
         <div class="card" style="margin-top:10px;">
@@ -1233,6 +1264,15 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
           <div id="miEquipoSessionsList" style="margin-top:10px;"></div>
         </div>
       </div>
+      <div id="miEquipoMesociclosView" class="hidden">
+        <button type="button" class="btn ghost small" id="miEquipoMesociclosBack" style="margin-bottom:10px;">← Volver</button>
+        <div class="card">
+          <h2 style="font-size:1.05rem;" id="miEquipoMesociclosTitle">🧩 Mesociclos</h2>
+          <p class="muted" style="margin-top:-6px;">Planifica las fases de la temporada (mesociclos) y, dentro de cada una, sus semanas de trabajo (microciclos). Los mesociclos colorean la mitad superior de cada día del calendario; los microciclos, la mitad inferior.</p>
+          <button type="button" class="btn accent small" id="btnNewMesociclo">+ Nuevo mesociclo</button>
+          <div id="mesociclosTimeline" style="margin-top:14px;"></div>
+        </div>
+      </div>
     </div>
 
     <!-- ---------- Mi equipo: calendario, elegir qué crear/ver en un día ---------- -->
@@ -1245,6 +1285,55 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
           <button type="button" class="btn accent" id="miEquipoCalDayNewMatchday">⚽ Crear partido (jornada)</button>
         </div>
         <button class="btn ghost" id="btnCloseMiEquipoCalDay" style="width:100%;margin-top:14px;">Cerrar</button>
+      </div>
+    </div>
+
+    <!-- ---------- Mi equipo: crear/editar un mesociclo (fase de temporada) ---------- -->
+    <div id="mesocicloFormModal" class="modal-bg hidden">
+      <div class="modal">
+        <h2 style="font-size:1.05rem;" id="mesocicloFormTitle">Nuevo mesociclo</h2>
+        <div class="row">
+          <div style="flex:1;min-width:180px;"><label>Nombre</label><input type="text" id="mesoName" placeholder="Ej: Pretemporada"></div>
+          <div style="flex:0 0 auto;min-width:0;"><label>Color</label><input type="color" id="mesoColor" class="color-input" value="#c0392b"></div>
+        </div>
+        <div class="row" style="margin-top:8px;">
+          <div><label>Fecha inicio</label><input type="date" id="mesoStart"></div>
+          <div><label>Fecha fin</label><input type="date" id="mesoEnd"></div>
+        </div>
+        <div style="margin-top:8px;"><label>Objetivos</label><textarea id="mesoObjetivos" placeholder="¿Qué se busca en esta fase?"></textarea></div>
+        <div style="margin-top:8px;"><label>Marcadores de éxito</label><textarea id="mesoMarcadores" placeholder="¿Cómo sabremos que se ha conseguido?"></textarea></div>
+        <div style="margin-top:8px;"><label>Evaluación</label><textarea id="mesoEvaluacion" placeholder="Valoración al terminar la fase"></textarea></div>
+        <p id="mesocicloFormMsg" class="muted" style="font-size:.78rem;"></p>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+          <button type="button" class="btn accent" id="btnSaveMesociclo" style="flex:1;">💾 Guardar</button>
+          <button type="button" class="btn danger hidden" id="btnDeleteMesociclo">🗑️ Borrar</button>
+        </div>
+        <button class="btn ghost" id="btnCloseMesocicloForm" style="width:100%;margin-top:8px;">Cerrar</button>
+      </div>
+    </div>
+
+    <!-- ---------- Mi equipo: crear/editar un microciclo (semana dentro de un mesociclo) ---------- -->
+    <div id="microcicloFormModal" class="modal-bg hidden">
+      <div class="modal">
+        <h2 style="font-size:1.05rem;" id="microcicloFormTitle">Nuevo microciclo</h2>
+        <p class="muted" id="microcicloFormRangeHint" style="margin-top:-6px;"></p>
+        <div class="row">
+          <div style="flex:1;min-width:180px;"><label>Nombre</label><input type="text" id="microName" placeholder="Ej: Semana 1"></div>
+          <div style="flex:0 0 auto;min-width:0;"><label>Color</label><input type="color" id="microColor" class="color-input" value="#2980b9"></div>
+        </div>
+        <div class="row" style="margin-top:8px;">
+          <div><label>Fecha inicio</label><input type="date" id="microStart"></div>
+          <div><label>Fecha fin</label><input type="date" id="microEnd"></div>
+        </div>
+        <div style="margin-top:8px;"><label>Objetivos</label><textarea id="microObjetivos" placeholder="¿Qué se busca esta semana?"></textarea></div>
+        <div style="margin-top:8px;"><label>Marcadores de éxito</label><textarea id="microMarcadores" placeholder="¿Cómo sabremos que se ha conseguido?"></textarea></div>
+        <div style="margin-top:8px;"><label>Evaluación</label><textarea id="microEvaluacion" placeholder="Valoración al terminar la semana"></textarea></div>
+        <p id="microcicloFormMsg" class="muted" style="font-size:.78rem;"></p>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+          <button type="button" class="btn accent" id="btnSaveMicrociclo" style="flex:1;">💾 Guardar</button>
+          <button type="button" class="btn danger hidden" id="btnDeleteMicrociclo">🗑️ Borrar</button>
+        </div>
+        <button class="btn ghost" id="btnCloseMicrocicloForm" style="width:100%;margin-top:8px;">Cerrar</button>
       </div>
     </div>
 
@@ -1850,6 +1939,11 @@ let selectedTeamId = null;
 let selectedSeason = null;
 let matchdays = [];
 let editingMatchdayId = null;
+let mesociclos = [];
+let microciclos = [];
+let editingMesocicloId = null;
+let editingMicrocicloId = null;
+let microcicloParentMesocicloId = null; // mesociclo al que pertenece el microciclo que se está creando/editando
 let statsMatchdayId = null;
 let trashTasks = [];
 let trashSessions = [];
@@ -2816,6 +2910,18 @@ function attachRealtimeListeners(){
     }
     renderMiEquipoCalendar_();
   }, err => showSyncError_("jornadas", err));
+
+  db.collection("mesociclos").orderBy("startDate").onSnapshot(snap=>{
+    mesociclos = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    renderMiEquipoCalendar_();
+    if(document.getElementById("miEquipoMesociclosView") && !document.getElementById("miEquipoMesociclosView").classList.contains("hidden")) renderMesociclosTimeline_();
+  }, err => showSyncError_("mesociclos", err));
+
+  db.collection("microciclos").orderBy("startDate").onSnapshot(snap=>{
+    microciclos = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    renderMiEquipoCalendar_();
+    if(document.getElementById("miEquipoMesociclosView") && !document.getElementById("miEquipoMesociclosView").classList.contains("hidden")) renderMesociclosTimeline_();
+  }, err => showSyncError_("microciclos", err));
 }
 
 /* ============================================================
@@ -5020,6 +5126,7 @@ function showMiEquipoView(view){
   document.getElementById("miEquipoAbpView").classList.toggle("hidden", view!=="abp");
   document.getElementById("miEquipoTaskView").classList.toggle("hidden", view!=="tasks");
   document.getElementById("miEquipoSessionsView").classList.toggle("hidden", view!=="sessions");
+  document.getElementById("miEquipoMesociclosView").classList.toggle("hidden", view!=="mesociclos");
 }
 function renderMiEquipoTeams(){
   const wrap = document.getElementById("miEquipoTeamsList");
@@ -5053,6 +5160,7 @@ window.openMiEquipoTeam = (teamId) => {
   document.getElementById("miEquipoTaskTitle").innerHTML =
     '<span class="tasks-icon"><img src="Tareas.jpeg" alt=""></span> Tareas de ' + escapeHtml(t ? t.name : "");
   document.getElementById("miEquipoSessionsTitle").textContent = "🗓️ Sesiones de " + (t ? t.name : "");
+  document.getElementById("miEquipoMesociclosTitle").textContent = "🧩 Mesociclos de " + (t ? t.name : "");
   showMiEquipoView("menu");
   renderMiEquipoCalendar_();
 };
@@ -5084,6 +5192,11 @@ document.getElementById("miEquipoGoSessions").onclick = () => {
   renderMiEquipoSessions();
 };
 document.getElementById("miEquipoSessionsBack").onclick = () => showMiEquipoView("menu");
+document.getElementById("miEquipoGoMesociclos").onclick = () => {
+  showMiEquipoView("mesociclos");
+  renderMesociclosTimeline_();
+};
+document.getElementById("miEquipoMesociclosBack").onclick = () => showMiEquipoView("menu");
 // Mismo agrupado por mes → semana que el listado general de Sesiones, pero ya filtrado a
 // un único equipo (el elegido en "Mi equipo"): no hace falta agrupar por entrenador/equipo,
 // solo listar directamente las sesiones de ese equipo.
@@ -5094,6 +5207,44 @@ function renderMiEquipoSessions(){
   const list = sessions.filter(s => sessionTeams_(s).some(t=>t.id===selectedTeamId));
   if(list.length===0){ wrap.innerHTML = '<div class="empty">🗓️ Este equipo todavía no tiene sesiones de entrenamiento guardadas.</div>'; return; }
   wrap.innerHTML = sessionsByMonthHtml_(list, selectedTeamId);
+}
+
+/* ---------- MI EQUIPO · Mesociclos y microciclos: planificación de la temporada por fases.
+   Un mesociclo es un bloque de fechas (p.ej. "Pretemporada") con color, objetivos, marcadores
+   de éxito y evaluación. Un microciclo es lo mismo pero más corto (p.ej. una semana) y SIEMPRE
+   cuelga de un mesociclo (mesocicloId), con sus fechas obligatoriamente dentro de las del
+   mesociclo padre. El mesociclo de cada día colorea la mitad superior de su celda en el
+   calendario de más abajo; el microciclo, la mitad inferior. Colección/borrado en Firestore
+   igual que "matchdays": sin papelera, borrado directo. ---------- */
+function isoEnRango_(iso, startIso, endIso){
+  return !!iso && !!startIso && !!endIso && iso >= startIso && iso <= endIso; // "yyyy-mm-dd" compara bien como texto
+}
+function mesociclosDeEquipo_(teamId){
+  return mesociclos.filter(m=>m.teamId===teamId).sort((a,b)=>(a.startDate||"").localeCompare(b.startDate||""));
+}
+function microciclosDeMesociclo_(mesocicloId){
+  return microciclos.filter(mc=>mc.mesocicloId===mesocicloId).sort((a,b)=>(a.startDate||"").localeCompare(b.startDate||""));
+}
+function mesocicloEnFecha_(teamId, iso){
+  return mesociclosDeEquipo_(teamId).find(m=>isoEnRango_(iso, m.startDate, m.endDate)) || null;
+}
+function microcicloEnFecha_(teamId, iso){
+  const candidatos = microciclos.filter(mc=>mc.teamId===teamId && isoEnRango_(iso, mc.startDate, mc.endDate));
+  candidatos.sort((a,b)=>(a.startDate||"").localeCompare(b.startDate||""));
+  return candidatos[0] || null;
+}
+// Blanco o negro según el brillo del color de fondo elegido, para que el texto siga siendo legible.
+function colorTextoContraste_(hex){
+  const h = (hex||"").replace("#","");
+  if(h.length!==6) return "#111";
+  const r = parseInt(h.slice(0,2),16), g = parseInt(h.slice(2,4),16), b = parseInt(h.slice(4,6),16);
+  const brillo = (r*299 + g*587 + b*114) / 1000;
+  return brillo > 150 ? "#111" : "#fff";
+}
+function fechaEs_(iso){
+  if(!iso) return "?";
+  const [y,m,d] = iso.split("-");
+  return `${d}/${m}/${y}`;
 }
 
 /* ---------- MI EQUIPO · Calendario: vista de mes directamente en la ventana principal
@@ -5138,9 +5289,15 @@ function renderMiEquipoCalendar_(){
     const daySessions = sessByDate[iso] || [];
     const dayMatchdays = mdByDate[iso] || [];
     const marks = `${daySessions.length ? `<span title="${daySessions.length} sesión(es) de entrenamiento">🗓️${daySessions.length>1?daySessions.length:""}</span>` : ""}${dayMatchdays.length ? `<span title="${dayMatchdays.length} partido(s)">⚽${dayMatchdays.length>1?dayMatchdays.length:""}</span>` : ""}`;
+    const meso = mesocicloEnFecha_(selectedTeamId, iso);
+    const micro = microcicloEnFecha_(selectedTeamId, iso);
+    const topStyle = meso ? ` style="background:${meso.color};color:${colorTextoContraste_(meso.color)};"` : "";
+    const bottomStyle = micro ? ` style="background:${micro.color};color:${colorTextoContraste_(micro.color)};"` : "";
+    const topTitle = meso ? ` title="${escapeHtml(meso.name||"")}"` : "";
+    const bottomTitle = micro ? ` title="${escapeHtml(micro.name||"")}"` : "";
     cells += `<div class="mi-equipo-cal-day${iso===todayIso?" mi-equipo-cal-today":""}" onclick="openMiEquipoCalDay_('${iso}')">
-      <span class="mi-equipo-cal-daynum">${d}</span>
-      <span class="mi-equipo-cal-marks">${marks}</span>
+      <div class="mi-equipo-cal-top"${topStyle}${topTitle}><span class="mi-equipo-cal-daynum">${d}</span></div>
+      <div class="mi-equipo-cal-bottom"${bottomStyle}${bottomTitle}><span class="mi-equipo-cal-marks">${marks}</span></div>
     </div>`;
   }
   grid.innerHTML = `
@@ -5202,6 +5359,200 @@ document.getElementById("miEquipoCalDayNewMatchday").onclick = () => {
   showPlantillaView("matchdays");
   openNewMatchdayForm_(iso);
   document.getElementById("matchdaysCard").scrollIntoView({behavior:"smooth"});
+};
+
+/* ---------- MI EQUIPO · Mesociclos: vista de línea de tiempo (tipo Gantt) ----------
+   Una fila por mesociclo (barra ancha, coloreada, con su nombre) y debajo, más fina, una
+   fila con las barras de sus microciclos. El eje horizontal cubre desde el inicio del
+   mesociclo más temprano hasta el fin del más tardío (con margen), o los próximos 90 días
+   si el equipo todavía no tiene ninguno. No es arrastrable: se edita pulsando la barra. ---------- */
+function mesociclosRangoTimeline_(teamId){
+  const list = mesociclosDeEquipo_(teamId).filter(m=>m.startDate && m.endDate);
+  let startIso, endIso;
+  if(list.length){
+    startIso = list.reduce((a,m)=> m.startDate<a ? m.startDate : a, list[0].startDate);
+    endIso = list.reduce((a,m)=> m.endDate>a ? m.endDate : a, list[0].endDate);
+  } else {
+    const hoy = new Date();
+    startIso = hoy.toISOString().slice(0,10);
+    const fin = new Date(hoy); fin.setDate(fin.getDate()+90);
+    endIso = fin.toISOString().slice(0,10);
+  }
+  const start = new Date(startIso+"T00:00:00"); start.setDate(start.getDate()-5);
+  const end = new Date(endIso+"T00:00:00"); end.setDate(end.getDate()+5);
+  return {start, end};
+}
+function pctEnRango_(iso, start, end){
+  const d = new Date(iso+"T00:00:00");
+  const total = end - start;
+  if(total<=0) return 0;
+  return Math.max(0, Math.min(100, (d-start)/total*100));
+}
+function mesesTimelineHtml_(start, end){
+  const raw = [];
+  const cur = new Date(start.getFullYear(), start.getMonth(), 1);
+  while(cur <= end){
+    const pct = pctEnRango_(cur.toISOString().slice(0,10), start, end);
+    let label = cur.toLocaleDateString("es-ES", {month:"short", year:"2-digit"});
+    label = label.charAt(0).toUpperCase()+label.slice(1);
+    raw.push({pct, label});
+    cur.setMonth(cur.getMonth()+1);
+  }
+  // Si un mes queda a menos de un 4% del siguiente (apenas un par de días visibles, típico
+  // del margen del principio/fin del eje), se omite su etiqueta para que no se solape con la
+  // del mes siguiente — se prioriza mostrar el mes "completo" sobre el trocito inicial.
+  const kept = raw.filter((l,i)=> !raw[i+1] || raw[i+1].pct - l.pct >= 4);
+  return kept.map(l=>`<span style="left:${l.pct}%;">${l.label}</span>`).join("");
+}
+function renderMesociclosTimeline_(){
+  const wrap = document.getElementById("mesociclosTimeline");
+  if(!wrap) return;
+  if(!selectedTeamId){ wrap.innerHTML = '<div class="empty">Elige un equipo primero.</div>'; return; }
+  const list = mesociclosDeEquipo_(selectedTeamId);
+  if(list.length===0){
+    wrap.innerHTML = '<div class="empty">🧩 Todavía no hay mesociclos para este equipo. Pulsa "+ Nuevo mesociclo" para empezar a planificar la temporada.</div>';
+    return;
+  }
+  const {start, end} = mesociclosRangoTimeline_(selectedTeamId);
+  let html = `<div class="meso-timeline">
+    <div class="meso-months-row">
+      <div style="width:150px;flex:0 0 150px;"></div>
+      <div class="meso-months">${mesesTimelineHtml_(start, end)}</div>
+    </div>`;
+  list.forEach(m=>{
+    const leftPct = pctEnRango_(m.startDate, start, end);
+    const widthPct = Math.max(1.5, pctEnRango_(m.endDate, start, end) - leftPct);
+    const color = m.color || "#c0392b";
+    const txt = colorTextoContraste_(color);
+    html += `<div class="meso-row">
+      <div class="meso-row-label" onclick="openMesocicloForm_('${m.id}')"><b>${escapeHtml(m.name||"(sin nombre)")}</b><span>${fechaEs_(m.startDate)} → ${fechaEs_(m.endDate)}</span></div>
+      <div class="meso-track">
+        <div class="meso-bar" style="left:${leftPct}%;width:${widthPct}%;background:${color};color:${txt};" onclick="openMesocicloForm_('${m.id}')" title="${escapeHtml(m.name||"")}">${escapeHtml(m.name||"")}</div>
+      </div>
+    </div>`;
+    const micros = microciclosDeMesociclo_(m.id);
+    html += `<div class="micro-row">
+      <div class="micro-row-label"><button type="button" class="btn ghost small" onclick="openMicrocicloForm_('${m.id}')" style="width:100%;font-size:.68rem;padding:5px 8px;">+ Microciclo</button></div>
+      <div class="micro-track">${micros.map(mc=>{
+        const lp = pctEnRango_(mc.startDate, start, end);
+        const wp = Math.max(1, pctEnRango_(mc.endDate, start, end) - lp);
+        return `<div class="micro-bar" style="left:${lp}%;width:${wp}%;background:${mc.color||"#2980b9"};" onclick="openMicrocicloForm_('${m.id}','${mc.id}')" title="${escapeHtml(mc.name||"")} (${fechaEs_(mc.startDate)} → ${fechaEs_(mc.endDate)})"></div>`;
+      }).join("")}</div>
+    </div>`;
+  });
+  html += `</div>`;
+  wrap.innerHTML = html;
+}
+document.getElementById("btnNewMesociclo").onclick = () => openMesocicloForm_(null);
+window.openMesocicloForm_ = (id) => {
+  if(!selectedTeamId) return;
+  editingMesocicloId = id || null;
+  const m = id ? mesociclos.find(x=>x.id===id) : null;
+  document.getElementById("mesocicloFormTitle").textContent = m ? "Editar mesociclo" : "Nuevo mesociclo";
+  document.getElementById("mesoName").value = m ? (m.name||"") : "";
+  document.getElementById("mesoColor").value = m ? (m.color||"#c0392b") : "#c0392b";
+  document.getElementById("mesoStart").value = m ? (m.startDate||"") : "";
+  document.getElementById("mesoEnd").value = m ? (m.endDate||"") : "";
+  document.getElementById("mesoObjetivos").value = m ? (m.objetivos||"") : "";
+  document.getElementById("mesoMarcadores").value = m ? (m.marcadoresExito||"") : "";
+  document.getElementById("mesoEvaluacion").value = m ? (m.evaluacion||"") : "";
+  document.getElementById("mesocicloFormMsg").textContent = "";
+  document.getElementById("btnDeleteMesociclo").classList.toggle("hidden", !m);
+  document.getElementById("mesocicloFormModal").classList.remove("hidden");
+};
+document.getElementById("btnCloseMesocicloForm").onclick = () => document.getElementById("mesocicloFormModal").classList.add("hidden");
+document.getElementById("btnSaveMesociclo").onclick = async () => {
+  const msg = document.getElementById("mesocicloFormMsg");
+  const name = document.getElementById("mesoName").value.trim();
+  const color = document.getElementById("mesoColor").value || "#c0392b";
+  const startDate = document.getElementById("mesoStart").value;
+  const endDate = document.getElementById("mesoEnd").value;
+  const objetivos = document.getElementById("mesoObjetivos").value.trim();
+  const marcadoresExito = document.getElementById("mesoMarcadores").value.trim();
+  const evaluacion = document.getElementById("mesoEvaluacion").value.trim();
+  if(!name){ msg.textContent = "⚠️ Ponle un nombre."; return; }
+  if(!startDate || !endDate){ msg.textContent = "⚠️ Falta fecha de inicio o de fin."; return; }
+  if(endDate < startDate){ msg.textContent = "⚠️ La fecha de fin no puede ser anterior a la de inicio."; return; }
+  const payload = { teamId: selectedTeamId, name, color, startDate, endDate, objetivos, marcadoresExito, evaluacion };
+  try{
+    if(editingMesocicloId){
+      await db.collection("mesociclos").doc(editingMesocicloId).update(payload);
+    } else {
+      payload.createdBy = currentUser.uid;
+      payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection("mesociclos").add(payload);
+    }
+    document.getElementById("mesocicloFormModal").classList.add("hidden");
+  } catch(err){ msg.textContent = "❌ " + (err.message||err); }
+};
+document.getElementById("btnDeleteMesociclo").onclick = async () => {
+  if(!editingMesocicloId) return;
+  if(!confirm("¿Borrar este mesociclo? También se borrarán sus microciclos.")) return;
+  try{
+    const micros = microciclosDeMesociclo_(editingMesocicloId);
+    await Promise.all(micros.map(mc=>db.collection("microciclos").doc(mc.id).delete()));
+    await db.collection("mesociclos").doc(editingMesocicloId).delete();
+    document.getElementById("mesocicloFormModal").classList.add("hidden");
+  } catch(err){ alert("❌ " + (err.message||err)); }
+};
+
+window.openMicrocicloForm_ = (mesocicloId, id) => {
+  const meso = mesociclos.find(x=>x.id===mesocicloId);
+  if(!meso) return;
+  microcicloParentMesocicloId = mesocicloId;
+  editingMicrocicloId = id || null;
+  const mc = id ? microciclos.find(x=>x.id===id) : null;
+  document.getElementById("microcicloFormTitle").textContent = mc ? "Editar microciclo" : "Nuevo microciclo";
+  document.getElementById("microcicloFormRangeHint").textContent = `Dentro de "${meso.name||""}": ${fechaEs_(meso.startDate)} → ${fechaEs_(meso.endDate)}`;
+  document.getElementById("microName").value = mc ? (mc.name||"") : "";
+  document.getElementById("microColor").value = mc ? (mc.color||"#2980b9") : "#2980b9";
+  document.getElementById("microStart").value = mc ? (mc.startDate||"") : (meso.startDate||"");
+  document.getElementById("microEnd").value = mc ? (mc.endDate||"") : "";
+  document.getElementById("microObjetivos").value = mc ? (mc.objetivos||"") : "";
+  document.getElementById("microMarcadores").value = mc ? (mc.marcadoresExito||"") : "";
+  document.getElementById("microEvaluacion").value = mc ? (mc.evaluacion||"") : "";
+  document.getElementById("microcicloFormMsg").textContent = "";
+  document.getElementById("btnDeleteMicrociclo").classList.toggle("hidden", !mc);
+  document.getElementById("microcicloFormModal").classList.remove("hidden");
+};
+document.getElementById("btnCloseMicrocicloForm").onclick = () => document.getElementById("microcicloFormModal").classList.add("hidden");
+document.getElementById("btnSaveMicrociclo").onclick = async () => {
+  const msg = document.getElementById("microcicloFormMsg");
+  const meso = mesociclos.find(x=>x.id===microcicloParentMesocicloId);
+  if(!meso){ msg.textContent = "❌ No se encuentra el mesociclo."; return; }
+  const name = document.getElementById("microName").value.trim();
+  const color = document.getElementById("microColor").value || "#2980b9";
+  const startDate = document.getElementById("microStart").value;
+  const endDate = document.getElementById("microEnd").value;
+  const objetivos = document.getElementById("microObjetivos").value.trim();
+  const marcadoresExito = document.getElementById("microMarcadores").value.trim();
+  const evaluacion = document.getElementById("microEvaluacion").value.trim();
+  if(!name){ msg.textContent = "⚠️ Ponle un nombre."; return; }
+  if(!startDate || !endDate){ msg.textContent = "⚠️ Falta fecha de inicio o de fin."; return; }
+  if(endDate < startDate){ msg.textContent = "⚠️ La fecha de fin no puede ser anterior a la de inicio."; return; }
+  if(startDate < meso.startDate || endDate > meso.endDate){
+    msg.textContent = `⚠️ Tiene que quedar dentro del mesociclo (${fechaEs_(meso.startDate)} → ${fechaEs_(meso.endDate)}).`;
+    return;
+  }
+  const payload = { teamId: meso.teamId, mesocicloId: meso.id, name, color, startDate, endDate, objetivos, marcadoresExito, evaluacion };
+  try{
+    if(editingMicrocicloId){
+      await db.collection("microciclos").doc(editingMicrocicloId).update(payload);
+    } else {
+      payload.createdBy = currentUser.uid;
+      payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection("microciclos").add(payload);
+    }
+    document.getElementById("microcicloFormModal").classList.add("hidden");
+  } catch(err){ msg.textContent = "❌ " + (err.message||err); }
+};
+document.getElementById("btnDeleteMicrociclo").onclick = async () => {
+  if(!editingMicrocicloId) return;
+  if(!confirm("¿Borrar este microciclo?")) return;
+  try{
+    await db.collection("microciclos").doc(editingMicrocicloId).delete();
+    document.getElementById("microcicloFormModal").classList.add("hidden");
+  } catch(err){ alert("❌ " + (err.message||err)); }
 };
 
 /* ---------- MI EQUIPO · ABP / Tareas: carpetas PROPIAS de cada entrenador, por equipo -----
@@ -9644,6 +9995,16 @@ service cloud.firestore {
       allow update, delete: if isActive() && (isGestor() || (myCoach().data.teamIds is list && resource.data.teamId in myCoach().data.teamIds));
     }
     match /matchdays/{matchdayId} {
+      allow read: if isActive();
+      allow write: if isActive();
+    }
+    // Mesociclos/microciclos de "Mi equipo" → Mesociclos: mismo criterio de acceso que
+    // matchdays (sin papelera, sin restricción por dueño), teamId lo filtra el cliente.
+    match /mesociclos/{id} {
+      allow read: if isActive();
+      allow write: if isActive();
+    }
+    match /microciclos/{id} {
       allow read: if isActive();
       allow write: if isActive();
     }
