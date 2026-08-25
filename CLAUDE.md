@@ -58,8 +58,10 @@ Defined ~line 1544 area (search `ROLE_GESTOR`): `ROLE_GESTOR` ("gestor"), `ROLE_
 Collections: `coaches`, `categories` (task folders), `tasks`, `sessions`, `abpCategories` (ABP
 folders), `plays` (ABP set-piece plays), `playSessions` (ABP sessions, can be public via a
 `#public=<id>` link), `playSessionFolders`, `gameModelFiles` (external doc links), `teams`,
-`players`, `matchdays` (jornadas + per-match stats), `mesociclos`/`microciclos` (periodización:
-fases de temporada y sus semanas, ver "Mi equipo" más abajo).
+`players`, `matchdays` (jornadas + per-match stats — includes an embedded `rivalReport` field:
+opponent scouting notes filled before the match, see "Jornadas" accordions below),
+`mesociclos`/`microciclos` (periodización: fases de temporada y sus semanas, ver "Mi equipo"
+más abajo).
 
 Most collections use **soft delete** (`deleted:true`, `deletedAt`, `deletedBy`) instead of a
 real delete. The gestor-only **Papelera** tab (~line 7891) restores or purges them.
