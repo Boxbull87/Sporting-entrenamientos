@@ -6416,14 +6416,21 @@ async function renderMatchdayScouting_(){
   if(!wrap) return;
   const m = matchdays.find(x=>x.id===statsMatchdayId);
   if(!m){ wrap.innerHTML = ""; return; }
+  // Si ya había un acordeón renderizado PARA ESTA MISMA jornada (p.ej. se repinta al pulsar
+  // "Actualizar") se respeta si estaba abierto o cerrado; al entrar en una jornada nueva
+  // siempre empieza plegado, como el resto de secciones.
+  const anterior = document.getElementById("accMatchdayScouting");
+  const yaAbierto = (anterior && anterior.dataset.matchdayId === m.id) ? anterior.open : false;
   wrap.innerHTML = `
-    <div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;">
-      <div class="row" style="align-items:center;justify-content:space-between;margin-bottom:8px;">
-        <h4 style="margin:0;font-size:.85rem;">🎥 Scouting FS</h4>
-        <button type="button" class="btn ghost small" id="btnRefreshScouting">🔄 Actualizar</button>
+    <details class="acc" id="accMatchdayScouting" data-matchday-id="${m.id}"${yaAbierto ? " open" : ""}>
+      <summary>🎥 Scouting FS</summary>
+      <div class="acc-body">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+          <button type="button" class="btn ghost small" id="btnRefreshScouting">🔄 Actualizar</button>
+        </div>
+        <div id="matchdayScoutingInner">${scoutingCargandoHtml_()}</div>
       </div>
-      <div id="matchdayScoutingInner">${scoutingCargandoHtml_()}</div>
-    </div>`;
+    </details>`;
   document.getElementById("btnRefreshScouting").onclick = renderMatchdayScouting_;
   renderScoutingEnContenedor_("matchdayScoutingInner", () => cargarScoutingDeJornada_(m.id));
 }
