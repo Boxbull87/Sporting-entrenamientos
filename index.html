@@ -6398,23 +6398,39 @@ function scoutingSinDatosHtml_(){
 }
 
 // Trae partidos_scouting + eventos_scouting de UNA jornada suelta.
+// Da forma de "proyecto" (un partido de Scouting FS con todo lo suyo: eventos, plantilla,
+// quinteto, pausas, saques/finales de parte) a partir del doc de partidos_scouting + sus
+// eventos ya leídos. Es la unidad que consumen scoutTiempoJugadoPorJugador_/
+// scoutCrudoPorProyecto_: cada partido tiene su propia línea de tiempo de vídeo, así que los
+// minutos/goles-por-quinteto de UN partido nunca se calculan mezclando datos de otro.
+function scoutProyectoDesdeDoc_(scout, eventos){
+  return {
+    eventos,
+    categorias: Array.isArray(scout.categorias) ? scout.categorias : [],
+    plantillaPropia: Array.isArray(scout.plantillaPropia) ? scout.plantillaPropia : [],
+    cambiosQuinteto: Array.isArray(scout.cambiosQuinteto) ? scout.cambiosQuinteto : [],
+    pausas: Array.isArray(scout.pausas) ? scout.pausas : [],
+    t0: scout.t0 || {1:null,2:null}, tFin: scout.tFin || {1:null,2:null},
+    fecha: scout.fecha || null, equipoRival: scout.equipoRival || null
+  };
+}
 async function cargarScoutingDeJornada_(matchdayId){
   const snap = await db.collection("partidos_scouting").where("partidoSportingId","==",matchdayId).limit(1).get();
   if(snap.empty) return null;
   const doc = snap.docs[0];
   const scout = doc.data();
   const evSnap = await db.collection("eventos_scouting").where("partidoId","==",doc.id).get();
+  const proyecto = scoutProyectoDesdeDoc_(scout, evSnap.docs.map(d=>d.data()));
   return {
-    eventos: evSnap.docs.map(d=>d.data()),
-    categorias: Array.isArray(scout.categorias) ? scout.categorias : [],
+    eventos: proyecto.eventos, categorias: proyecto.categorias,
     equipoPropio: scout.equipoPropio, equipoRival: scout.equipoRival,
-    // Solo disponibles para una jornada suelta (no se agregan entre varios partidos: cada uno
-    // tiene su propia línea de tiempo de vídeo, sumar cambiosQuinteto de varios sin más no tendría
-    // sentido) — con esto "Por quinteto" y "Rendimiento individual" solo aparecen aquí.
-    plantillaPropia: Array.isArray(scout.plantillaPropia) ? scout.plantillaPropia : [],
-    cambiosQuinteto: Array.isArray(scout.cambiosQuinteto) ? scout.cambiosQuinteto : [],
-    pausas: Array.isArray(scout.pausas) ? scout.pausas : [],
-    t0: scout.t0 || {1:null,2:null}, tFin: scout.tFin || {1:null,2:null}
+    // Solo disponible para una jornada suelta (agregar cambiosQuinteto de varios partidos sin
+    // más no tendría sentido): con esto "Por quinteto" solo aparece aquí, no en Temporada.
+    cambiosQuinteto: proyecto.cambiosQuinteto,
+    // proyectos: SIEMPRE una lista (aquí de un solo elemento) — es lo que consume tanto
+    // "Rendimiento individual" como el dashboard, para poder usar el mismo código tanto para
+    // un partido suelto como para agregados de varios (ver cargarScoutingDeEquipo_ más abajo).
+    proyectos: [proyecto]
   };
 }
 // Trae y agrega los partidos_scouting de un EQUIPO cuya jornada vinculada esté entre
@@ -6424,16 +6440,18 @@ async function cargarScoutingDeJornada_(matchdayId){
 async function cargarScoutingDeEquipo_(teamId, matchdayIds){
   const idsValidos = new Set(matchdayIds);
   const snap = await db.collection("partidos_scouting").where("teamIdSporting","==",teamId).get();
-  const proyectos = snap.docs.map(d=>({id:d.id, ...d.data()})).filter(p=>p.partidoSportingId && idsValidos.has(p.partidoSportingId));
-  if(!proyectos.length) return null;
-  const listas = await Promise.all(proyectos.map(p=>
+  const docs = snap.docs.map(d=>({id:d.id, ...d.data()})).filter(p=>p.partidoSportingId && idsValidos.has(p.partidoSportingId));
+  if(!docs.length) return null;
+  const listas = await Promise.all(docs.map(p=>
     db.collection("eventos_scouting").where("partidoId","==",p.id).get().then(s=>s.docs.map(d=>d.data()))
   ));
+  const proyectos = docs.map((p,i)=>scoutProyectoDesdeDoc_(p, listas[i]))
+    .sort((a,b)=> (a.fecha||"").localeCompare(b.fecha||""));
   const categorias=[], vistos=new Set();
-  proyectos.forEach(p=>(Array.isArray(p.categorias)?p.categorias:[]).forEach(c=>{
+  docs.forEach(p=>(Array.isArray(p.categorias)?p.categorias:[]).forEach(c=>{
     if(!vistos.has(c.id)){ vistos.add(c.id); categorias.push(c); }
   }));
-  return {eventos: listas.flat(), categorias, numJornadas: proyectos.length};
+  return {eventos: listas.flat(), categorias, numJornadas: docs.length, proyectos};
 }
 
 /* ---------- Por quinteto / Rendimiento individual ----------
@@ -6546,32 +6564,57 @@ function scoutColumnasQuinteto_(catsCruza){
 function scoutEtiquetaJugador_(j){
   return '#'+escapeHtml(String(j.dorsal))+(j.nombre? ' '+escapeHtml(j.nombre) : '');
 }
-function scoutStatsIndividualPorJugador_(datos){
-  const idsGol = new Set(datos.categorias.filter(c=>c.indGol).map(c=>c.id));
-  const idsOcasion = new Set(datos.categorias.filter(c=>c.indOcasion).map(c=>c.id));
-  if(!idsGol.size && !idsOcasion.size) return {filas:[], sinCategorias:true};
-  const intervalos = scoutIntervalosQuinteto_(datos.cambiosQuinteto||[]);
+// Minutos + goles/ocasiones a favor/en contra de UN partido (proyecto), sin normalizar
+// todavía por 10 min — eso se hace en scoutRendimientoMultiPartido_ después de sumar entre
+// partidos, nunca antes (promediar tasas ya calculadas pesaría igual un partido de 5 minutos
+// que uno de 40).
+function scoutCrudoPorProyecto_(proyecto){
+  const idsGol = new Set((proyecto.categorias||[]).filter(c=>c.indGol).map(c=>c.id));
+  const idsOcasion = new Set((proyecto.categorias||[]).filter(c=>c.indOcasion).map(c=>c.id));
   const acumulado = new Map();
-  datos.eventos.forEach(ev=>{
-    const esGol = idsGol.has(ev.tipo), esOcasion = idsOcasion.has(ev.tipo);
-    if(!esGol && !esOcasion) return;
-    if(ev.equipo!=='propio' && ev.equipo!=='rival') return;
-    const iv = intervalos.find(x=>ev.t_mark>=x.tIni && ev.t_mark<x.tFin);
-    if(!iv || !iv.jugadores.length) return;
-    const aFavor = ev.equipo==='propio';
-    iv.jugadores.forEach(id=>{
-      if(!acumulado.has(id)) acumulado.set(id,{golF:0,golC:0,ocF:0,ocC:0});
-      const o=acumulado.get(id);
-      if(esGol){ if(aFavor) o.golF++; else o.golC++; }
-      if(esOcasion){ if(aFavor) o.ocF++; else o.ocC++; }
+  scoutTiempoJugadoPorJugador_(proyecto).forEach(m=>{
+    acumulado.set(m.jugador.id, {jugador:m.jugador, total:m.total, golF:0, golC:0, ocF:0, ocC:0});
+  });
+  if(idsGol.size || idsOcasion.size){
+    const intervalos = scoutIntervalosQuinteto_(proyecto.cambiosQuinteto||[]);
+    (proyecto.eventos||[]).forEach(ev=>{
+      const esGol = idsGol.has(ev.tipo), esOcasion = idsOcasion.has(ev.tipo);
+      if(!esGol && !esOcasion) return;
+      if(ev.equipo!=='propio' && ev.equipo!=='rival') return;
+      const iv = intervalos.find(x=>ev.t_mark>=x.tIni && ev.t_mark<x.tFin);
+      if(!iv || !iv.jugadores.length) return;
+      const aFavor = ev.equipo==='propio';
+      iv.jugadores.forEach(id=>{
+        if(!acumulado.has(id)) return; // sin minutos calculados no debería pasar, por si acaso
+        const o=acumulado.get(id);
+        if(esGol){ if(aFavor) o.golF++; else o.golC++; }
+        if(esOcasion){ if(aFavor) o.ocF++; else o.ocC++; }
+      });
+    });
+  }
+  return Array.from(acumulado.values());
+}
+// Rendimiento individual sobre UNA LISTA de partidos (uno para una jornada suelta, varios para
+// un equipo/temporada): suma minutos y recuentos crudos partido a partido y solo al final
+// recalcula las 4 tasas por 10 min sobre el total sumado. El emparejamiento entre partidos es
+// por id de jugador — solo funciona bien si la plantilla se cargó del roster real de Sporting
+// en todos ellos; un partido con jugadores sueltos escritos a mano no se sumará con los demás
+// para ese jugador (no hay forma de saber que es la misma persona).
+function scoutRendimientoMultiPartido_(proyectos){
+  const hayCategorias = proyectos.some(p=>(p.categorias||[]).some(c=>c.indGol||c.indOcasion));
+  if(!hayCategorias) return {filas:[], sinCategorias:true};
+  const acumulado = new Map();
+  proyectos.forEach(p=>{
+    scoutCrudoPorProyecto_(p).forEach(fila=>{
+      if(!acumulado.has(fila.jugador.id)) acumulado.set(fila.jugador.id, {jugador:fila.jugador, total:0, golF:0,golC:0,ocF:0,ocC:0});
+      const o=acumulado.get(fila.jugador.id);
+      o.total+=fila.total; o.golF+=fila.golF; o.golC+=fila.golC; o.ocF+=fila.ocF; o.ocC+=fila.ocC;
     });
   });
-  const filas = scoutTiempoJugadoPorJugador_(datos).map(m=>{
-    const minJugados=m.total;
-    const o=acumulado.get(m.jugador.id)||{golF:0,golC:0,ocF:0,ocC:0};
-    const bloques10=minJugados/600;
-    const norm=v=> bloques10>0? v/bloques10 : null;
-    return {jugador:m.jugador, minJugados, golF:o.golF, golC:o.golC, ocF:o.ocF, ocC:o.ocC,
+  const filas = Array.from(acumulado.values()).map(o=>{
+    const bloques10 = o.total/600;
+    const norm = v=> bloques10>0? v/bloques10 : null;
+    return {jugador:o.jugador, minJugados:o.total, golF:o.golF, golC:o.golC, ocF:o.ocF, ocC:o.ocC,
       golF10:norm(o.golF), golC10:norm(o.golC), ocF10:norm(o.ocF), ocC10:norm(o.ocC)};
   }).sort((a,b)=>b.minJugados-a.minJugados);
   return {filas, sinCategorias:false};
@@ -6614,8 +6657,10 @@ function scoutPorQuintetoHtml_(datos){
       <tbody>${filasHtml}</tbody></table></div>
     <p class="muted" style="font-size:.72rem;margin-top:4px;">Quinteto propio en pista cuando ocurrió cada estadística (propia o rival), según los cambios marcados en Scouting FS.</p>`;
 }
+// datos.proyectos siempre viene informado (un solo elemento para una jornada suelta, varios
+// para un equipo/temporada) — así este mismo bloque sirve para los dos niveles.
 function scoutRendimientoIndividualHtml_(datos){
-  const {filas, sinCategorias} = scoutStatsIndividualPorJugador_(datos);
+  const {filas, sinCategorias} = scoutRendimientoMultiPartido_(datos.proyectos||[]);
   if(sinCategorias || !filas.length) return '';
   const clasif = scoutClasificacion_(filas);
   return `<h3 style="font-size:.9rem;margin-top:14px;">Rendimiento individual (por 10 min jugados)</h3>
@@ -6703,6 +6748,163 @@ function scoutPintarCamposUbicacion_(eventos, catsUbic){
   if(COURT_IMG.complete && COURT_IMG.naturalWidth>0) dibujar(); else COURT_IMG.addEventListener('load', dibujar, {once:true});
 }
 
+/* ============================================================
+   DASHBOARD VISUAL (alternativa a las tablas de texto de arriba)
+   Reutiliza Chart.js, que esta app ya carga para el donut de goles (ver
+   renderGoalDonutChart_). Vive detrás del mismo toggle "📄 Texto / 📊
+   Dashboard" tanto en la ficha de una jornada suelta como en el resumen de
+   temporada — mismo componente para los dos, la única diferencia es cuántos
+   proyectos trae `datos.proyectos` (uno o varios).
+============================================================= */
+const scoutChartInstances_ = {};
+function scoutDestruirGrafico_(id){
+  if(scoutChartInstances_[id]){ scoutChartInstances_[id].destroy(); delete scoutChartInstances_[id]; }
+}
+// Puntos con opacidad baja acumulándose: donde caen varios encima, se ve más "caliente" que
+// donde cae uno solo — a diferencia de dibujarPuntosEn_ (un punto claramente marcado cada vez),
+// aquí lo que importa es la densidad cuando hay muchos eventos y puntos sueltos ya no se leen.
+function scoutDibujarDensidadEn_(ctx, canvasEl, puntos, color){
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  puntos.forEach(p=>{
+    const x=p.x*canvasEl.width, y=p.y*canvasEl.height;
+    const grad = ctx.createRadialGradient(x,y,0,x,y,14);
+    grad.addColorStop(0, (color||'#D8232A')+'55');
+    grad.addColorStop(1, (color||'#D8232A')+'00');
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(x,y,14,0,Math.PI*2); ctx.fill();
+  });
+  ctx.restore();
+}
+function scoutKpiCardHtml_(valor, etiqueta){
+  return `<div style="background:var(--card-bg,rgba(127,127,127,.08));border:1px solid var(--border);border-radius:8px;padding:10px 12px;text-align:center;min-width:90px;">
+    <div style="font-size:1.4rem;font-weight:700;">${valor}</div>
+    <div class="muted" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;">${escapeHtml(etiqueta)}</div>
+  </div>`;
+}
+function scoutDashboardHtml_(prefijo, datos){
+  const eventos = datos.eventos;
+  const catsStats = datos.categorias.filter(c=>c.stats!==false);
+  const proyectos = datos.proyectos||[];
+  const catGolIds = new Set(datos.categorias.filter(c=>c.indGol).map(c=>c.id));
+  const catOcasionIds = new Set(datos.categorias.filter(c=>c.indOcasion).map(c=>c.id));
+  const contarFlag = (ids, equipo) => eventos.filter(e=>ids.has(e.tipo) && e.equipo===equipo).length;
+
+  const kpis = [scoutKpiCardHtml_(eventos.length, 'Eventos')];
+  if(catGolIds.size){
+    kpis.push(scoutKpiCardHtml_(contarFlag(catGolIds,'propio'), 'Goles a favor'));
+    kpis.push(scoutKpiCardHtml_(contarFlag(catGolIds,'rival'), 'Goles en contra'));
+  }
+  if(catOcasionIds.size){
+    kpis.push(scoutKpiCardHtml_(contarFlag(catOcasionIds,'propio'), 'Ocasiones a favor'));
+    kpis.push(scoutKpiCardHtml_(contarFlag(catOcasionIds,'rival'), 'Ocasiones en contra'));
+  }
+
+  const catsUbic = datos.categorias.filter(c=>c.ubicacion);
+  const {filas: filasRanking, sinCategorias} = scoutRendimientoMultiPartido_(proyectos);
+  const clasif = !sinCategorias && filasRanking.length ? scoutClasificacion_(filasRanking) : null;
+
+  return `
+    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;">${kpis.join('')}</div>
+    ${catsStats.length ? `<canvas id="${prefijo}_barChart" height="90"></canvas>` : ''}
+    ${proyectos.length>1 ? `<h4 style="font-size:.82rem;margin:14px 0 4px;">Evolución por jornada</h4><canvas id="${prefijo}_lineChart" height="90"></canvas>` : ''}
+    ${catsUbic.length ? `<h4 style="font-size:.82rem;margin:14px 0 6px;">Densidad de ubicaciones</h4>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;">
+        ${catsUbic.map(c=>{
+          const tam = SCOUT_COURT_CANVAS[c.ubicacion] || SCOUT_COURT_CANVAS.entero;
+          return `<div><canvas id="${prefijo}_heat_${escapeHtml(c.id)}" width="${tam.w}" height="${tam.h}" style="border-radius:4px;max-width:100%;"></canvas>
+            <p class="muted" style="font-size:.7rem;text-align:center;">${escapeHtml(c.nom)}</p></div>`;
+        }).join('')}
+      </div>` : ''}
+    ${clasif ? `<h4 style="font-size:.82rem;margin:14px 0 6px;">Top 5 · rendimiento individual (por 10 min)</h4>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;">
+        <div><p class="muted" style="font-size:.72rem;margin-bottom:2px;">Goles a favor</p><canvas id="${prefijo}_rank_golF" height="120"></canvas></div>
+        <div><p class="muted" style="font-size:.72rem;margin-bottom:2px;">Goles en contra</p><canvas id="${prefijo}_rank_golC" height="120"></canvas></div>
+        <div><p class="muted" style="font-size:.72rem;margin-bottom:2px;">Ocasiones a favor</p><canvas id="${prefijo}_rank_ocF" height="120"></canvas></div>
+        <div><p class="muted" style="font-size:.72rem;margin-bottom:2px;">Ocasiones en contra</p><canvas id="${prefijo}_rank_ocC" height="120"></canvas></div>
+      </div>` : ''}`;
+}
+// Los <canvas> del dashboard no dibujan solos al insertarlos por innerHTML (ni Chart.js ni el
+// mapa de densidad) — esto se llama aparte, y solo cuando el dashboard está realmente visible
+// (si el contenedor está en display:none al crear un Chart, se queda con tamaño 0).
+// prefijo: identifica de qué contenedor son estos canvas (jornada suelta / temporada de
+// equipo...), para no chocar los ids si hay más de uno en la página a la vez.
+function scoutPintarDashboardCharts_(prefijo, datos){
+  const eventos = datos.eventos;
+  const catsStats = datos.categorias.filter(c=>c.stats!==false);
+  const proyectos = datos.proyectos||[];
+  const nomPropio = datos.equipoPropio || "Propio", nomRival = datos.equipoRival || "Rival";
+
+  const barId = prefijo+'_bar';
+  const barCanvas = document.getElementById(prefijo+'_barChart');
+  if(barCanvas && typeof Chart!=='undefined'){
+    scoutDestruirGrafico_(barId);
+    scoutChartInstances_[barId] = new Chart(barCanvas.getContext('2d'), {
+      type:'bar',
+      data:{
+        labels: catsStats.map(c=>c.nom),
+        datasets:[
+          {label:nomPropio, backgroundColor:'#D8232A', data:catsStats.map(c=>eventos.filter(e=>e.tipo===c.id&&e.equipo==='propio').length)},
+          {label:nomRival, backgroundColor:'#2E6FB7', data:catsStats.map(c=>eventos.filter(e=>e.tipo===c.id&&e.equipo==='rival').length)}
+        ]
+      },
+      options:{responsive:true, plugins:{datalabels:{display:false}}, scales:{y:{beginAtZero:true, ticks:{precision:0}}}}
+    });
+  }
+
+  const lineId = prefijo+'_line';
+  const lineCanvas = document.getElementById(prefijo+'_lineChart');
+  if(lineCanvas && typeof Chart!=='undefined' && proyectos.length>1){
+    scoutDestruirGrafico_(lineId);
+    const catGolIds = new Set(datos.categorias.filter(c=>c.indGol).map(c=>c.id));
+    const etiquetas = proyectos.map(p=>(p.fecha||'?')+(p.equipoRival?' · '+p.equipoRival:''));
+    const golesFavor = proyectos.map(p=>p.eventos.filter(e=>catGolIds.has(e.tipo)&&e.equipo==='propio').length);
+    const golesContra = proyectos.map(p=>p.eventos.filter(e=>catGolIds.has(e.tipo)&&e.equipo==='rival').length);
+    scoutChartInstances_[lineId] = new Chart(lineCanvas.getContext('2d'), {
+      type:'line',
+      data:{labels:etiquetas, datasets:[
+        {label:'Goles a favor', data:golesFavor, borderColor:'#D8232A', backgroundColor:'#D8232A', tension:.25},
+        {label:'Goles en contra', data:golesContra, borderColor:'#2E6FB7', backgroundColor:'#2E6FB7', tension:.25}
+      ]},
+      options:{responsive:true, plugins:{datalabels:{display:false}}, scales:{y:{beginAtZero:true, ticks:{precision:0}}}}
+    });
+  }
+
+  datos.categorias.filter(c=>c.ubicacion).forEach(c=>{
+    const cv = document.getElementById(prefijo+'_heat_'+c.id);
+    if(!cv) return;
+    const ctx = cv.getContext('2d');
+    const dibujar = () => {
+      scoutDibujarCampoEn_(ctx, cv, c.ubicacion);
+      const propios = eventos.filter(e=>e.tipo===c.id && e.equipo==='propio' && e.punto).map(e=>e.punto);
+      const rivales = eventos.filter(e=>e.tipo===c.id && e.equipo==='rival' && e.punto).map(e=>e.punto);
+      scoutDibujarDensidadEn_(ctx, cv, propios, c.color||'#D8232A');
+      scoutDibujarDensidadEn_(ctx, cv, rivales, '#2E6FB7');
+    };
+    if(COURT_IMG.complete && COURT_IMG.naturalWidth>0) dibujar(); else COURT_IMG.addEventListener('load', dibujar, {once:true});
+  });
+
+  const {filas, sinCategorias} = scoutRendimientoMultiPartido_(proyectos);
+  if(!sinCategorias && filas.length && typeof Chart!=='undefined'){
+    const clasif = scoutClasificacion_(filas);
+    [['golF','#D8232A'],['golC','#2E6FB7'],['ocF','#D8232A'],['ocC','#2E6FB7']].forEach(([campo,color])=>{
+      const cv = document.getElementById(prefijo+'_rank_'+campo);
+      if(!cv) return;
+      const top5 = clasif[campo].slice(0,5);
+      const id = prefijo+'_rank_'+campo;
+      scoutDestruirGrafico_(id);
+      scoutChartInstances_[id] = new Chart(cv.getContext('2d'), {
+        type:'bar',
+        data:{labels: top5.map(f=>scoutEtiquetaJugador_(f.jugador).replace(/<[^>]+>/g,'')),
+          datasets:[{data: top5.map(f=>f[campo+'10']), backgroundColor:color}]},
+        options:{indexAxis:'y', responsive:true,
+          plugins:{legend:{display:false}, datalabels:{anchor:'end', align:'end', formatter:v=>v.toFixed(2)}},
+          scales:{x:{beginAtZero:true}}}
+      });
+    });
+  }
+}
+
 // Tabla de equipo (propio/rival por categoría) + tabla individual (jugador por categoría,
 // solo eventos "propio" con jugadorRef resuelto contra la plantilla real de Sporting).
 function scoutingStatsHtml_(datos){
@@ -6771,29 +6973,62 @@ function scoutingStatsHtml_(datos){
     : '<p class="muted">No hay categorías marcadas para aparecer en estadísticas.</p>'}
     ${scoutUbicacionHtml_(eventos, datos.categorias.filter(c=>c.ubicacion))}
     ${datos.cambiosQuinteto ? scoutPorQuintetoHtml_(datos) : ''}
-    ${datos.cambiosQuinteto ? scoutRendimientoIndividualHtml_(datos) : ''}
+    ${(datos.proyectos && datos.proyectos.length) ? scoutRendimientoIndividualHtml_(datos) : ''}
     <p class="muted" style="margin:8px 0 0;font-size:.72rem;">${eventos.length} evento${eventos.length===1?"":"s"} de Scouting FS${datos.numJornadas?" · "+datos.numJornadas+" jornada"+(datos.numJornadas===1?"":"s"):""} · solo lectura, edítalos en Scouting FS.</p>`;
 }
-// Rellena un contenedor con lo que devuelva fetcher(), con estado de carga/error. Se usa en
-// las tres vistas para no repetir el try/catch en cada una.
+// Qué vista (texto/dashboard) tenía elegida cada contenedor — para que "Actualizar" o volver
+// a entrar en la misma jornada no te devuelva siempre a la vista por defecto.
+const scoutVistaActual_ = {};
+// Rellena un contenedor con lo que devuelva fetcher(), con estado de carga/error, y con un
+// toggle "📄 Texto / 📊 Dashboard" para alternar entre las tablas de siempre y la versión
+// visual (mismo componente en los tres sitios donde aparece Scouting FS: jornada suelta en
+// la pestaña Jornadas, jornada suelta en Estadísticas, y temporada de un equipo).
 async function renderScoutingEnContenedor_(contenedorId, fetcher){
   const el = document.getElementById(contenedorId);
   if(!el) return;
   el.innerHTML = scoutingCargandoHtml_();
+  let datos;
   try{
-    const datos = await fetcher();
-    const elAhora = document.getElementById(contenedorId); // por si se repintó la vista mientras cargaba
-    if(elAhora){
-      elAhora.innerHTML = scoutingStatsHtml_(datos);
-      // Los canvas de "Ubicación en el campo" no se pintan solos al meterlos por innerHTML.
-      if(datos && datos.eventos.length){
-        scoutPintarCamposUbicacion_(datos.eventos, datos.categorias.filter(c=>c.ubicacion));
-      }
-    }
+    datos = await fetcher();
   }catch(err){
     const elAhora = document.getElementById(contenedorId);
     if(elAhora) elAhora.innerHTML = '<p class="error-msg">No se pudieron cargar los datos de Scouting FS: '+escapeHtml(err.message)+'</p>';
+    return;
   }
+  const elAhora = document.getElementById(contenedorId); // por si se repintó la vista mientras cargaba
+  if(!elAhora) return;
+  if(!datos || !datos.eventos.length){ elAhora.innerHTML = scoutingSinDatosHtml_(); return; }
+
+  const vista = scoutVistaActual_[contenedorId] || 'texto';
+  const btnEstilo = activa => activa
+    ? 'font-weight:700;border-color:var(--accent,#888);'
+    : 'font-weight:400;';
+  elAhora.innerHTML = `
+    <div style="display:flex;justify-content:flex-end;gap:6px;margin-bottom:8px;">
+      <button type="button" class="btn ghost small" data-vista="texto" style="${btnEstilo(vista==='texto')}">📄 Texto</button>
+      <button type="button" class="btn ghost small" data-vista="dashboard" style="${btnEstilo(vista==='dashboard')}">📊 Dashboard</button>
+    </div>
+    <div id="${contenedorId}_texto" class="${vista==='texto'?'':'hidden'}">${scoutingStatsHtml_(datos)}</div>
+    <div id="${contenedorId}_dashboard" class="${vista==='dashboard'?'':'hidden'}">${scoutDashboardHtml_(contenedorId, datos)}</div>`;
+
+  // Los canvas de "Ubicación en el campo" (vista texto) no se pintan solos al meterlos por
+  // innerHTML — a diferencia de esos, la vista dashboard se pinta bajo demanda más abajo (si
+  // se crea un Chart con su canvas en display:none, se queda con tamaño 0).
+  scoutPintarCamposUbicacion_(datos.eventos, datos.categorias.filter(c=>c.ubicacion));
+  if(vista==='dashboard') scoutPintarDashboardCharts_(contenedorId, datos);
+
+  elAhora.querySelectorAll('[data-vista]').forEach(btn=>{
+    btn.onclick = () => {
+      const elegida = btn.dataset.vista;
+      scoutVistaActual_[contenedorId] = elegida;
+      elAhora.querySelector('#'+contenedorId+'_texto').classList.toggle('hidden', elegida!=='texto');
+      elAhora.querySelector('#'+contenedorId+'_dashboard').classList.toggle('hidden', elegida!=='dashboard');
+      elAhora.querySelectorAll('[data-vista]').forEach(b=>{
+        b.setAttribute('style', btnEstilo(b.dataset.vista===elegida));
+      });
+      if(elegida==='dashboard') scoutPintarDashboardCharts_(contenedorId, datos);
+    };
+  });
 }
 
 async function renderMatchdayScouting_(){
