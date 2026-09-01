@@ -6439,7 +6439,10 @@ async function cargarScoutingDeJornada_(matchdayId){
     equipoPropio: scout.equipoPropio, equipoRival: scout.equipoRival,
     // Solo disponible para una jornada suelta (agregar cambiosQuinteto de varios partidos sin
     // más no tendría sentido): con esto "Por quinteto" solo aparece aquí, no en Temporada.
+    // plantillaPropia va con él porque scoutPorQuintetoHtml_ necesita ambos para poder
+    // etiquetar con dorsal/nombre a los jugadores de cada quinteto (si no, salen como "#?").
     cambiosQuinteto: proyecto.cambiosQuinteto,
+    plantillaPropia: proyecto.plantillaPropia,
     // proyectos: SIEMPRE una lista (aquí de un solo elemento) — es lo que consume tanto
     // "Rendimiento individual" como el dashboard, para poder usar el mismo código tanto para
     // un partido suelto como para agregados de varios (ver cargarScoutingDeEquipo_ más abajo).
