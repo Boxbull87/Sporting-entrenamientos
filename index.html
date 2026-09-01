@@ -972,7 +972,12 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
         <div class="card">
           <h2 style="font-size:1.05rem;">📊 Cargas de trabajo</h2>
           <p class="muted" style="font-size:.82rem;margin-top:-4px;">Resultados de las encuestas que rellenan los jugadores tras cada sesión: valoración de cada tarea y control diario de cargas.</p>
-          <div id="sessionsLoadsWrap"><div class="empty">Cargando...</div></div>
+          <div class="row" style="margin-top:8px;">
+            <input type="text" readonly id="sessionsLoadsPublicUrl" value="" onclick="this.select()" style="font-size:.78rem;">
+            <button type="button" class="btn ghost small" style="flex:0 0 auto;" onclick="copyWorkloadsPublicLink()">🔗 Copiar enlace de esta sección</button>
+          </div>
+          <p class="muted" style="font-size:.72rem;margin-top:4px;">Enlace público, sin necesidad de iniciar sesión: solo enseña esta sección (no da acceso a nada más de la aplicación), y solo incluye las sesiones que tengan la encuesta activada.</p>
+          <div id="sessionsLoadsWrap" style="margin-top:10px;"><div class="empty">Cargando...</div></div>
         </div>
       </div>
     </div>
@@ -2253,6 +2258,11 @@ const PUBLIC_MATCH = PUBLIC_PLAY_MATCH ? null : location.hash.match(/public=([^&
 // entrenamiento (se comprueba la última de las tres para no depender de que las regex
 // sean mutuamente excluyentes si el formato del hash cambiara en el futuro).
 const SURVEY_MATCH = (PUBLIC_PLAY_MATCH || PUBLIC_MATCH) ? null : location.hash.match(/survey=([^&]+)/);
+// #loads=1 comparte TODO el apartado de "Cargas de trabajo" (todas las sesiones con la
+// encuesta activada, agrupadas por equipo y mes), de solo lectura. A diferencia de las
+// tres anteriores no apunta a un elemento concreto por id, así que no hace falta capturar
+// ningún valor — basta con que el hash contenga "loads=".
+const WORKLOADS_PUBLIC_MATCH = (PUBLIC_PLAY_MATCH || PUBLIC_MATCH || SURVEY_MATCH) ? null : location.hash.match(/loads=/);
 if(PUBLIC_PLAY_MATCH){
   document.getElementById("authScreen").classList.add("hidden");
   loadPublicPlay(decodeURIComponent(PUBLIC_PLAY_MATCH[1]));
@@ -2262,6 +2272,9 @@ if(PUBLIC_PLAY_MATCH){
 } else if(SURVEY_MATCH){
   document.getElementById("authScreen").classList.add("hidden");
   loadSurveyForm(decodeURIComponent(SURVEY_MATCH[1]));
+} else if(WORKLOADS_PUBLIC_MATCH){
+  document.getElementById("authScreen").classList.add("hidden");
+  loadPublicWorkloads();
 } else {
   auth.onAuthStateChanged(async (user) => {
     currentUser = user;
@@ -2642,7 +2655,7 @@ function renderPlaySessionsFolderList(){
       <button type="button" class="home-card" onclick="playSessionBrowserPath=['__NONE__']; renderAbpSessionsBank();">
         <span class="home-card-icon">❔</span>
         <span class="home-card-label">Sin carpeta</span>
-        <span class="home-card-desc">${noneCount} sesión${noneCount===1?"":"es"}</span>
+        <span class="home-card-desc">${noneCount} ${noneCount===1?"sesión":"sesiones"}</span>
       </button>
       </div>`;
     }
@@ -2659,7 +2672,7 @@ function renderPlaySessionsFolderList(){
           <button type="button" class="folder-card-main" onclick="playSessionBrowserPath=[...playSessionBrowserPath,'${f.id}']; renderAbpSessionsBank();">
             <span class="home-card-icon">📁</span>
             <span class="home-card-label">${escapeHtml(f.name)}${hasUnread ? '<span class="card-dot"></span>' : ""}</span>
-            <span class="home-card-desc">${count} sesión${count===1?"":"es"}${subCount?` · ${subCount} carpeta${subCount===1?"":"s"}`:""}</span>
+            <span class="home-card-desc">${count} ${count===1?"sesión":"sesiones"}${subCount?` · ${subCount} carpeta${subCount===1?"":"s"}`:""}</span>
           </button>
           <button type="button" class="folder-menu-btn" onclick="openFolderActions('playSessions','${f.id}')" title="Gestionar carpeta">⋯</button>
         </div>`;
@@ -7156,7 +7169,7 @@ function matchdaySessionCheckboxesByMonth_(list, linked){
     return `
     <details class="month-group" style="margin:6px 0 0 4px;">
       <summary style="cursor:pointer;font-weight:600;font-size:.85rem;padding:8px 10px;background:#faf8f5;border:1px solid var(--border);border-radius:8px;">
-        🗓️ ${sessionMonthLabel(mk)} <span class="muted" style="font-weight:400;">(${mlist.length} sesión${mlist.length===1?"":"es"})</span>
+        🗓️ ${sessionMonthLabel(mk)} <span class="muted" style="font-weight:400;">(${mlist.length} ${mlist.length===1?"sesión":"sesiones"})</span>
       </summary>
       <div style="margin-top:8px;">${mlist.map(s=>`
         <div style="display:flex;align-items:center;gap:8px;padding:4px 0;">
@@ -7204,7 +7217,7 @@ function renderMatchdaySessionsLink(){
       return `
       <details class="team-group" style="margin:8px 0 0 4px;">
         <summary style="cursor:pointer;font-weight:600;padding:9px 11px;background:#f2f6f4;border:1px solid var(--border);border-radius:8px;">
-          👕 ${escapeHtml(grp.name)} <span class="muted" style="font-weight:400;">(${grp.sessions.length} sesión${grp.sessions.length===1?"":"es"})</span>
+          👕 ${escapeHtml(grp.name)} <span class="muted" style="font-weight:400;">(${grp.sessions.length} ${grp.sessions.length===1?"sesión":"sesiones"})</span>
         </summary>
         <div style="margin-top:8px;">${matchdaySessionCheckboxesByMonth_(grp.sessions, linked)}</div>
       </details>`;
@@ -8922,7 +8935,7 @@ function sessionsByMonthHtml_(list, contextTeamId){
     return `
     <details class="month-group" style="margin:8px 0 0 4px;">
       <summary style="cursor:pointer;font-weight:600;font-size:.85rem;padding:8px 10px;background:#faf8f5;border:1px solid var(--border);border-radius:8px;">
-        🗓️ ${sessionMonthLabel(mk)} <span class="muted" style="font-weight:400;">(${mlist.length} sesión${mlist.length===1?"":"es"})</span>
+        🗓️ ${sessionMonthLabel(mk)} <span class="muted" style="font-weight:400;">(${mlist.length} ${mlist.length===1?"sesión":"sesiones"})</span>
       </summary>
       <div style="margin-top:8px;">${cardsHtml}</div>
     </details>`;
@@ -8985,7 +8998,7 @@ function renderSavedSessions(){
       return `
       <details class="team-group" style="margin:8px 0 0 4px;">
         <summary style="cursor:pointer;font-weight:600;padding:9px 11px;background:#f2f6f4;border:1px solid var(--border);border-radius:8px;">
-          👕 ${escapeHtml(grp.name)} <span class="muted" style="font-weight:400;">(${tlist.length} sesión${tlist.length===1?"":"es"})</span>
+          👕 ${escapeHtml(grp.name)} <span class="muted" style="font-weight:400;">(${tlist.length} ${tlist.length===1?"sesión":"sesiones"})</span>
         </summary>
         <div style="margin-top:8px;">${monthsHtml}</div>
       </details>`;
@@ -8993,7 +9006,7 @@ function renderSavedSessions(){
     return `
     <details class="coach-group" style="margin-bottom:10px;">
       <summary style="cursor:pointer;font-weight:700;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);">
-        ${escapeHtml(name)} <span class="muted" style="font-weight:400;">(${list.length} sesión${list.length===1?"":"es"})</span>
+        ${escapeHtml(name)} <span class="muted" style="font-weight:400;">(${list.length} ${list.length===1?"sesión":"sesiones"})</span>
       </summary>
       <div style="margin-top:8px;">${teamsHtml}</div>
     </details>`;
@@ -9004,6 +9017,8 @@ function renderSavedSessions(){
 function renderSessionLoads_(){
   const wrap = document.getElementById("sessionsLoadsWrap");
   if(!wrap) return;
+  const urlInput = document.getElementById("sessionsLoadsPublicUrl");
+  if(urlInput) urlInput.value = location.origin + location.pathname + "#loads=1";
   const surveySessions = sessions.filter(s=>s.surveyPublic);
   if(surveySessions.length===0){
     wrap.innerHTML = '<div class="empty">Todavía no has activado la encuesta en ninguna sesión. Actívala desde "✏️ Editar sesión" → "Activar encuesta para jugadores".</div>';
@@ -9026,7 +9041,7 @@ function renderSessionLoads_(){
     return `
     <details class="team-group" style="margin:8px 0 0 4px;">
       <summary style="cursor:pointer;font-weight:600;padding:9px 11px;background:#f2f6f4;border:1px solid var(--border);border-radius:8px;">
-        👕 ${escapeHtml(grp.name)} <span class="muted" style="font-weight:400;">(${grp.sessions.length} sesión${grp.sessions.length===1?"":"es"})</span>
+        👕 ${escapeHtml(grp.name)} <span class="muted" style="font-weight:400;">(${grp.sessions.length} ${grp.sessions.length===1?"sesión":"sesiones"})</span>
       </summary>
       <div style="margin-top:8px;">${sessionLoadsByMonthHtml_(grp.sessions)}</div>
     </details>`;
@@ -9045,7 +9060,7 @@ function sessionLoadsByMonthHtml_(list){
     return `
     <details class="month-group" style="margin:8px 0 0 4px;">
       <summary style="cursor:pointer;font-weight:600;font-size:.85rem;padding:8px 10px;background:#faf8f5;border:1px solid var(--border);border-radius:8px;">
-        🗓️ ${sessionMonthLabel(mk)} <span class="muted" style="font-weight:400;">(${mlist.length} sesión${mlist.length===1?"":"es"})</span>
+        🗓️ ${sessionMonthLabel(mk)} <span class="muted" style="font-weight:400;">(${mlist.length} ${mlist.length===1?"sesión":"sesiones"})</span>
       </summary>
       <div style="margin-top:8px;">${mlist.map(sessionLoadCardHtml_).join("")}</div>
     </details>`;
@@ -9079,9 +9094,11 @@ function sessionLoadCardHtml_(s){
       <h3 style="font-size:.95rem;">${escapeHtml(s.name)}</h3>
       <span class="muted">${s.date||""}</span>
     </div>
-    <p class="muted" style="font-size:.8rem;margin-top:-2px;">${responses.length} respuesta${responses.length===1?"":"s"}</p>
     <button type="button" class="btn ghost small" onclick="copySurveyLink('${s.id}')">🔗 Copiar enlace de encuesta</button>
-    ${rows || '<p class="muted" style="margin-top:8px;">Todavía no hay respuestas.</p>'}
+    <details style="margin-top:8px;">
+      <summary style="cursor:pointer;font-size:.85rem;font-weight:600;">📋 ${responses.length} respuesta${responses.length===1?"":"s"}</summary>
+      <div style="margin-top:6px;">${rows || '<p class="muted" style="margin-top:8px;">Todavía no hay respuestas.</p>'}</div>
+    </details>
   </div>`;
 }
 window.deleteSessionSurvey_ = async (id) => {
@@ -10075,6 +10092,14 @@ window.copySurveyLink = (id) => {
     prompt("Copia este enlace:", url);
   });
 };
+window.copyWorkloadsPublicLink = () => {
+  const url = location.origin + location.pathname + "#loads=1";
+  navigator.clipboard.writeText(url).then(()=>{
+    alert("Enlace copiado al portapapeles.");
+  }).catch(()=>{
+    prompt("Copia este enlace:", url);
+  });
+};
 
 function renderSavedPlaySessions(){
   const wrap = document.getElementById("playSessionsSaved");
@@ -10245,6 +10270,115 @@ async function loadPublicPlay(id){
   }catch(err){
     wrap.innerHTML = '<div class="empty">No se ha podido cargar esta jugada: '+escapeHtml(err.message)+'</div>';
   }
+}
+
+/* ---------- Enlace público de TODO el apartado "Cargas de trabajo" (sin login, #loads=1) ----------
+   A diferencia de #survey=<id> (una sola sesión, para que el jugador la rellene), este enlace
+   es de solo lectura y enseña TODAS las sesiones que tengan la encuesta activada
+   (surveyPublic == true), agrupadas por equipo y mes igual que ve el entrenador en "Cargas de
+   trabajo" — pensado para compartir con alguien sin cuenta (preparador físico, fisio...) que
+   necesite ver los resultados sin acceder a nada más de la aplicación.
+   Activar la encuesta en una sesión ya la hace pública a ella y a sus respuestas (mismo
+   campo que usa #survey=); este enlace solo reúne en una vista todo lo que ya es público,
+   no añade una capa de seguridad nueva ni un id que revocar. ---------- */
+async function loadPublicWorkloads(){
+  document.getElementById("publicScreen").classList.remove("hidden");
+  const wrap = document.getElementById("publicWrap");
+  wrap.innerHTML = '<div class="empty">Cargando...</div>';
+  try{
+    const [sessionsSnap, teamsSnap] = await Promise.all([
+      db.collection("sessions").where("surveyPublic","==",true).get(),
+      db.collection("teams").orderBy("name").get()
+    ]);
+    const pubSessions = sessionsSnap.docs.map(d=>({id:d.id, ...d.data()}));
+    const pubTeams = teamsSnap.docs.map(d=>({id:d.id, ...d.data()}));
+    if(pubSessions.length===0){
+      wrap.innerHTML = '<div class="card"><h2 style="font-size:1.1rem;">📊 Cargas de trabajo</h2><p class="muted">Todavía no hay ninguna sesión con la encuesta activada.</p></div>';
+      return;
+    }
+    // Firestore limita "in" a 10 valores por consulta, así que se pide por lotes.
+    const ids = pubSessions.map(s=>s.id);
+    const lotes = [];
+    for(let i=0;i<ids.length;i+=10) lotes.push(ids.slice(i,i+10));
+    const surveySnaps = await Promise.all(lotes.map(lote=>db.collection("sessionSurveys").where("sessionId","in",lote).get()));
+    const pubSurveys = surveySnaps.flatMap(snap=>snap.docs.map(d=>({id:d.id, ...d.data()})));
+
+    const teamGroups = {};
+    pubSessions.forEach(s=>{
+      const tids = Array.isArray(s.teamIds) && s.teamIds.length ? s.teamIds : (s.teamId ? [s.teamId] : []);
+      const sTeams = tids.map(id=>pubTeams.find(t=>t.id===id)).filter(Boolean);
+      const entries = sTeams.length ? sTeams.map(t=>({id:t.id, name:t.name})) : [{id:null, name:"Sin equipo"}];
+      entries.forEach(e=>{
+        const key = e.id || ("none:"+e.name);
+        if(!teamGroups[key]) teamGroups[key] = {name:e.name, sessions:[]};
+        teamGroups[key].sessions.push(s);
+      });
+    });
+    const teamKeys = Object.keys(teamGroups).sort((a,b)=>teamGroups[a].name.localeCompare(teamGroups[b].name,'es'));
+    const monthGroupsHtml_ = (list)=>{
+      const mg = {};
+      list.forEach(s=>{ const mk=sessionMonthKey(s); if(!mg[mk]) mg[mk]=[]; mg[mk].push(s); });
+      const mks = Object.keys(mg).sort((a,b)=>b.localeCompare(a));
+      return mks.map(mk=>{
+        const mlist = mg[mk].slice().sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+        return `
+        <details class="month-group" style="margin:8px 0 0 4px;">
+          <summary style="cursor:pointer;font-weight:600;font-size:.85rem;padding:8px 10px;background:#faf8f5;border:1px solid var(--border);border-radius:8px;">
+            🗓️ ${sessionMonthLabel(mk)} <span class="muted" style="font-weight:400;">(${mlist.length} ${mlist.length===1?"sesión":"sesiones"})</span>
+          </summary>
+          <div style="margin-top:8px;">${mlist.map(s=>publicSessionLoadCardHtml_(s, pubSurveys)).join("")}</div>
+        </details>`;
+      }).join("");
+    };
+
+    wrap.innerHTML = `
+      <div class="card">
+        <h2 style="font-size:1.1rem;">📊 Cargas de trabajo</h2>
+        <p class="muted" style="font-size:.85rem;">Resultados de las encuestas que rellenan los jugadores tras cada sesión.</p>
+      </div>` +
+      teamKeys.map(tk=>{
+        const grp = teamGroups[tk];
+        return `
+        <details class="team-group" style="margin:8px 0 0 4px;">
+          <summary style="cursor:pointer;font-weight:600;padding:9px 11px;background:#f2f6f4;border:1px solid var(--border);border-radius:8px;">
+            👕 ${escapeHtml(grp.name)} <span class="muted" style="font-weight:400;">(${grp.sessions.length} ${grp.sessions.length===1?"sesión":"sesiones"})</span>
+          </summary>
+          <div style="margin-top:8px;">${monthGroupsHtml_(grp.sessions)}</div>
+        </details>`;
+      }).join("");
+  }catch(err){
+    wrap.innerHTML = '<div class="empty">No se ha podido cargar esta sección: '+escapeHtml(err.message)+'</div>';
+  }
+}
+function publicSessionLoadCardHtml_(s, allSurveys){
+  const responses = allSurveys.filter(r=>r.sessionId===s.id).slice().sort((a,b)=>(a.playerName||"").localeCompare(b.playerName||"",'es'));
+  const rows = responses.map(r=>{
+    const taskCells = (r.taskSnapshot||[]).map(t=>
+      `<span class="badge outline" style="margin:2px 4px 2px 0;">${escapeHtml(t.title)}: ${t.rating}</span>`
+    ).join("");
+    return `
+    <div style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-top:8px;">
+      <strong>${jerseyNameHtml_(r.playerPosition, escapeHtml(r.playerName))}</strong>
+      <div style="margin-top:4px;">${taskCells}</div>
+      <div style="margin-top:6px;font-size:.85rem;display:flex;flex-wrap:wrap;gap:10px;">
+        <span>💥 Dureza sesión: <strong>${r.rpe}</strong>/10</span>
+        <span>😣 Molestias: <strong>${r.pain ? "Sí" : "No"}</strong>${r.pain && r.painDetail ? " ("+escapeHtml(r.painDetail)+")" : ""}</span>
+        <span>😴 Cansancio antes: <strong>${r.fatigueBefore}</strong>/10</span>
+        <span>😴 Cansancio después: <strong>${r.fatigueAfter}</strong>/10</span>
+      </div>
+    </div>`;
+  }).join("");
+  return `
+  <div class="card" style="margin-bottom:10px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <h3 style="font-size:.95rem;">${escapeHtml(s.name)}</h3>
+      <span class="muted">${s.date||""}</span>
+    </div>
+    <details style="margin-top:8px;">
+      <summary style="cursor:pointer;font-size:.85rem;font-weight:600;">📋 ${responses.length} respuesta${responses.length===1?"":"s"}</summary>
+      <div style="margin-top:6px;">${rows || '<p class="muted" style="margin-top:8px;">Todavía no hay respuestas.</p>'}</div>
+    </details>
+  </div>`;
 }
 
 /* ---------- Encuesta pública de "Cargas de trabajo" (sin login, #survey=<sessionId>) ----------
@@ -10794,9 +10928,12 @@ service cloud.firestore {
       // documento es "{sessionId}_{playerId}" (se valida aquí), así que reenviar la encuesta
       // simplemente sustituye la respuesta anterior de ese jugador para esa sesión. Solo se
       // puede escribir si la sesión referenciada tiene la encuesta activada
-      // (surveyPublic == true) y el jugador existe de verdad en la plantilla. La lectura (para
-      // ver los resultados en "Cargas de trabajo") solo la tienen los entrenadores.
-      allow read: if isActive();
+      // (surveyPublic == true) y el jugador existe de verdad en la plantilla.
+      // Lectura: los entrenadores ven todo. Además, lectura pública (sin login) SOLO de las
+      // respuestas cuya sesión tenga la encuesta activada — mismo criterio que ya usa
+      // /sessions para su propia lectura pública — para que el enlace de "Cargas de trabajo"
+      // (#loads=1) pueda enseñar los resultados sin que el visitante tenga cuenta.
+      allow read: if isActive() || get(/databases/$(database)/documents/sessions/$(resource.data.sessionId)).data.surveyPublic == true;
       allow create, update: if request.resource.data.sessionId is string
         && request.resource.data.playerId is string
         && surveyId == request.resource.data.sessionId + '_' + request.resource.data.playerId
