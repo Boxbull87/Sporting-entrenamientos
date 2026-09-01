@@ -529,6 +529,25 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
     max-height:75vh;
   }
 }
+.quinteto-nums{
+  cursor:help;
+  border-bottom:1px dotted var(--muted);
+  white-space:nowrap;
+}
+.quinteto-tip-popup{
+  position:fixed;
+  z-index:9999;
+  background:#222;
+  color:#fff;
+  font-size:.75rem;
+  line-height:1.3;
+  padding:6px 9px;
+  border-radius:6px;
+  max-width:240px;
+  box-shadow:0 2px 8px rgba(0,0,0,.25);
+  pointer-events:none;
+}
+.quinteto-tip-popup.hidden{ display:none; }
 </style>
 </head>
 <body>
@@ -1942,6 +1961,11 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
     <span class="muted" id="fsFrameCount">0 fotogramas</span>
   </div>
 </div>
+
+<!-- ---------- Tooltip táctil compartido: "Por quinteto" (Scouting FS) enseña solo los
+     dorsales para que la tabla no se desborde; al pasar el ratón (title nativo) o mantener
+     pulsado en móvil sobre los números se ve el nombre de TODO el quinteto. ---------- -->
+<div id="quintetoTipPopup" class="quinteto-tip-popup hidden"></div>
 
 <script>
 /* ============================================================
@@ -6657,22 +6681,52 @@ function scoutPorQuintetoHtml_(datos){
   const columnas = scoutColumnasQuinteto_(catsCruza);
   const cabeceras = columnas.map(x=>`<th style="padding:3px;text-align:center;" title="${escapeHtml(x.cat.nom)}">${escapeHtml(x.cat.equipoFijo? x.cat.nom : x.cat.nom+' '+(x.equipo==='propio'?'P':'R'))}</th>`).join('');
   const filasHtml = filas.map(f=>{
-    const etiqueta = f.jugadores.map(id=>{
-      const j=(datos.plantillaPropia||[]).find(x=>x.id===id);
-      return j? scoutEtiquetaJugador_(j) : '#?';
-    }).join(', ');
+    // Solo los dorsales en la celda (compacto, no desborda la tabla); el nombre completo de
+    // TODO el quinteto va en el tooltip — title (ratón) y data-tip (mantener pulsado en
+    // móvil, ver el listener de "quinteto-nums" más abajo) llevan el mismo texto.
+    const jugadores = f.jugadores.map(id=>(datos.plantillaPropia||[]).find(x=>x.id===id));
+    const numeros = jugadores.map((j,i)=> j? '#'+escapeHtml(String(j.dorsal)) : '#?').join(' ');
+    const nombres = jugadores.map((j,i)=> j? scoutEtiquetaJugador_(j) : '#?').join(', ');
     const celdas = columnas.map(x=>{
       const n = f.porCategoria[x.cat.id+'_'+x.equipo]||0;
       return `<td style="padding:3px;text-align:center;">${n||'—'}</td>`;
     }).join('');
-    return `<tr><td style="padding:3px;">${etiqueta}</td>${celdas}<td class="muted" style="padding:3px;text-align:center;">${f.total}</td></tr>`;
+    return `<tr><td style="padding:3px;"><span class="quinteto-nums" title="${nombres}" data-tip="${nombres}">${numeros}</span></td>${celdas}<td class="muted" style="padding:3px;text-align:center;">${f.total}</td></tr>`;
   }).join('');
   return `<h3 style="font-size:.9rem;margin-top:14px;">Por quinteto</h3>
     <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:.8rem;min-width:420px;">
       <thead><tr style="text-align:left;border-bottom:1px solid var(--border);"><th style="padding:3px;">Quinteto</th>${cabeceras}<th style="padding:3px;text-align:center;">Total</th></tr></thead>
       <tbody>${filasHtml}</tbody></table></div>
-    <p class="muted" style="font-size:.72rem;margin-top:4px;">Quinteto propio en pista cuando ocurrió cada estadística (propia o rival), según los cambios marcados en Scouting FS.</p>`;
+    <p class="muted" style="font-size:.72rem;margin-top:4px;">Quinteto propio en pista cuando ocurrió cada estadística (propia o rival), según los cambios marcados en Scouting FS. Pasa el ratón (o mantén pulsado en el móvil) sobre los dorsales para ver los nombres.</p>`;
 }
+// Tooltip táctil de "quinteto-nums" (ver scoutPorQuintetoHtml_): el ratón ya tiene el title
+// nativo del navegador, esto es solo para mantener pulsado en móvil, donde title no aparece.
+// Delegado en document (no en cada <span>) porque la tabla se vuelve a pintar en cada render.
+(function(){
+  const popup = document.getElementById('quintetoTipPopup');
+  if(!popup) return;
+  let holdTimer = null;
+  function mostrarTip(target, x, y){
+    const texto = target.getAttribute('data-tip');
+    if(!texto) return;
+    popup.textContent = texto;
+    popup.style.left = Math.max(4, Math.min(x, window.innerWidth-244))+'px';
+    popup.style.top = Math.max(4, y-44)+'px';
+    popup.classList.remove('hidden');
+  }
+  function ocultarTip(){ popup.classList.add('hidden'); }
+  document.addEventListener('touchstart', e=>{
+    const target = e.target.closest('.quinteto-nums');
+    clearTimeout(holdTimer);
+    if(!target) return;
+    const touch = e.touches[0];
+    holdTimer = setTimeout(()=>mostrarTip(target, touch.clientX, touch.clientY), 350);
+  }, {passive:true});
+  document.addEventListener('touchend', ()=>{ clearTimeout(holdTimer); ocultarTip(); });
+  document.addEventListener('touchcancel', ()=>{ clearTimeout(holdTimer); ocultarTip(); });
+  document.addEventListener('touchmove', ()=>{ clearTimeout(holdTimer); ocultarTip(); });
+})();
+
 // datos.proyectos siempre viene informado (un solo elemento para una jornada suelta, varios
 // para un equipo/temporada) — así este mismo bloque sirve para los dos niveles.
 function scoutRendimientoIndividualHtml_(datos){
