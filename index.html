@@ -6641,8 +6641,6 @@ function scoutCrudoPorProyecto_(proyecto){
 // en todos ellos; un partido con jugadores sueltos escritos a mano no se sumará con los demás
 // para ese jugador (no hay forma de saber que es la misma persona).
 function scoutRendimientoMultiPartido_(proyectos){
-  const hayCategorias = proyectos.some(p=>(p.categorias||[]).some(c=>c.indGol||c.indOcasion));
-  if(!hayCategorias) return {filas:[], sinCategorias:true};
   const acumulado = new Map();
   proyectos.forEach(p=>{
     scoutCrudoPorProyecto_(p).forEach(fila=>{
@@ -6657,7 +6655,11 @@ function scoutRendimientoMultiPartido_(proyectos){
     return {jugador:o.jugador, minJugados:o.total, golF:o.golF, golC:o.golC, ocF:o.ocF, ocC:o.ocC,
       golF10:norm(o.golF), golC10:norm(o.golC), ocF10:norm(o.ocF), ocC10:norm(o.ocC)};
   }).sort((a,b)=>b.minJugados-a.minJugados);
-  return {filas, sinCategorias:false};
+  // Los minutos (arriba) no dependen de tener categorías marcadas como gol/ocasión — solo del
+  // quinteto. Las 4 tasas /10min sí, así que aquí solo se avisa de si hay o no para que quien
+  // pinte esto sepa si mostrar (o no) esos rankings, sin dejar de enseñar nunca los minutos.
+  const conGolOcasion = proyectos.some(p=>(p.categorias||[]).some(c=>c.indGol||c.indOcasion));
+  return {filas, conGolOcasion};
 }
 function scoutClasificacion_(filas){
   const conMinutos = filas.filter(f=>f.minJugados>0);
@@ -6729,12 +6731,39 @@ function scoutPorQuintetoHtml_(datos){
 
 // datos.proyectos siempre viene informado (un solo elemento para una jornada suelta, varios
 // para un equipo/temporada) — así este mismo bloque sirve para los dos niveles.
+// Minutos en formato mm:ss, igual que tc() en Scouting FS (mismo criterio, para que un
+// entrenador que mire las dos aplicaciones vea el mismo formato).
+function scoutFormatearMinutos_(s){
+  const m=Math.floor(s/60), x=Math.floor(s%60);
+  return String(m).padStart(2,'0')+':'+String(x).padStart(2,'0');
+}
+function scoutTablaMinutosHtml_(filas){
+  const conMinutos = filas.filter(f=>f.minJugados>0).slice().sort((a,b)=>b.minJugados-a.minJugados);
+  if(!conMinutos.length) return '';
+  const filasHtml = conMinutos.map(f=>`<tr>
+    <td style="padding:3px;">${scoutEtiquetaJugador_(f.jugador)}</td>
+    <td style="padding:3px;text-align:center;color:var(--muted);">${scoutFormatearMinutos_(f.minJugados)}</td>
+  </tr>`).join('');
+  return `<div><h4 style="font-size:.78rem;color:var(--muted);margin-bottom:6px;">Minutos jugados</h4>
+    <table style="width:100%;border-collapse:collapse;font-size:.78rem;"><tbody>${filasHtml}</tbody></table></div>`;
+}
 function scoutRendimientoIndividualHtml_(datos){
-  const {filas, sinCategorias} = scoutRendimientoMultiPartido_(datos.proyectos||[]);
-  if(sinCategorias || !filas.length) return '';
+  const {filas, conGolOcasion} = scoutRendimientoMultiPartido_(datos.proyectos||[]);
+  const tablaMinutos = scoutTablaMinutosHtml_(filas);
+  if(!tablaMinutos) return '';
+  // Los minutos siempre se enseñan si hay quinteto marcado (basta con eso). Las 4 tasas /10min
+  // de goles/ocasiones solo se añaden si además hay alguna categoría marcada como tal — si no,
+  // "Rendimiento individual" se queda solo con la tabla de minutos.
+  if(!conGolOcasion){
+    return `<h3 style="font-size:.9rem;margin-top:14px;">Rendimiento individual</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-top:6px;">
+        ${tablaMinutos}
+      </div>`;
+  }
   const clasif = scoutClasificacion_(filas);
   return `<h3 style="font-size:.9rem;margin-top:14px;">Rendimiento individual (por 10 min jugados)</h3>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-top:6px;">
+      ${tablaMinutos}
       ${scoutTablaClasificacionHtml_('Goles a favor', clasif.golF, 'golF10')}
       ${scoutTablaClasificacionHtml_('Goles en contra', clasif.golC, 'golC10')}
       ${scoutTablaClasificacionHtml_('Ocasiones a favor', clasif.ocF, 'ocF10')}
@@ -6871,8 +6900,9 @@ function scoutDashboardHtml_(prefijo, datos){
   }
 
   const catsUbic = datos.categorias.filter(c=>c.ubicacion);
-  const {filas: filasRanking, sinCategorias} = scoutRendimientoMultiPartido_(proyectos);
-  const clasif = !sinCategorias && filasRanking.length ? scoutClasificacion_(filasRanking) : null;
+  const {filas: filasRanking, conGolOcasion} = scoutRendimientoMultiPartido_(proyectos);
+  const hayMinutos = filasRanking.some(f=>f.minJugados>0);
+  const clasif = conGolOcasion && filasRanking.length ? scoutClasificacion_(filasRanking) : null;
 
   return `
     <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;">${kpis.join('')}</div>
@@ -6886,6 +6916,8 @@ function scoutDashboardHtml_(prefijo, datos){
             <p class="muted" style="font-size:.7rem;text-align:center;">${escapeHtml(c.nom)}</p></div>`;
         }).join('')}
       </div>` : ''}
+    ${hayMinutos ? `<h4 style="font-size:.82rem;margin:14px 0 6px;">Top 5 · minutos jugados</h4>
+      <div style="max-width:280px;"><canvas id="${prefijo}_rank_minutos" height="120"></canvas></div>` : ''}
     ${clasif ? `<h4 style="font-size:.82rem;margin:14px 0 6px;">Top 5 · rendimiento individual (por 10 min)</h4>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;">
         <div><p class="muted" style="font-size:.72rem;margin-bottom:2px;">Goles a favor</p><canvas id="${prefijo}_rank_golF" height="120"></canvas></div>
@@ -6954,8 +6986,25 @@ function scoutPintarDashboardCharts_(prefijo, datos){
     if(COURT_IMG.complete && COURT_IMG.naturalWidth>0) dibujar(); else COURT_IMG.addEventListener('load', dibujar, {once:true});
   });
 
-  const {filas, sinCategorias} = scoutRendimientoMultiPartido_(proyectos);
-  if(!sinCategorias && filas.length && typeof Chart!=='undefined'){
+  const {filas, conGolOcasion} = scoutRendimientoMultiPartido_(proyectos);
+
+  const minutosCv = document.getElementById(prefijo+'_rank_minutos');
+  const conMinutos = filas.filter(f=>f.minJugados>0).sort((a,b)=>b.minJugados-a.minJugados);
+  if(minutosCv && conMinutos.length && typeof Chart!=='undefined'){
+    const top5min = conMinutos.slice(0,5);
+    const idMin = prefijo+'_rank_minutos';
+    scoutDestruirGrafico_(idMin);
+    scoutChartInstances_[idMin] = new Chart(minutosCv.getContext('2d'), {
+      type:'bar',
+      data:{labels: top5min.map(f=>scoutEtiquetaJugador_(f.jugador).replace(/<[^>]+>/g,'')),
+        datasets:[{data: top5min.map(f=>Math.round(f.minJugados/60)), backgroundColor:'#D8232A'}]},
+      options:{indexAxis:'y', responsive:true,
+        plugins:{legend:{display:false}, datalabels:{anchor:'end', align:'end', formatter:v=>v+"'"}},
+        scales:{x:{beginAtZero:true, ticks:{precision:0}}}}
+    });
+  }
+
+  if(conGolOcasion && filas.length && typeof Chart!=='undefined'){
     const clasif = scoutClasificacion_(filas);
     [['golF','#D8232A'],['golC','#2E6FB7'],['ocF','#D8232A'],['ocC','#2E6FB7']].forEach(([campo,color])=>{
       const cv = document.getElementById(prefijo+'_rank_'+campo);
