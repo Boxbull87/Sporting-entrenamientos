@@ -628,6 +628,7 @@ footer{text-align:center;padding:24px;color:var(--muted);font-size:.78rem;}
 .scout-rank-table td.num{text-align:right;font-family:'Roboto Mono',monospace;font-weight:600;}
 .scout-rank-table tr:last-child td{border-bottom:none;}
 .scout-rank-table td.num.lead{color:var(--accent);font-weight:700;}
+.scout-rank-table td.num.lead-good{color:var(--scout-positive);font-weight:700;}
 
 details.scout-level4{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;overflow:hidden;}
 details.scout-level4 summary{cursor:pointer;list-style:none;padding:12px 16px;font-family:'Oswald',sans-serif;font-weight:600;font-size:.82rem;text-transform:uppercase;letter-spacing:.02em;display:flex;justify-content:space-between;align-items:center;}
@@ -6839,23 +6840,38 @@ function scoutRendimientoIndividualHtml_(datos){
   const {filas, conGolOcasion} = scoutRendimientoMultiPartido_(datos.proyectos||[]);
   const conMinutos = filas.filter(f=>f.minJugados>0).slice().sort((a,b)=>b.minJugados-a.minJugados);
   if(!conMinutos.length) return '';
-  let maxGolF10=-Infinity, maxOcF10=-Infinity;
+  // "Mejor" en las columnas *F/10' es el valor más alto (a favor); en las *C/10' es el más
+  // bajo (en contra, menos es mejor) — de ahí las dos clases de resalte, .lead y .lead-good.
+  let maxGolF10=-Infinity, minGolC10=Infinity, maxOcF10=-Infinity, minOcC10=Infinity;
   if(conGolOcasion){
     conMinutos.forEach(f=>{
       if(f.golF10!=null && f.golF10>maxGolF10) maxGolF10=f.golF10;
+      if(f.golC10!=null && f.golC10<minGolC10) minGolC10=f.golC10;
       if(f.ocF10!=null && f.ocF10>maxOcF10) maxOcF10=f.ocF10;
+      if(f.ocC10!=null && f.ocC10<minOcC10) minOcC10=f.ocC10;
     });
   }
   const cabeceras = conGolOcasion
-    ? `<th>Jugador</th><th class="num">Min.</th><th class="num" title="Goles a favor">GF</th>
+    ? `<th>Jugador</th><th class="num">Min.</th>
+       <th class="num" title="Goles del equipo con el jugador en pista, a favor">GF</th>
+       <th class="num" title="Goles del equipo con el jugador en pista, en contra">GC</th>
+       <th class="num" title="Ocasiones del equipo con el jugador en pista, a favor">OF</th>
+       <th class="num" title="Ocasiones del equipo con el jugador en pista, en contra">OC</th>
        <th class="num" title="Goles a favor cada 10 min en pista">GF/10'</th>
-       <th class="num" title="Ocasiones a favor cada 10 min en pista">OF/10'</th>`
+       <th class="num" title="Goles en contra cada 10 min en pista (menos es mejor)">GC/10'</th>
+       <th class="num" title="Ocasiones a favor cada 10 min en pista">OF/10'</th>
+       <th class="num" title="Ocasiones en contra cada 10 min en pista (menos es mejor)">OC/10'</th>`
     : `<th>Jugador</th><th class="num">Min.</th>`;
   const filasHtml = conMinutos.map(f=>{
     const extra = conGolOcasion ? `
       <td class="num tabnum">${f.golF}</td>
+      <td class="num tabnum">${f.golC}</td>
+      <td class="num tabnum">${f.ocF}</td>
+      <td class="num tabnum">${f.ocC}</td>
       <td class="num tabnum${f.golF10===maxGolF10 && maxGolF10>0?' lead':''}">${f.golF10!=null?f.golF10.toFixed(2):'—'}</td>
-      <td class="num tabnum${f.ocF10===maxOcF10 && maxOcF10>0?' lead':''}">${f.ocF10!=null?f.ocF10.toFixed(2):'—'}</td>` : '';
+      <td class="num tabnum${f.golC10!=null && f.golC10===minGolC10 && minGolC10<Infinity?' lead-good':''}">${f.golC10!=null?f.golC10.toFixed(2):'—'}</td>
+      <td class="num tabnum${f.ocF10===maxOcF10 && maxOcF10>0?' lead':''}">${f.ocF10!=null?f.ocF10.toFixed(2):'—'}</td>
+      <td class="num tabnum${f.ocC10!=null && f.ocC10===minOcC10 && minOcC10<Infinity?' lead-good':''}">${f.ocC10!=null?f.ocC10.toFixed(2):'—'}</td>` : '';
     return `<tr><td>${scoutEtiquetaJugador_(f.jugador)}</td><td class="num tabnum">${scoutFormatearMinutos_(f.minJugados)}</td>${extra}</tr>`;
   }).join('');
   return `<div class="scout-section">
@@ -6863,6 +6879,7 @@ function scoutRendimientoIndividualHtml_(datos){
     <div class="card" style="overflow-x:auto;padding:6px 4px;">
       <table class="scout-rank-table"><thead><tr>${cabeceras}</tr></thead><tbody>${filasHtml}</tbody></table>
     </div>
+    ${conGolOcasion ? `<p class="muted" style="font-size:.72rem;margin-top:6px;">GF/GC/OF/OC son los goles y ocasiones del <b>equipo</b> mientras cada jugador estaba en pista, no los que marcó él personalmente — para eso está "Máximo goleador" en Jugadores destacados. Solo cuentan los tramos con quinteto marcado en Scouting FS.</p>` : ''}
   </div>`;
 }
 
@@ -7168,16 +7185,24 @@ function scoutDestacadosHtml_(datos){
   const conMinutos = filas.filter(f=>f.minJugados>0);
   const tarjetas = [];
 
-  if(datos.categorias.some(c=>c.indGol)){
-    const top = conMinutos.filter(f=>f.golF>0).sort((a,b)=>b.golF-a.golF)[0];
-    if(top) tarjetas.push(scoutStandoutHtml_('⭐ Más goleador', scoutEtiquetaJugador_(top.jugador), top.golF, 'gol'+(top.golF===1?'':'es')));
+  // Máximo goleador: goles marcados PERSONALMENTE (evento con jugadorRef propio en una
+  // categoría indGol) — distinto de la columna "GF" de la tabla de abajo, que son los goles
+  // del EQUIPO mientras ese jugador estaba en pista, los marcase él o no.
+  const catGolIds = new Set(datos.categorias.filter(c=>c.indGol).map(c=>c.id));
+  if(catGolIds.size){
+    const top = scoutAgruparPorJugador_(datos.eventos)
+      .map(g=>({...g, n:g.eventos.filter(e=>catGolIds.has(e.tipo)).length}))
+      .filter(g=>g.n>0).sort((a,b)=>b.n-a.n)[0];
+    if(top) tarjetas.push(scoutStandoutHtml_('⭐ Máximo goleador', top.etiqueta, top.n, 'gol'+(top.n===1?'':'es')));
   }
   if(conGolOcasion){
-    // Impacto/10' = goles+ocasiones a favor cada 10 min — con un mínimo de 10 min jugados para
-    // que un jugador con 2 minutos y una acción puntual no salga primero por pura casualidad.
+    // Impacto/10' = SOLO goles+ocasiones A FAVOR cada 10 min (golF10+ocF10) — a propósito no
+    // suma golC/ocC (en contra) ni ninguna otra categoría (tiros en contra, pérdidas...): eso
+    // serían acciones negativas o ajenas al ataque, no "impacto" positivo del jugador. Mínimo
+    // de 10 min jugados para que 2 minutos y una acción puntual no salga primero por azar.
     const candidatos = conMinutos.filter(f=>f.minJugados>=600 && (f.golF10!=null || f.ocF10!=null))
       .map(f=>({...f, impacto10:(f.golF10||0)+(f.ocF10||0)})).sort((a,b)=>b.impacto10-a.impacto10);
-    if(candidatos.length) tarjetas.push(scoutStandoutHtml_("⚡ Más impacto / 10'", scoutEtiquetaJugador_(candidatos[0].jugador), candidatos[0].impacto10.toFixed(1), "acciones/10'"));
+    if(candidatos.length) tarjetas.push(scoutStandoutHtml_("⚡ Más impacto / 10'", scoutEtiquetaJugador_(candidatos[0].jugador), candidatos[0].impacto10.toFixed(1), "acciones/10' a favor"));
   }
   const catRobo = scoutBuscarCategoriaPorNombre_(datos.categorias, 'robo', 'robos');
   if(catRobo){
