@@ -9456,6 +9456,14 @@ function renderSessionIntoDoc(doc, s, opts){
     doc.setFont("helvetica","bold"); doc.setFontSize(14);
     doc.setTextColor(255,255,255);
     doc.text("ENTREGA SESIÓN", cx+r+6, cy+1.6);
+    // Deja la fuente en el tamaño/color "normal" del cuerpo del documento antes de devolver el
+    // control: si un salto de página (ensureSpace → newPage → drawBanner) cae justo entre que
+    // una función fija su fuente y el doc.text() que la usa (p.ej. fullBox o el bloque de
+    // "Consigna / Explicación"), ese texto heredaba el negrita+14pt del rótulo de arriba en vez
+    // del tamaño que le tocaba — de ahí que apareciera con letra gigante solo cuando ese bloque
+    // caía justo al principio de una página nueva.
+    doc.setFont("helvetica","normal"); doc.setFontSize(9.5);
+    doc.setTextColor(TEXT[0],TEXT[1],TEXT[2]);
   }
   function newPage(){
     doc.addPage();
