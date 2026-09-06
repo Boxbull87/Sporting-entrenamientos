@@ -3192,7 +3192,14 @@ function attachRealtimeListeners(){
       renderMatchdayReport();
     }
     renderTeamSummary();
-  }, err => showSyncError_("notas de jornadas", err));
+  }, err => {
+    // A diferencia del resto de listeners (que usan showSyncError_ con un banner fijo
+    // porque un fallo ahí SIEMPRE es una avería real), aquí un "permission-denied" es el
+    // día a día para cualquier entrenador sin ese equipo asignado — es la restricción
+    // funcionando, no un error. Mostrar un banner rojo permanente por eso sería ruido para
+    // (casi) todo el mundo, así que solo se registra en consola para poder depurarlo.
+    console.warn("No se han podido cargar las notas privadas de jornadas (normal si no tienes ningún equipo con notas asignado):", err);
+  });
 
   db.collection("mesociclos").orderBy("startDate").onSnapshot(snap=>{
     mesociclos = snap.docs.map(d=>({id:d.id, ...d.data()}));
