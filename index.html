@@ -7162,15 +7162,26 @@ function scoutComparativaHtml_(datos){
   if(!catsStats.length) return '';
   const eventos = datos.eventos;
   const nomPropio = datos.equipoPropio || 'Sporting FS', nomRival = datos.equipoRival || 'Rival';
+  // Un gol es, por definición, un tiro que entró — en Scouting FS no se marca también como
+  // "Tiro", así que aquí se suma a la fila de Tiro para no infravalorar los tiros totales
+  // (mismo criterio que el KPI "Tiros totales" del nivel 1).
+  const catTiro = scoutBuscarCategoriaPorNombre_(datos.categorias, 'tiro', 'tiros');
+  const idsGolCmp = new Set(datos.categorias.filter(c=>c.indGol).map(c=>c.id));
   const filas = catsStats.map(c=>{
     const evsCat = eventos.filter(e=>e.tipo===c.id);
-    const p = evsCat.filter(e=>e.equipo==='propio').length, r = evsCat.filter(e=>e.equipo==='rival').length;
+    let p = evsCat.filter(e=>e.equipo==='propio').length, r = evsCat.filter(e=>e.equipo==='rival').length;
+    const esTiro = catTiro && c.id===catTiro.id && idsGolCmp.size>0;
+    if(esTiro){
+      p += eventos.filter(e=>idsGolCmp.has(e.tipo) && e.equipo==='propio').length;
+      r += eventos.filter(e=>idsGolCmp.has(e.tipo) && e.equipo==='rival').length;
+    }
     const max = Math.max(p, r, 1);
     const conteo = new Map();
     evsCat.forEach(e=>{ if(e.resultado) conteo.set(e.resultado, (conteo.get(e.resultado)||0)+1); });
     const desglose = Array.from(conteo.entries()).sort((a,b)=>b[1]-a[1]).map(([k,v])=>escapeHtml(k)+' '+v).join(' · ');
+    const nota = esTiro ? (desglose? desglose+' · incl. goles' : 'Incluye los goles') : desglose;
     return `<div class="scout-compare-row">
-      <div class="scout-compare-cat">${escapeHtml(c.nom)}${desglose?`<span class="scout-compare-sub">${desglose}</span>`:''}</div>
+      <div class="scout-compare-cat">${escapeHtml(c.nom)}${nota?`<span class="scout-compare-sub">${nota}</span>`:''}</div>
       <div class="scout-bar-wrap"><span class="scout-bar-num propio tabnum">${p}</span><div class="scout-bar-track"><div class="scout-bar-fill" style="width:${p/max*100}%;"></div></div></div>
       <div class="scout-bar-wrap rival"><div class="scout-bar-track rival"><div class="scout-bar-fill rival" style="width:${r/max*100}%;"></div></div><span class="scout-bar-num rival tabnum">${r}</span></div>
     </div>`;
@@ -7243,18 +7254,28 @@ function scoutDetalleHtml_(datos){
   const bloques = [];
 
   if(catsStats.length){
-    const contarEquipo = equipo => catsStats.map(c=>eventos.filter(e=>e.tipo===c.id && e.equipo===equipo).length);
+    // Un gol es, por definición, un tiro que entró — en Scouting FS no se marca también como
+    // "Tiro", así que se suma en la columna/fila de Tiro para no infravalorarla (mismo
+    // criterio que el KPI "Tiros totales" y la comparativa por categoría).
+    const catTiroDet = scoutBuscarCategoriaPorNombre_(datos.categorias, 'tiro', 'tiros');
+    const idsGolDet = new Set(datos.categorias.filter(c=>c.indGol).map(c=>c.id));
+    const contarCategoria = (evs, catId, equipo) => {
+      let n = evs.filter(e=>e.tipo===catId && (!equipo || e.equipo===equipo)).length;
+      if(catTiroDet && catId===catTiroDet.id && idsGolDet.size) n += evs.filter(e=>idsGolDet.has(e.tipo) && (!equipo || e.equipo===equipo)).length;
+      return n;
+    };
+    const contarEquipo = equipo => catsStats.map(c=>contarCategoria(eventos, c.id, equipo));
     const propio = contarEquipo("propio"), rival = contarEquipo("rival");
     const filasEquipo = catsStats.map((c,i)=>`<tr>
-      <td><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${escapeHtml(c.color||"#888")};margin-right:5px;"></span>${escapeHtml(c.nom)}</td>
+      <td><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${escapeHtml(c.color||"#888")};margin-right:5px;"></span>${escapeHtml(c.nom)}${catTiroDet && c.id===catTiroDet.id && idsGolDet.size? ' <span class="muted" style="font-size:.7em;">(incl. goles)</span>':''}</td>
       <td class="num">${propio[i]}</td><td class="num">${rival[i]}</td></tr>`).join("");
     bloques.push({titulo:'Totales por categoría', cuenta:catsStats.length+' categoría'+(catsStats.length===1?'':'s'),
       html:`<table class="scout-detail"><thead><tr><th>Categoría</th><th class="num">${escapeHtml(nomPropio)}</th><th class="num">${escapeHtml(nomRival)}</th></tr></thead><tbody>${filasEquipo}</tbody></table>`});
 
     const grupos = scoutAgruparPorJugador_(eventos).map(g=>({...g, total:g.eventos.length})).sort((a,b)=>b.total-a.total);
-    const cabecerasCat = catsStats.map(c=>`<th class="num" title="${escapeHtml(c.nom)}">${escapeHtml(c.nom)}</th>`).join("");
+    const cabecerasCat = catsStats.map(c=>`<th class="num" title="${escapeHtml(c.nom)}${catTiroDet && c.id===catTiroDet.id && idsGolDet.size? ' (incluye los goles)':''}">${escapeHtml(c.nom)}</th>`).join("");
     const filasJugador = grupos.map(g=>{
-      const celdas = catsStats.map(c=>`<td class="num">${g.eventos.filter(e=>e.tipo===c.id).length||"—"}</td>`).join("");
+      const celdas = catsStats.map(c=>`<td class="num">${contarCategoria(g.eventos, c.id)||"—"}</td>`).join("");
       return `<tr><td>${g.etiqueta}</td>${celdas}<td class="num" style="color:var(--muted);">${g.total}</td></tr>`;
     }).join("");
     bloques.push({titulo:'Por jugador (todas las categorías)', cuenta:grupos.length+' jugador'+(grupos.length===1?'':'es'),
