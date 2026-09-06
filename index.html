@@ -7062,13 +7062,14 @@ function scoutKpiRowHtml_(datos){
     const p = eventos.filter(e=>e.tipo===catTiro.id && e.equipo==='propio').length;
     const r = eventos.filter(e=>e.tipo===catTiro.id && e.equipo==='rival').length;
     kpis.push(scoutKpiHtml_('Tiros', p, r));
-    // Eficacia de tiro: solo si además hay categoría de gol, hubo al menos un tiro propio, y el
-    // resultado no pasa de 100% — si un entrenador marca un gol sin marcar también el tiro que
-    // lo generó, goles>tiros y el % dejaría de tener sentido; en ese caso mejor no mostrar nada
-    // que enseñar un porcentaje imposible.
-    if(catGol.length && p>0){
+    // Eficacia = goles / tiros totales. En Scouting FS un gol se marca con la categoría "Gol",
+    // no además como "Tiro" — así que los tiros de verdad son los marcados como Tiro MÁS los
+    // que acabaron en gol (todo gol es, por definición, un tiro que entró). Con esto el
+    // resultado nunca puede pasar de 100%, así que ya no hace falta esa comprobación aparte.
+    if(catGol.length){
       const golesP = scoutContarPorFlag_(eventos, idsGol, 'propio');
-      if(golesP<=p) kpis.push(scoutKpiHtml_('Eficacia de tiro', Math.round((golesP/p)*100)+'%', null, 'Goles / tiros'));
+      const tirosTotalesP = p + golesP;
+      if(tirosTotalesP>0) kpis.push(scoutKpiHtml_('Eficacia de tiro', Math.round((golesP/tirosTotalesP)*100)+'%', null, 'Goles / tiros'));
     }
   }
   if(catOcasion.length){
@@ -7135,10 +7136,13 @@ function scoutInsightsHtml_(datos){
   const catGol = datos.categorias.filter(c=>c.indGol);
   if(catTiro && catGol.length){
     const idsGol = new Set(catGol.map(c=>c.id));
-    const tirosP = eventos.filter(e=>e.tipo===catTiro.id && e.equipo==='propio').length;
-    if(tirosP>=5){
-      const pct = Math.round((scoutContarPorFlag_(eventos,idsGol,'propio')/tirosP)*100);
-      if(pct>=30 && pct<=100) frases.push(`<b>Alta eficacia.</b> Se convirtió el ${pct}% de los tiros en gol.`);
+    const golesP = scoutContarPorFlag_(eventos,idsGol,'propio');
+    // Mismo criterio que el KPI de eficacia: los tiros totales son los marcados como Tiro
+    // más los goles (un gol es un tiro que entró, y en Scouting FS no se marca dos veces).
+    const tirosTotalesP = eventos.filter(e=>e.tipo===catTiro.id && e.equipo==='propio').length + golesP;
+    if(tirosTotalesP>=5){
+      const pct = Math.round((golesP/tirosTotalesP)*100);
+      if(pct>=30) frases.push(`<b>Alta eficacia.</b> Se convirtió el ${pct}% de los tiros en gol.`);
     }
   }
   if(!frases.length) return '';
