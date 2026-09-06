@@ -1678,14 +1678,17 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
               <div class="acc-body">
                 <p class="muted" style="margin-top:0;">Dificultad del rival:</p>
                 <div id="matchdayDifficultyPicker" style="margin-bottom:10px;display:flex;flex-wrap:wrap;"></div>
-                <label style="font-size:.85rem;font-weight:600;">Informe / texto libre</label>
-                <textarea id="mdReportText" rows="5" style="width:100%;margin-bottom:10px;" placeholder="Escribe aquí lo que quieras sobre el partido..."></textarea>
-                <label style="font-size:.85rem;font-weight:600;">Observaciones</label>
-                <textarea id="mdReportObservations" rows="3" style="width:100%;margin-bottom:10px;" placeholder="Observaciones adicionales..."></textarea>
-                <label style="font-size:.85rem;font-weight:600;">Notas de jugadores</label>
-                <div id="matchdayPlayerNotes" style="margin-bottom:10px;"></div>
-                <button class="btn accent" id="btnSaveMatchdayReport">💾 Guardar informe</button>
-                <div id="matchdayReportMsg"></div>
+                <p class="muted" id="mdReportNoAccess" style="display:none;">🔒 Esta información (informe, observaciones y notas de jugadores) solo la puede ver el entrenador asignado a este equipo y los gestores del club.</p>
+                <div id="mdReportPrivateWrap">
+                  <label style="font-size:.85rem;font-weight:600;">Informe / texto libre</label>
+                  <textarea id="mdReportText" rows="5" style="width:100%;margin-bottom:10px;" placeholder="Escribe aquí lo que quieras sobre el partido..."></textarea>
+                  <label style="font-size:.85rem;font-weight:600;">Observaciones</label>
+                  <textarea id="mdReportObservations" rows="3" style="width:100%;margin-bottom:10px;" placeholder="Observaciones adicionales..."></textarea>
+                  <label style="font-size:.85rem;font-weight:600;">Notas de jugadores</label>
+                  <div id="matchdayPlayerNotes" style="margin-bottom:10px;"></div>
+                  <button class="btn accent" id="btnSaveMatchdayReport">💾 Guardar informe</button>
+                  <div id="matchdayReportMsg"></div>
+                </div>
 
                 <h4 style="margin-top:18px;font-size:.85rem;">🔗 Sesiones de entrenamiento vinculadas</h4>
                 <p class="muted" style="margin-top:-6px;">Marca las sesiones de tus equipos que quieras vincular a este partido (o desmárcalas para desvincularlas) y guarda.</p>
@@ -2183,6 +2186,15 @@ let sessionSurveys = []; // respuestas a la encuesta de "Cargas de trabajo" (ver
 let selectedTeamId = null;
 let selectedSeason = null;
 let matchdays = [];
+// Notas de jugadores + informe del partido de cada jornada: viven en un subdocumento
+// aparte (matchdays/{id}/private/report) con sus propias reglas, en vez de como campos
+// del propio documento de la jornada — Firestore no puede filtrar campo a campo dentro
+// de un mismo documento, así que la única forma de que el resto de entrenadores/editores
+// no puedan leer esta información es que ni siquiera esté en el documento que sí ven.
+// { [matchdayId]: {reportText, reportObservations, playerNotes, playerRatings} } — solo
+// contiene las jornadas para las que este entrenador tiene permiso (el propio listener de
+// Firestore ya filtra el resto, ver el onSnapshot de collectionGroup("private") más abajo).
+let matchdayPrivate = {};
 let editingMatchdayId = null;
 let mesociclos = [];
 let microciclos = [];
@@ -3154,6 +3166,7 @@ function attachRealtimeListeners(){
   db.collection("matchdays").orderBy("number").onSnapshot(snap=>{
     matchdays = snap.docs.map(d=>({id:d.id, ...d.data()}));
     stampLegacyMatchdaySeasons_();
+    migrateMatchdayPrivateFields_();
     renderMatchdaysList();
     renderTeamSummary();
     if(statsMatchdayId && !document.getElementById("matchdayStatsView").classList.contains("hidden")){
@@ -3163,6 +3176,23 @@ function attachRealtimeListeners(){
     }
     renderMiEquipoCalendar_();
   }, err => showSyncError_("jornadas", err));
+
+  // Notas de jugadores + informe del partido (ver comentario de "matchdayPrivate" más
+  // arriba). Un collectionGroup en vez de ir jornada a jornada: Firestore evalúa la regla
+  // de matchdays/{id}/private/{docId} documento a documento y solo entrega los que este
+  // entrenador puede leer (los suyos, o todos si es gestor) — nada que filtrar a mano aquí,
+  // y si algún día cambian sus equipos asignados, este listener se reajusta solo.
+  db.collectionGroup("private").onSnapshot(snap=>{
+    snap.docChanges().forEach(change=>{
+      const matchdayId = change.doc.ref.parent.parent.id;
+      if(change.type==="removed") delete matchdayPrivate[matchdayId];
+      else matchdayPrivate[matchdayId] = change.doc.data();
+    });
+    if(statsMatchdayId && !document.getElementById("matchdayStatsView").classList.contains("hidden")){
+      renderMatchdayReport();
+    }
+    renderTeamSummary();
+  }, err => showSyncError_("notas de jornadas", err));
 
   db.collection("mesociclos").orderBy("startDate").onSnapshot(snap=>{
     mesociclos = snap.docs.map(d=>({id:d.id, ...d.data()}));
@@ -5230,6 +5260,35 @@ async function stampLegacyMatchdaySeasons_(){
     catch(err){ seasonStampAttempted.delete(m.id); }
   }
 }
+// Migración: jornadas creadas antes de que las notas de jugadores y el informe del partido
+// pasaran a vivir en matchdays/{id}/private/report (ver comentario de "matchdayPrivate" más
+// arriba) todavía tienen esos 4 campos sueltos en el propio documento de la jornada, donde
+// CUALQUIER entrenador activo puede leerlos — justo lo que se quería evitar. Se ejecuta sola
+// (solo un gestor puede, igual que stampLegacyMatchdaySeasons_) cada vez que llega un cambio
+// de "matchdays": mueve esos 4 campos al subdocumento privado y los borra del documento
+// público, en un único batch por jornada para que no quede a medias.
+const matchdayPrivateMigrationAttempted = new Set();
+const MATCHDAY_PRIVATE_FIELDS = ["reportText","reportObservations","playerNotes","playerRatings"];
+async function migrateMatchdayPrivateFields_(){
+  if(!currentCoach || currentCoach.role !== ROLE_GESTOR) return;
+  const pending = matchdays.filter(m =>
+    !matchdayPrivateMigrationAttempted.has(m.id) &&
+    MATCHDAY_PRIVATE_FIELDS.some(f => m[f] !== undefined)
+  );
+  for(const m of pending){
+    matchdayPrivateMigrationAttempted.add(m.id);
+    try{
+      const batch = db.batch();
+      const privateData = {};
+      MATCHDAY_PRIVATE_FIELDS.forEach(f => { if(m[f] !== undefined) privateData[f] = m[f]; });
+      batch.set(db.collection("matchdays").doc(m.id).collection("private").doc("report"), privateData, {merge:true});
+      const clear = {};
+      MATCHDAY_PRIVATE_FIELDS.forEach(f => { clear[f] = firebase.firestore.FieldValue.delete(); });
+      batch.update(db.collection("matchdays").doc(m.id), clear);
+      await batch.commit();
+    }catch(err){ matchdayPrivateMigrationAttempted.delete(m.id); }
+  }
+}
 function defaultSeasonLabel_(){
   const now = new Date();
   const y = now.getFullYear();
@@ -5319,6 +5378,19 @@ function coachVisibleTeams_(){
   if(canEditContent) return teams; // gestor/editor ven todos los equipos
   const ids = Array.isArray(currentCoach.teamIds) ? currentCoach.teamIds : [];
   return teams.filter(t=>ids.includes(t.id));
+}
+// A diferencia de coachVisibleTeams_ (qué equipos se pueden ver/navegar en general), esto
+// decide quién puede ver las notas de jugadores y el informe del partido de un equipo: SOLO
+// un gestor o el entrenador que tenga ese equipo asignado (currentCoach.teamIds), sea cual
+// sea su rol — un editor sin ese equipo asignado NO entra aquí, aunque coachVisibleTeams_ le
+// deje navegar y ver el resto de la Jornada con normalidad. Coincide exactamente con lo que
+// permiten las reglas de Firestore para matchdays/{id}/private/report (ver REGLAS_FIRESTORE),
+// así que esto es solo para mostrar un aviso claro en vez de un formulario vacío engañoso —
+// la seguridad real la da la regla, no esta función.
+function puedeVerNotasPrivadas_(teamId){
+  if(!currentCoach) return false;
+  if(currentCoach.role === ROLE_GESTOR) return true;
+  return Array.isArray(currentCoach.teamIds) && currentCoach.teamIds.includes(teamId);
 }
 // A diferencia de coachVisibleTeams_ (qué equipos se pueden VER), esto decide quién puede
 // EDITAR la plantilla (jugadores) de un equipo: solo el gestor, o un entrenador/editor
@@ -7973,11 +8045,18 @@ function renderMatchdayReport(){
   if(!m) return;
   selectedMatchDifficulty = m.difficulty || null;
   renderMatchdayDifficultyPicker();
-  document.getElementById("mdReportText").value = m.reportText || "";
-  document.getElementById("mdReportObservations").value = m.reportObservations || "";
+
+  const puedeVer = puedeVerNotasPrivadas_(m.teamId);
+  document.getElementById("mdReportNoAccess").style.display = puedeVer ? "none" : "";
+  document.getElementById("mdReportPrivateWrap").style.display = puedeVer ? "" : "none";
+  if(!puedeVer) return; // sin acceso: no rellenar nada, ni siquiera con lo que hubiera en caché
+
+  const priv = matchdayPrivate[m.id] || {};
+  document.getElementById("mdReportText").value = priv.reportText || "";
+  document.getElementById("mdReportObservations").value = priv.reportObservations || "";
   const roster = players.filter(p=>p.teamId===m.teamId).sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
-  const notes = m.playerNotes || {};
-  const ratings = m.playerRatings || {};
+  const notes = priv.playerNotes || {};
+  const ratings = priv.playerRatings || {};
   const wrap = document.getElementById("matchdayPlayerNotes");
   if(roster.length===0){ wrap.innerHTML = '<p class="muted">Este equipo todavía no tiene jugadores en la plantilla.</p>'; return; }
   wrap.innerHTML = roster.map(p=>`
@@ -8007,13 +8086,17 @@ document.getElementById("btnSaveMatchdayReport").onclick = async () => {
     if(val!=="" && !isNaN(Number(val))) playerRatings[inp.dataset.playerId] = Number(val);
   });
   try{
+    // La dificultad se queda en el documento público de la jornada (no es información
+    // sensible); el resto va al subdocumento privado (ver comentario de "matchdayPrivate").
     await db.collection("matchdays").doc(statsMatchdayId).update({
-      difficulty: selectedMatchDifficulty || null,
+      difficulty: selectedMatchDifficulty || null
+    });
+    await db.collection("matchdays").doc(statsMatchdayId).collection("private").doc("report").set({
       reportText: document.getElementById("mdReportText").value.trim(),
       reportObservations: document.getElementById("mdReportObservations").value.trim(),
       playerNotes,
       playerRatings
-    });
+    }, {merge:true});
     msgEl.innerHTML = '<p class="ok-msg">Informe guardado.</p>';
   }catch(err){
     msgEl.innerHTML = '<p class="error-msg">Error al guardar: '+err.message+'</p>';
@@ -8087,6 +8170,10 @@ function exportMatchdayReportPDF(matchdayId){
   const roster = players.filter(p=>p.teamId===m.teamId).sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
   const statsMap = {};
   (m.playerStats||[]).forEach(s=>{ statsMap[s.playerId] = s; });
+  // Informe/observaciones/notas/puntuaciones: solo si este entrenador tiene acceso a las
+  // notas privadas de este equipo (ver "matchdayPrivate" más arriba) — si no, el PDF sale
+  // sin esas secciones en vez de con datos de otro equipo que no debería poder ver.
+  const priv = puedeVerNotasPrivadas_(m.teamId) ? (matchdayPrivate[m.id] || {}) : {};
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({unit:"mm", format:"a4"});
   const pageW = doc.internal.pageSize.getWidth();
@@ -8197,11 +8284,11 @@ function exportMatchdayReportPDF(matchdayId){
     doc.text(`Dificultad del rival: ${diff.label}`, margin+9, y+3.6);
     y += 9;
   }
-  fullBox("Informe", m.reportText || "");
-  fullBox("Observaciones", m.reportObservations || "");
+  fullBox("Informe", priv.reportText || "");
+  fullBox("Observaciones", priv.reportObservations || "");
 
   const notesRows = roster
-    .map(p=>({p, note: (m.playerNotes||{})[p.id] || "", rating: (m.playerRatings||{})[p.id]}))
+    .map(p=>({p, note: (priv.playerNotes||{})[p.id] || "", rating: (priv.playerRatings||{})[p.id]}))
     .filter(r => r.note || r.rating!=null);
   if(notesRows.length){
     y += 2;
@@ -8420,7 +8507,10 @@ function computeTeamSummary_(teamId, season, difficultyFilter, competitionFilter
         if(s.goalsConceded===0) st.cleanSheets++;
       }
     });
-    Object.entries(m.playerRatings||{}).forEach(([playerId, rating])=>{
+    // Las puntuaciones son parte de las notas privadas (ver "matchdayPrivate" más arriba):
+    // si este entrenador no tiene acceso al equipo, matchdayPrivate[m.id] ni siquiera llega
+    // (el listener de Firestore lo filtra), así que aquí ya sale vacío sin nada que comprobar.
+    Object.entries((matchdayPrivate[m.id]||{}).playerRatings||{}).forEach(([playerId, rating])=>{
       const st = stats[playerId];
       if(!st || rating==null || isNaN(rating)) return;
       st.ratingSum += Number(rating);
@@ -8599,8 +8689,11 @@ function renderMatchdaySummary_(wrap){
   const linkedIds = m.linkedSessionIds || [];
   const linkedSessions = linkedIds.map(id=>sessions.find(s=>s.id===id)).filter(Boolean);
   const diff = matchDifficultyInfo_(m.difficulty);
-  const notes = m.playerNotes || {};
-  const ratings = m.playerRatings || {};
+  // Notas/puntuaciones/informe: ver "matchdayPrivate" más arriba. Si este entrenador no
+  // tiene acceso a este equipo, matchdayPrivate[m.id] no llega nunca (filtrado por Firestore).
+  const priv = puedeVerNotasPrivadas_(m.teamId) ? (matchdayPrivate[m.id] || {}) : {};
+  const notes = priv.playerNotes || {};
+  const ratings = priv.playerRatings || {};
   const forAgg = aggregateGoalEvents_([m], "goalsForEvents");
   const againstAgg = aggregateGoalEvents_([m], "goalsAgainstEvents");
   wrap.innerHTML = `
@@ -8653,10 +8746,10 @@ function renderMatchdaySummary_(wrap){
       </tbody>
     </table>
     </div>
-    ${(m.reportText || m.reportObservations || Object.keys(notes).length) ? `
+    ${(priv.reportText || priv.reportObservations || Object.keys(notes).length) ? `
       <h3 style="margin-top:14px;font-size:.9rem;">📋 Informe del partido</h3>
-      ${m.reportText ? `<p style="white-space:pre-wrap;font-size:.85rem;">${escapeHtml(m.reportText)}</p>` : ""}
-      ${m.reportObservations ? `<p class="muted" style="white-space:pre-wrap;font-size:.85rem;"><strong>Observaciones:</strong> ${escapeHtml(m.reportObservations)}</p>` : ""}
+      ${priv.reportText ? `<p style="white-space:pre-wrap;font-size:.85rem;">${escapeHtml(priv.reportText)}</p>` : ""}
+      ${priv.reportObservations ? `<p class="muted" style="white-space:pre-wrap;font-size:.85rem;"><strong>Observaciones:</strong> ${escapeHtml(priv.reportObservations)}</p>` : ""}
       ${Object.keys(notes).length ? `
         <h4 style="font-size:.85rem;margin:8px 0 2px 0;">Notas de jugadores</h4>
         <ul style="margin:0 0 0 18px;padding:0;font-size:.85rem;">
@@ -10998,7 +11091,13 @@ window.purgePlaySession = async (id) => {
 /* ============================================================
    COPIA DE SEGURIDAD COMPLETA (exportar / restaurar)
 ============================================================= */
-const BACKUP_COLLECTIONS = ["tasks","sessions","categories","coaches","abpCategories","plays","playSessions","playSessionFolders","gameModelFiles","teams","players","matchdays"];
+// "matchdays_private" no es una colección de verdad: es el nombre que usa esta copia de
+// seguridad para las notas de jugadores e informe del partido, que viven en el subdocumento
+// matchdays/{id}/private/report (ver comentario de "matchdayPrivate" más arriba). Se trata
+// aparte porque no es un db.collection(...) de primer nivel — ver los "if" especiales de
+// abajo, tanto al exportar (se lee con un collectionGroup) como al restaurar (cada entrada
+// lleva su propio "parentId" para reconstruir la ruta).
+const BACKUP_COLLECTIONS = ["tasks","sessions","categories","coaches","abpCategories","plays","playSessions","playSessionFolders","gameModelFiles","teams","players","matchdays","matchdays_private"];
 
 document.getElementById("btnExportBackup").onclick = async () => {
   const msgEl = document.getElementById("backupExportMsg");
@@ -11006,6 +11105,11 @@ document.getElementById("btnExportBackup").onclick = async () => {
   try{
     const backup = { exportedAt: new Date().toISOString(), version: 1, collections: {} };
     for(const col of BACKUP_COLLECTIONS){
+      if(col === "matchdays_private"){
+        const snap = await db.collectionGroup("private").get();
+        backup.collections[col] = snap.docs.map(d => ({ id: d.id, parentId: d.ref.parent.parent.id, data: d.data() }));
+        continue;
+      }
       const snap = await db.collection(col).get();
       backup.collections[col] = snap.docs.map(d => ({ id: d.id, data: d.data() }));
     }
@@ -11080,7 +11184,9 @@ document.getElementById("btnRestoreBackup").onclick = async () => {
         const chunk = docs.slice(i, i+RESTORE_CONCURRENCY);
         msgEl.innerHTML = `<p class="muted">Restaurando "${col}"... ${i}/${docs.length} — no cierres esta pantalla.</p>`;
         const results = await Promise.allSettled(
-          chunk.map(({id, data}) => db.collection(col).doc(id).set(reviveTimestamps(data)))
+          chunk.map(({id, parentId, data}) => col === "matchdays_private"
+            ? db.collection("matchdays").doc(parentId).collection("private").doc(id).set(reviveTimestamps(data))
+            : db.collection(col).doc(id).set(reviveTimestamps(data)))
         );
         results.forEach((r, idx) => {
           if(r.status === "fulfilled") ok++;
@@ -11208,6 +11314,19 @@ service cloud.firestore {
     match /matchdays/{matchdayId} {
       allow read: if isActive();
       allow write: if isActive();
+
+      // Notas de jugadores + informe del partido (texto libre, observaciones y puntuaciones):
+      // a diferencia del resto de la jornada (resultado, convocatoria, informe del rival...),
+      // esto SOLO lo puede leer/escribir un gestor o el entrenador que tenga este equipo
+      // asignado (myCoach().data.teamIds), sea cual sea su rol — el resto de entrenadores y
+      // editores ven la jornada con normalidad pero nunca este subdocumento. Firestore no deja
+      // filtrar campo a campo dentro de un mismo documento, por eso vive aparte.
+      match /private/{docId} {
+        allow read, write: if isGestor() || (
+          myCoach().data.teamIds is list &&
+          get(/databases/$(database)/documents/matchdays/$(matchdayId)).data.teamId in myCoach().data.teamIds
+        );
+      }
     }
     // Mesociclos/microciclos de "Mi equipo" → Mesociclos: mismo criterio de acceso que
     // matchdays (sin papelera, sin restricción por dueño), teamId lo filtra el cliente.
