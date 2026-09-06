@@ -7055,25 +7055,29 @@ function scoutKpiRowHtml_(datos){
   const idsOcasion = new Set(catOcasion.map(c=>c.id));
   const kpis = [];
 
+  // En Scouting FS un gol se marca con la categoría "Gol", no ADEMÁS como "Tiro" ni "Ocasión"
+  // — así que un gol siempre cuenta también como el tiro/ocasión que fue: se suma a las dos
+  // por separado (un gol es, por definición, un tiro que entró Y una ocasión que se aprovechó).
+  const golesP = catGol.length ? scoutContarPorFlag_(eventos, idsGol, 'propio') : 0;
+  const golesR = catGol.length ? scoutContarPorFlag_(eventos, idsGol, 'rival') : 0;
+
   if(catGol.length){
-    kpis.push(scoutKpiHtml_('Goles', scoutContarPorFlag_(eventos,idsGol,'propio'), scoutContarPorFlag_(eventos,idsGol,'rival')));
+    kpis.push(scoutKpiHtml_('Goles', golesP, golesR));
   }
   if(catTiro){
-    const p = eventos.filter(e=>e.tipo===catTiro.id && e.equipo==='propio').length;
-    const r = eventos.filter(e=>e.tipo===catTiro.id && e.equipo==='rival').length;
-    kpis.push(scoutKpiHtml_('Tiros', p, r));
-    // Eficacia = goles / tiros totales. En Scouting FS un gol se marca con la categoría "Gol",
-    // no además como "Tiro" — así que los tiros de verdad son los marcados como Tiro MÁS los
-    // que acabaron en gol (todo gol es, por definición, un tiro que entró). Con esto el
-    // resultado nunca puede pasar de 100%, así que ya no hace falta esa comprobación aparte.
-    if(catGol.length){
-      const golesP = scoutContarPorFlag_(eventos, idsGol, 'propio');
-      const tirosTotalesP = p + golesP;
-      if(tirosTotalesP>0) kpis.push(scoutKpiHtml_('Eficacia de tiro', Math.round((golesP/tirosTotalesP)*100)+'%', null, 'Goles / tiros'));
+    const tirosTotalesP = eventos.filter(e=>e.tipo===catTiro.id && e.equipo==='propio').length + golesP;
+    const tirosTotalesR = eventos.filter(e=>e.tipo===catTiro.id && e.equipo==='rival').length + golesR;
+    kpis.push(scoutKpiHtml_('Tiros totales', tirosTotalesP, tirosTotalesR));
+    // Eficacia = goles / tiros totales. Con los goles ya sumados en el total, el resultado
+    // nunca puede pasar de 100%, así que ya no hace falta ninguna comprobación aparte.
+    if(catGol.length && tirosTotalesP>0){
+      kpis.push(scoutKpiHtml_('Eficacia de tiro', Math.round((golesP/tirosTotalesP)*100)+'%', null, 'Goles / tiros'));
     }
   }
   if(catOcasion.length){
-    kpis.push(scoutKpiHtml_('Ocasiones', scoutContarPorFlag_(eventos,idsOcasion,'propio'), scoutContarPorFlag_(eventos,idsOcasion,'rival')));
+    const ocasionesTotalesP = scoutContarPorFlag_(eventos,idsOcasion,'propio') + golesP;
+    const ocasionesTotalesR = scoutContarPorFlag_(eventos,idsOcasion,'rival') + golesR;
+    kpis.push(scoutKpiHtml_('Ocasiones totales', ocasionesTotalesP, ocasionesTotalesR));
   }
   if(esJornadaSuelta){
     const proyecto = (datos.proyectos||[])[0];
@@ -7125,9 +7129,14 @@ function scoutInsightsHtml_(datos){
   const eventos = datos.eventos;
   const frases = [];
   const catOcasion = datos.categorias.filter(c=>c.indOcasion);
+  const catGolIns = datos.categorias.filter(c=>c.indGol);
   if(catOcasion.length){
     const ids = new Set(catOcasion.map(c=>c.id));
-    const p = scoutContarPorFlag_(eventos, ids, 'propio'), r = scoutContarPorFlag_(eventos, ids, 'rival');
+    const idsGolIns = new Set(catGolIns.map(c=>c.id));
+    // Un gol es, por definición, una ocasión aprovechada — mismo criterio que el KPI
+    // "Ocasiones totales": se suma aunque no esté marcada también como Ocasión.
+    const p = scoutContarPorFlag_(eventos, ids, 'propio') + scoutContarPorFlag_(eventos, idsGolIns, 'propio');
+    const r = scoutContarPorFlag_(eventos, ids, 'rival') + scoutContarPorFlag_(eventos, idsGolIns, 'rival');
     if(p>0 && r>0 && p>=r*1.5) frases.push(`<b>Dominio ofensivo.</b> Se generaron ${p} ocasiones frente a las ${r} del rival.`);
     else if(p>0 && r===0) frases.push(`<b>Dominio ofensivo.</b> ${p===1?'Se generó':'Se generaron'} ${p} ${p===1?'ocasión':'ocasiones'} sin que el rival generara ninguna.`);
     else if(r>0 && r>=p*1.5) frases.push(`<b>Ocasiones concedidas.</b> El rival generó ${r} ocasiones frente a las ${p} propias.`);
