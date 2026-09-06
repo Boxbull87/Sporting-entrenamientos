@@ -3057,6 +3057,39 @@ function showSyncError_(label, err){
   el.classList.remove("hidden");
   el.innerHTML += `<div>⚠️ No se ha podido cargar "${escapeHtml(label)}": ${escapeHtml(err && err.message ? err.message : String(err))}</div>`;
 }
+// Ver "matchdayPrivate" y el comentario junto a su listener más abajo. Aparte (en vez de
+// una llamada suelta a onSnapshot) porque a diferencia del resto de listeners de este
+// fichero, este SÍ necesita poder volver a engancharse solo: un "permission-denied" deja
+// MUERTO ese listener concreto para siempre hasta que se vuelve a crear — no se reintenta
+// solo aunque después cambien las reglas o los equipos asignados de este entrenador — y sin
+// este reintento, la única forma de recuperar las notas sería recargar la página a mano.
+// Pasó justo esto la primera vez: el código se desplegó unos segundos antes de publicar la
+// regla nueva en Firestore, el listener murió con el primer error, y aunque la regla se
+// publicó bien poco después, la app se quedó "ciega" a esas notas hasta refrescar.
+let matchdayPrivateRetryMs = 4000;
+function attachMatchdayPrivateListener_(){
+  db.collectionGroup("private").onSnapshot(snap=>{
+    matchdayPrivateRetryMs = 4000; // una carga buena reinicia el backoff
+    snap.docChanges().forEach(change=>{
+      const matchdayId = change.doc.ref.parent.parent.id;
+      if(change.type==="removed") delete matchdayPrivate[matchdayId];
+      else matchdayPrivate[matchdayId] = change.doc.data();
+    });
+    if(statsMatchdayId && !document.getElementById("matchdayStatsView").classList.contains("hidden")){
+      renderMatchdayReport();
+    }
+    renderTeamSummary();
+  }, err => {
+    // A diferencia del resto de listeners (que usan showSyncError_ con un banner fijo
+    // porque un fallo ahí SIEMPRE es una avería real), aquí un "permission-denied" es el
+    // día a día para cualquier entrenador sin ese equipo asignado — es la restricción
+    // funcionando, no un error. Mostrar un banner rojo permanente por eso sería ruido para
+    // (casi) todo el mundo, así que solo se registra en consola para poder depurarlo.
+    console.warn("No se han podido cargar las notas privadas de jornadas (normal si no tienes ningún equipo con notas asignado, o transitorio justo tras publicar un cambio de reglas):", err);
+    setTimeout(attachMatchdayPrivateListener_, matchdayPrivateRetryMs);
+    matchdayPrivateRetryMs = Math.min(matchdayPrivateRetryMs * 2, 60000); // backoff hasta 1 min
+  });
+}
 function attachRealtimeListeners(){
   db.collection("categories").orderBy("name").onSnapshot(snap=>{
     categories = snap.docs.map(d=>({id:d.id, ...d.data()}));
@@ -3180,26 +3213,8 @@ function attachRealtimeListeners(){
   // Notas de jugadores + informe del partido (ver comentario de "matchdayPrivate" más
   // arriba). Un collectionGroup en vez de ir jornada a jornada: Firestore evalúa la regla
   // de matchdays/{id}/private/{docId} documento a documento y solo entrega los que este
-  // entrenador puede leer (los suyos, o todos si es gestor) — nada que filtrar a mano aquí,
-  // y si algún día cambian sus equipos asignados, este listener se reajusta solo.
-  db.collectionGroup("private").onSnapshot(snap=>{
-    snap.docChanges().forEach(change=>{
-      const matchdayId = change.doc.ref.parent.parent.id;
-      if(change.type==="removed") delete matchdayPrivate[matchdayId];
-      else matchdayPrivate[matchdayId] = change.doc.data();
-    });
-    if(statsMatchdayId && !document.getElementById("matchdayStatsView").classList.contains("hidden")){
-      renderMatchdayReport();
-    }
-    renderTeamSummary();
-  }, err => {
-    // A diferencia del resto de listeners (que usan showSyncError_ con un banner fijo
-    // porque un fallo ahí SIEMPRE es una avería real), aquí un "permission-denied" es el
-    // día a día para cualquier entrenador sin ese equipo asignado — es la restricción
-    // funcionando, no un error. Mostrar un banner rojo permanente por eso sería ruido para
-    // (casi) todo el mundo, así que solo se registra en consola para poder depurarlo.
-    console.warn("No se han podido cargar las notas privadas de jornadas (normal si no tienes ningún equipo con notas asignado):", err);
-  });
+  // entrenador puede leer (los suyos, o todos si es gestor) — nada que filtrar a mano aquí.
+  attachMatchdayPrivateListener_();
 
   db.collection("mesociclos").orderBy("startDate").onSnapshot(snap=>{
     mesociclos = snap.docs.map(d=>({id:d.id, ...d.data()}));
