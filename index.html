@@ -2191,9 +2191,10 @@ let matchdays = [];
 // del propio documento de la jornada — Firestore no puede filtrar campo a campo dentro
 // de un mismo documento, así que la única forma de que el resto de entrenadores/editores
 // no puedan leer esta información es que ni siquiera esté en el documento que sí ven.
-// { [matchdayId]: {reportText, reportObservations, playerNotes, playerRatings} } — solo
-// contiene las jornadas para las que este entrenador tiene permiso (el propio listener de
-// Firestore ya filtra el resto, ver el onSnapshot de collectionGroup("private") más abajo).
+// { [matchdayId]: {reportText, reportObservations, playerNotes, playerRatings} } — caché de lo
+// ya leído; solo se piden las jornadas de equipos a los que este entrenador tiene acceso (ver
+// puedeVerNotasPrivadas_ y cargarNotasPrivadas_ más abajo). Que la clave exista (aunque valga
+// {}) significa "ya cargada"; que no exista, "todavía sin pedir".
 let matchdayPrivate = {};
 let editingMatchdayId = null;
 let mesociclos = [];
@@ -3057,38 +3058,57 @@ function showSyncError_(label, err){
   el.classList.remove("hidden");
   el.innerHTML += `<div>⚠️ No se ha podido cargar "${escapeHtml(label)}": ${escapeHtml(err && err.message ? err.message : String(err))}</div>`;
 }
-// Ver "matchdayPrivate" y el comentario junto a su listener más abajo. Aparte (en vez de
-// una llamada suelta a onSnapshot) porque a diferencia del resto de listeners de este
-// fichero, este SÍ necesita poder volver a engancharse solo: un "permission-denied" deja
-// MUERTO ese listener concreto para siempre hasta que se vuelve a crear — no se reintenta
-// solo aunque después cambien las reglas o los equipos asignados de este entrenador — y sin
-// este reintento, la única forma de recuperar las notas sería recargar la página a mano.
-// Pasó justo esto la primera vez: el código se desplegó unos segundos antes de publicar la
-// regla nueva en Firestore, el listener murió con el primer error, y aunque la regla se
-// publicó bien poco después, la app se quedó "ciega" a esas notas hasta refrescar.
-let matchdayPrivateRetryMs = 4000;
-function attachMatchdayPrivateListener_(){
-  db.collectionGroup("private").onSnapshot(snap=>{
-    matchdayPrivateRetryMs = 4000; // una carga buena reinicia el backoff
-    snap.docChanges().forEach(change=>{
-      const matchdayId = change.doc.ref.parent.parent.id;
-      if(change.type==="removed") delete matchdayPrivate[matchdayId];
-      else matchdayPrivate[matchdayId] = change.doc.data();
-    });
-    if(statsMatchdayId && !document.getElementById("matchdayStatsView").classList.contains("hidden")){
-      renderMatchdayReport();
-    }
-    renderTeamSummary();
-  }, err => {
-    // A diferencia del resto de listeners (que usan showSyncError_ con un banner fijo
-    // porque un fallo ahí SIEMPRE es una avería real), aquí un "permission-denied" es el
-    // día a día para cualquier entrenador sin ese equipo asignado — es la restricción
-    // funcionando, no un error. Mostrar un banner rojo permanente por eso sería ruido para
-    // (casi) todo el mundo, así que solo se registra en consola para poder depurarlo.
-    console.warn("No se han podido cargar las notas privadas de jornadas (normal si no tienes ningún equipo con notas asignado, o transitorio justo tras publicar un cambio de reglas):", err);
-    setTimeout(attachMatchdayPrivateListener_, matchdayPrivateRetryMs);
-    matchdayPrivateRetryMs = Math.min(matchdayPrivateRetryMs * 2, 60000); // backoff hasta 1 min
-  });
+/* ---------- Lectura de las notas privadas de una jornada (ver "matchdayPrivate" arriba) ----------
+   POR RUTA DIRECTA, jornada a jornada — NO con db.collectionGroup("private"), aunque a primera
+   vista sería más cómodo. En Firestore, una regla anidada por ruta como
+   match /matchdays/{matchdayId}/private/{docId} autoriza el acceso a ESA ruta concreta, pero NO
+   autoriza una consulta de tipo "collection group": esas necesitan además una regla comodín
+   (match /{path=**}/private/{docId}), y aun con ella una consulta sin filtrar la rechazarían las
+   reglas para cualquiera que no tenga permiso sobre TODOS los documentos ("las reglas no filtran
+   resultados": si un solo documento del resultado no pasa la regla, falla la consulta entera).
+   Por eso el primer intento escribía bien (ruta directa) pero no podía leer nada.
+   Aquí, en cambio, cada lectura es un get de matchdays/{id}/private/report: la regla se evalúa
+   documento a documento y funciona tal cual está publicada.
+   La contrapartida es que no hay actualización en vivo entre dispositivos, algo irrelevante aquí:
+   estas notas las escribe un único entrenador (el del equipo), y tras guardar se refresca la
+   caché local en el propio guardado. */
+const matchdayPrivateEnVuelo = new Map(); // matchdayId -> promesa de su lectura en curso
+function refPrivadaJornada_(matchdayId){
+  return db.collection("matchdays").doc(matchdayId).collection("private").doc("report");
+}
+// Promesa que resuelve cuando las notas de esa jornada están en caché (o al momento si ya
+// estaban, o si este entrenador no tiene acceso). Si falla, cachea vacío a propósito: sin eso,
+// cada pintado volvería a pedirlo, fallaría otra vez y volvería a pintar — un bucle infinito de
+// peticiones. Para reintentar basta con volver a abrir la jornada (openMatchdayStats limpia su
+// entrada de la caché) o recargar la página.
+function cargarNotasPrivadas_(m){
+  if(!m || !puedeVerNotasPrivadas_(m.teamId) || (m.id in matchdayPrivate)) return Promise.resolve();
+  if(matchdayPrivateEnVuelo.has(m.id)) return matchdayPrivateEnVuelo.get(m.id);
+  const p = refPrivadaJornada_(m.id).get()
+    .then(doc => { matchdayPrivate[m.id] = doc.exists ? doc.data() : {}; })
+    .catch(err => {
+      matchdayPrivate[m.id] = {};
+      // Sin banner rojo: aquí un permission-denied es la restricción funcionando, no una avería.
+      console.warn('No se han podido cargar las notas privadas de la jornada "'+m.id+'":', err);
+    })
+    .then(() => { matchdayPrivateEnVuelo.delete(m.id); });
+  matchdayPrivateEnVuelo.set(m.id, p);
+  return p;
+}
+// Devuelve lo que haya en caché (vacío la primera vez) y, si falta, lo pide en segundo plano y
+// llama a alCargar() al llegar para que quien esté pintando se vuelva a pintar ya con el dato.
+function notasPrivadas_(m, alCargar){
+  if(!m || !puedeVerNotasPrivadas_(m.teamId)) return {};
+  if(m.id in matchdayPrivate) return matchdayPrivate[m.id];
+  precargarNotasPrivadas_([m], alCargar);
+  return {};
+}
+// alCargar solo se llama si de verdad faltaba algo por cargar: si no, un re-pintado que vuelva
+// a pasar por aquí llamaría otra vez a alCargar y se quedaría dando vueltas.
+function precargarNotasPrivadas_(mds, alCargar){
+  const pendientes = (mds||[]).filter(m => m && puedeVerNotasPrivadas_(m.teamId) && !(m.id in matchdayPrivate));
+  if(!pendientes.length) return Promise.resolve();
+  return Promise.all(pendientes.map(cargarNotasPrivadas_)).then(()=>{ if(alCargar) alCargar(); });
 }
 function attachRealtimeListeners(){
   db.collection("categories").orderBy("name").onSnapshot(snap=>{
@@ -3210,11 +3230,8 @@ function attachRealtimeListeners(){
     renderMiEquipoCalendar_();
   }, err => showSyncError_("jornadas", err));
 
-  // Notas de jugadores + informe del partido (ver comentario de "matchdayPrivate" más
-  // arriba). Un collectionGroup en vez de ir jornada a jornada: Firestore evalúa la regla
-  // de matchdays/{id}/private/{docId} documento a documento y solo entrega los que este
-  // entrenador puede leer (los suyos, o todos si es gestor) — nada que filtrar a mano aquí.
-  attachMatchdayPrivateListener_();
+  // (Las notas de jugadores + informe del partido NO se cargan aquí con un listener: se leen
+  // por ruta directa y bajo demanda, ver notasPrivadas_/precargarNotasPrivadas_ más arriba.)
 
   db.collection("mesociclos").orderBy("startDate").onSnapshot(snap=>{
     mesociclos = snap.docs.map(d=>({id:d.id, ...d.data()}));
@@ -6586,6 +6603,10 @@ document.getElementById("btnSaveMatchday").onclick = async () => {
 
 window.openMatchdayStats = (id) => {
   statsMatchdayId = id;
+  // Las notas privadas se releen enteras al abrir la jornada: así se ve lo último que haya
+  // guardado otro dispositivo, y es el punto natural para reintentar si una lectura anterior
+  // falló (ver cargarNotasPrivadas_, que cachea vacío ante un error para no entrar en bucle).
+  delete matchdayPrivate[id];
   // Estos acordeones son HTML fijo (nunca se recrean, a diferencia del de "Scouting FS" que
   // se repinta entero), así que sin esto su abierto/cerrado se quedaría pegado de una jornada
   // a otra en vez de volver siempre al mismo estado por defecto al entrar en una jornada.
@@ -8073,7 +8094,8 @@ function renderMatchdayReport(){
   document.getElementById("mdReportPrivateWrap").style.display = puedeVer ? "" : "none";
   if(!puedeVer) return; // sin acceso: no rellenar nada, ni siquiera con lo que hubiera en caché
 
-  const priv = matchdayPrivate[m.id] || {};
+  // Si aún no están cargadas, notasPrivadas_ las pide y vuelve a llamar aquí al llegar.
+  const priv = notasPrivadas_(m, renderMatchdayReport);
   document.getElementById("mdReportText").value = priv.reportText || "";
   document.getElementById("mdReportObservations").value = priv.reportObservations || "";
   const roster = players.filter(p=>p.teamId===m.teamId).sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
@@ -8113,12 +8135,16 @@ document.getElementById("btnSaveMatchdayReport").onclick = async () => {
     await db.collection("matchdays").doc(statsMatchdayId).update({
       difficulty: selectedMatchDifficulty || null
     });
-    await db.collection("matchdays").doc(statsMatchdayId).collection("private").doc("report").set({
+    const datosPrivados = {
       reportText: document.getElementById("mdReportText").value.trim(),
       reportObservations: document.getElementById("mdReportObservations").value.trim(),
       playerNotes,
       playerRatings
-    }, {merge:true});
+    };
+    await refPrivadaJornada_(statsMatchdayId).set(datosPrivados, {merge:true});
+    // No hay listener que refresque esto solo (se lee bajo demanda, ver notasPrivadas_):
+    // se actualiza la caché a mano para que Estadísticas y el PDF usen ya lo recién guardado.
+    matchdayPrivate[statsMatchdayId] = {...(matchdayPrivate[statsMatchdayId]||{}), ...datosPrivados};
     msgEl.innerHTML = '<p class="ok-msg">Informe guardado.</p>';
   }catch(err){
     msgEl.innerHTML = '<p class="error-msg">Error al guardar: '+err.message+'</p>';
@@ -8184,7 +8210,7 @@ document.getElementById("btnSaveRivalReport").onclick = async () => {
 };
 
 /* ---------- Exportar convocatoria en PDF ---------- */
-function exportMatchdayReportPDF(matchdayId){
+async function exportMatchdayReportPDF(matchdayId){
   const m = matchdays.find(x=>x.id===matchdayId);
   if(!m){ alert("No se ha encontrado la jornada."); return; }
   if(!window.jspdf){ alert("No se ha podido cargar el generador de PDF. Comprueba tu conexión e inténtalo de nuevo."); return; }
@@ -8195,6 +8221,9 @@ function exportMatchdayReportPDF(matchdayId){
   // Informe/observaciones/notas/puntuaciones: solo si este entrenador tiene acceso a las
   // notas privadas de este equipo (ver "matchdayPrivate" más arriba) — si no, el PDF sale
   // sin esas secciones en vez de con datos de otro equipo que no debería poder ver.
+  // Se esperan aquí (se leen bajo demanda, ver notasPrivadas_) para no generar un PDF sin
+  // el informe solo porque todavía no hubieran terminado de cargarse.
+  await cargarNotasPrivadas_(m);
   const priv = puedeVerNotasPrivadas_(m.teamId) ? (matchdayPrivate[m.id] || {}) : {};
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({unit:"mm", format:"a4"});
@@ -8529,9 +8558,10 @@ function computeTeamSummary_(teamId, season, difficultyFilter, competitionFilter
         if(s.goalsConceded===0) st.cleanSheets++;
       }
     });
-    // Las puntuaciones son parte de las notas privadas (ver "matchdayPrivate" más arriba):
-    // si este entrenador no tiene acceso al equipo, matchdayPrivate[m.id] ni siquiera llega
-    // (el listener de Firestore lo filtra), así que aquí ya sale vacío sin nada que comprobar.
+    // Las puntuaciones son parte de las notas privadas (ver "matchdayPrivate" más arriba). Esto
+    // es síncrono a propósito: quien pinta ya se ha encargado de precargarlas antes
+    // (precargarNotasPrivadas_ en renderTeamSummary) y de repintar cuando llegan. Si el
+    // entrenador no tiene acceso al equipo, no se piden nunca y aquí sale vacío.
     Object.entries((matchdayPrivate[m.id]||{}).playerRatings||{}).forEach(([playerId, rating])=>{
       const st = stats[playerId];
       if(!st || rating==null || isNaN(rating)) return;
@@ -8633,6 +8663,11 @@ function renderTeamSummary(){
 
   if(teamMds.length===0){ wrap.innerHTML = '<div class="empty">No hay jornadas que coincidan con este filtro en esta temporada.</div>'; return; }
 
+  // Las puntuaciones de la temporada ("Nota media") salen de las notas privadas, que se leen
+  // bajo demanda: se piden todas las de este equipo de una vez y, cuando llegan, se vuelve a
+  // pintar ya con ellas (solo la primera vez: después están en caché y esto no hace nada).
+  precargarNotasPrivadas_(teamMds, renderTeamSummary);
+
   if(summaryMode==="matchday") renderMatchdaySummary_(wrap);
   else renderSeasonSummary_(wrap);
 }
@@ -8711,9 +8746,9 @@ function renderMatchdaySummary_(wrap){
   const linkedIds = m.linkedSessionIds || [];
   const linkedSessions = linkedIds.map(id=>sessions.find(s=>s.id===id)).filter(Boolean);
   const diff = matchDifficultyInfo_(m.difficulty);
-  // Notas/puntuaciones/informe: ver "matchdayPrivate" más arriba. Si este entrenador no
-  // tiene acceso a este equipo, matchdayPrivate[m.id] no llega nunca (filtrado por Firestore).
-  const priv = puedeVerNotasPrivadas_(m.teamId) ? (matchdayPrivate[m.id] || {}) : {};
+  // Notas/puntuaciones/informe: ver "matchdayPrivate" más arriba. Sale vacío si este entrenador
+  // no tiene este equipo asignado; si aún no están cargadas, se piden y se vuelve a pintar.
+  const priv = notasPrivadas_(m, renderTeamSummary);
   const notes = priv.playerNotes || {};
   const ratings = priv.playerRatings || {};
   const forAgg = aggregateGoalEvents_([m], "goalsForEvents");
@@ -11117,8 +11152,9 @@ window.purgePlaySession = async (id) => {
 // seguridad para las notas de jugadores e informe del partido, que viven en el subdocumento
 // matchdays/{id}/private/report (ver comentario de "matchdayPrivate" más arriba). Se trata
 // aparte porque no es un db.collection(...) de primer nivel — ver los "if" especiales de
-// abajo, tanto al exportar (se lee con un collectionGroup) como al restaurar (cada entrada
-// lleva su propio "parentId" para reconstruir la ruta).
+// abajo, tanto al exportar (se lee jornada a jornada, NO con un collectionGroup: ver el
+// comentario de cargarNotasPrivadas_) como al restaurar (cada entrada lleva su propio
+// "parentId" para reconstruir la ruta).
 const BACKUP_COLLECTIONS = ["tasks","sessions","categories","coaches","abpCategories","plays","playSessions","playSessionFolders","gameModelFiles","teams","players","matchdays","matchdays_private"];
 
 document.getElementById("btnExportBackup").onclick = async () => {
@@ -11128,8 +11164,13 @@ document.getElementById("btnExportBackup").onclick = async () => {
     const backup = { exportedAt: new Date().toISOString(), version: 1, collections: {} };
     for(const col of BACKUP_COLLECTIONS){
       if(col === "matchdays_private"){
-        const snap = await db.collectionGroup("private").get();
-        backup.collections[col] = snap.docs.map(d => ({ id: d.id, parentId: d.ref.parent.parent.id, data: d.data() }));
+        const mdSnap = await db.collection("matchdays").get();
+        const privDocs = await Promise.all(mdSnap.docs.map(d =>
+          d.ref.collection("private").doc("report").get()
+            .then(p => p.exists ? { id: p.id, parentId: d.id, data: p.data() } : null)
+            .catch(() => null) // una jornada sin permiso no debe tumbar la copia entera
+        ));
+        backup.collections[col] = privDocs.filter(Boolean);
         continue;
       }
       const snap = await db.collection(col).get();
@@ -11343,6 +11384,12 @@ service cloud.firestore {
       // asignado (myCoach().data.teamIds), sea cual sea su rol — el resto de entrenadores y
       // editores ven la jornada con normalidad pero nunca este subdocumento. Firestore no deja
       // filtrar campo a campo dentro de un mismo documento, por eso vive aparte.
+      // OJO: esta regla anidada autoriza el acceso POR RUTA DIRECTA
+      // (matchdays/{id}/private/report), que es como lo lee y escribe la app. NO autoriza
+      // consultas db.collectionGroup("private") — esas necesitarían además una regla comodín
+      // match /{path=**}/private/{docId}, y ni con ella funcionarían para un entrenador normal,
+      // porque las reglas no filtran resultados: si un solo documento del resultado no pasa la
+      // regla, se rechaza la consulta entera. Ver el comentario de cargarNotasPrivadas_.
       match /private/{docId} {
         allow read, write: if isGestor() || (
           myCoach().data.teamIds is list &&
