@@ -1213,6 +1213,7 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
             <button class="btn ghost small" id="btnNewAbpFolder">📁+ Carpeta</button>
             <button class="btn ghost small" id="btnDebugAbpFolders">🔧 Ver datos de carpetas</button>
             <button class="btn ghost small" id="btnRepairAbpCategoryFolder">🩹 Reparar carpeta Categorías</button>
+            <button class="btn danger small hidden" id="btnDisableAllPublicLinks" title="Pone en privado TODAS las jugadas sueltas y sesiones de ABP que ahora mismo tengan un enlace público activo">🚨 Desactivar todos los enlaces públicos</button>
           </div>
           <div id="abpBreadcrumb" class="breadcrumb"></div>
           <div id="abpFolderList" style="margin-top:10px;"></div>
@@ -2458,6 +2459,7 @@ function initAppUI(){
   document.getElementById("btnNewTaskFolder").classList.toggle("hidden", !canEditContent);
   document.getElementById("playEditorPanel").classList.toggle("hidden", !canEditContent);
   document.getElementById("btnNewAbpFolder").classList.toggle("hidden", !canEditContent);
+  document.getElementById("btnDisableAllPublicLinks").classList.toggle("hidden", !isGestor);
   document.getElementById("modeloUploadPanel").classList.toggle("hidden", !canEditContent);
   document.getElementById("plantillaGoTeams").classList.toggle("hidden", !canEditContent);
   updateCompareCardVisibility();
@@ -3020,6 +3022,34 @@ document.getElementById("btnDebugAbpFolders").onclick = () => {
     w.document.write(`<pre style="white-space:pre-wrap;font-family:monospace;font-size:13px;padding:16px;">${report.replace(/[&<>]/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]))}</pre>`);
   } else {
     alert(report);
+  }
+};
+// Red de seguridad (solo gestor, ver initAppUI): pone en privado de golpe TODAS las jugadas
+// sueltas y sesiones de ABP que ahora mismo tengan el enlace público activo, sin tener que
+// repasarlas una a una. No hace falta tocar los "publicToken": con "public:false" el enlace
+// deja de funcionar YA (la regla de Firestore exige public==true para leer sin sesión
+// iniciada) — si más adelante se vuelve a activar alguna, sale con un enlace nuevo, como
+// siempre (ver togglePlayPublic/togglePlaySessionPublic).
+document.getElementById("btnDisableAllPublicLinks").onclick = async () => {
+  const playsPublicos = plays.filter(p=>p.public);
+  const sesionesPublicas = playSessions.filter(s=>s.public);
+  const total = playsPublicos.length + sesionesPublicas.length;
+  if(total===0){ alert("No hay ninguna jugada ni sesión de ABP con el enlace público activo ahora mismo."); return; }
+  if(!confirm(`Esto desactivará el enlace público de ${playsPublicos.length} jugada(s) y ${sesionesPublicas.length} sesión(es) de ABP AHORA MISMO. Podrás volver a activarlos uno a uno cuando quieras (con un enlace nuevo cada vez). ¿Continuar?`)) return;
+  try{
+    const CHUNK = 400; // margen bajo el límite de 500 operaciones por batch de Firestore
+    const escrituras = [
+      ...playsPublicos.map(p=>({col:"plays", id:p.id})),
+      ...sesionesPublicas.map(s=>({col:"playSessions", id:s.id}))
+    ];
+    for(let i=0; i<escrituras.length; i+=CHUNK){
+      const batch = db.batch();
+      escrituras.slice(i, i+CHUNK).forEach(({col,id}) => batch.update(db.collection(col).doc(id), {public:false}));
+      await batch.commit();
+    }
+    alert("Listo: todos los enlaces públicos de ABP han quedado desactivados.");
+  }catch(err){
+    alert("No se ha podido completar: " + err.message + "\n\nRevisa cuáles han quedado sin desactivar y repite si hace falta.");
   }
 };
 
@@ -10029,6 +10059,14 @@ function videoEmbedHtml(url){
 ============================================================= */
 let editingPlayId = null;
 
+// Enlaces públicos de jugadas/sesiones de ABP: ver comentario largo junto a loadPublicPlay.
+// Tan aleatorio como el propio id que genera Firestore (que es lo que se usaba antes en la
+// URL), pero se puede cambiar cuando se quiera sin tocar el documento ni sus referencias.
+function nuevoTokenPublico_(){
+  return (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+    : (Date.now().toString(36) + Math.random().toString(36).slice(2));
+}
+
 document.getElementById("playForm").onsubmit = async (e) => {
   e.preventDefault();
   const msgEl = document.getElementById("playFormMsg");
@@ -10055,6 +10093,12 @@ document.getElementById("playForm").onsubmit = async (e) => {
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   };
   if(!payload.title){ msgEl.innerHTML = '<p class="error-msg">Ponle un título a la jugada.</p>'; return; }
+  // Enlace nuevo cada vez que el enlace público pasa de apagado a encendido (al crearla con la
+  // casilla marcada, o al volver a marcarla tras haberla desmarcado) — así un enlace antiguo que
+  // hubiera quedado repartido por ahí no revive solo. Si ya estaba público y sigue estándolo,
+  // se guarda el mismo token de siempre: editar la jugada no debe romper un enlace ya compartido.
+  const playAnterior = editingPlayId ? plays.find(x=>x.id===editingPlayId) : null;
+  if(payload.public && !(playAnterior && playAnterior.public)) payload.publicToken = nuevoTokenPublico_();
   try{
     if(editingPlayId){
       await db.collection("plays").doc(editingPlayId).update(payload);
@@ -10239,7 +10283,9 @@ function renderPlayList(){
   }
   wrap.innerHTML = list.map(p=>{
     const frameCount = (p.animation && p.animation.frames) ? p.animation.frames.length : 0;
-    const publicUrl = location.origin + location.pathname + "#publicplay=" + p.id;
+    // publicToken si ya se generó; si no (jugadas públicas de antes de este cambio), se sigue
+    // usando el id tal cual, ver el comentario grande junto a loadPublicPlay.
+    const publicUrl = location.origin + location.pathname + "#publicplay=" + (p.publicToken || p.id);
     return `
     <div class="task-item" style="flex-wrap:wrap;">
       <div>
@@ -10253,7 +10299,13 @@ function renderPlayList(){
         <div class="row" style="margin-top:6px;">
           <input type="text" readonly value="${escapeHtml(publicUrl)}" onclick="this.select()" style="font-size:.78rem;">
           <button type="button" class="btn small ghost" style="flex:0 0 auto;" onclick="copyPublicPlayLink('${p.id}')">🔗 Copiar enlace</button>
-        </div>` : `<p class="muted" style="font-size:.78rem;margin-top:4px;">Enlace público desactivado para esta jugada.</p>`}
+          <button type="button" class="btn small ghost" style="flex:0 0 auto;" title="Genera un enlace nuevo; el actual deja de funcionar" onclick="regenerarPlayPublicLink('${p.id}')">🔄 Cambiar enlace</button>
+          <button type="button" class="btn small danger" style="flex:0 0 auto;" onclick="togglePlayPublic('${p.id}')">🔒 Desactivar enlace</button>
+        </div>` : `
+        <div class="row" style="margin-top:6px;align-items:center;">
+          <p class="muted" style="font-size:.78rem;margin:0;">Enlace público desactivado para esta jugada.</p>
+          <button type="button" class="btn small ghost" style="flex:0 0 auto;" onclick="togglePlayPublic('${p.id}')">🔓 Activar enlace</button>
+        </div>`}
       </div>
       <div class="task-actions">
         <button type="button" class="star-btn ${isPlayFavorite(p.id)?"active":""}" onclick="toggleFavoritePlay('${p.id}')" title="${isPlayFavorite(p.id)?"Quitar de favoritas":"Añadir a favoritas"}">${isPlayFavorite(p.id)?"★":"☆"}</button>
@@ -10402,6 +10454,10 @@ document.getElementById("btnSavePlaySession").onclick = async () => {
     folderIds: [...selectedPlaySessionFolderIds],
     plays: JSON.parse(JSON.stringify(playSessionItems))
   };
+  // Ver el comentario igual junto al guardado de una jugada suelta: enlace nuevo solo al pasar
+  // de apagado a encendido, nunca al simple editar-y-guardar de una sesión ya pública.
+  const sesionAnterior = editingPlaySessionId ? playSessions.find(x=>x.id===editingPlaySessionId) : null;
+  if(payload.public && !(sesionAnterior && sesionAnterior.public)) payload.publicToken = nuevoTokenPublico_();
   try{
     if(editingPlaySessionId){
       await db.collection("playSessions").doc(editingPlaySessionId).update(payload);
@@ -10536,7 +10592,8 @@ window.deletePlaySession = async (id, contextFolderId) => {
 };
 
 window.copyPublicLink = (id) => {
-  const url = location.origin + location.pathname + "#public=" + id;
+  const s = playSessions.find(x=>x.id===id);
+  const url = location.origin + location.pathname + "#public=" + ((s && s.publicToken) || id);
   navigator.clipboard.writeText(url).then(()=>{
     alert("Enlace copiado al portapapeles.");
   }).catch(()=>{
@@ -10544,12 +10601,44 @@ window.copyPublicLink = (id) => {
   });
 };
 window.copyPublicPlayLink = (id) => {
-  const url = location.origin + location.pathname + "#publicplay=" + id;
+  const p = plays.find(x=>x.id===id);
+  const url = location.origin + location.pathname + "#publicplay=" + ((p && p.publicToken) || id);
   navigator.clipboard.writeText(url).then(()=>{
     alert("Enlace copiado al portapapeles.");
   }).catch(()=>{
     prompt("Copia este enlace:", url);
   });
+};
+/* ---------- Activar/desactivar y regenerar los enlaces públicos de ABP ----------
+   Ver el comentario grande junto a loadPublicPlay para el porqué del "publicToken" en vez
+   de compartir el id del documento tal cual. */
+window.togglePlayPublic = async (id) => {
+  const p = plays.find(x=>x.id===id);
+  if(!p) return;
+  const activar = !p.public;
+  const payload = { public: activar };
+  if(activar) payload.publicToken = nuevoTokenPublico_(); // enlace nuevo cada vez que se reactiva
+  try{ await db.collection("plays").doc(id).update(payload); }
+  catch(err){ alert("No se ha podido cambiar el enlace: " + err.message); }
+};
+window.regenerarPlayPublicLink = async (id) => {
+  if(!confirm("Se generará un enlace nuevo para esta jugada. El enlace actual dejará de funcionar de inmediato, aunque alguien lo tenga guardado. ¿Continuar?")) return;
+  try{ await db.collection("plays").doc(id).update({ publicToken: nuevoTokenPublico_() }); }
+  catch(err){ alert("No se ha podido cambiar el enlace: " + err.message); }
+};
+window.togglePlaySessionPublic = async (id) => {
+  const s = playSessions.find(x=>x.id===id);
+  if(!s) return;
+  const activar = !s.public;
+  const payload = { public: activar };
+  if(activar) payload.publicToken = nuevoTokenPublico_();
+  try{ await db.collection("playSessions").doc(id).update(payload); }
+  catch(err){ alert("No se ha podido cambiar el enlace: " + err.message); }
+};
+window.regenerarPlaySessionPublicLink = async (id) => {
+  if(!confirm("Se generará un enlace nuevo para esta sesión. El enlace actual dejará de funcionar de inmediato, aunque alguien lo tenga guardado. ¿Continuar?")) return;
+  try{ await db.collection("playSessions").doc(id).update({ publicToken: nuevoTokenPublico_() }); }
+  catch(err){ alert("No se ha podido cambiar el enlace: " + err.message); }
 };
 window.copySurveyLink = (id) => {
   const url = location.origin + location.pathname + "#survey=" + id;
@@ -10592,7 +10681,9 @@ function renderSavedPlaySessions(){
   wrap.innerHTML = list.map(s=>{
     const canManage = currentCoach && (currentCoach.role===ROLE_GESTOR || s.createdBy===currentUser.uid);
     const sFolderIds = playSessionCategoryIds(s);
-    const publicUrl = location.origin + location.pathname + "#public=" + s.id;
+    // publicToken si ya se generó; si no (sesiones públicas de antes de este cambio), se sigue
+    // usando el id tal cual, ver el comentario grande junto a loadPublicPlaySession.
+    const publicUrl = location.origin + location.pathname + "#public=" + (s.publicToken || s.id);
     const itemsHtml = (s.plays||[]).map((item,i)=>`<li>${escapeHtml(item.title)}${item.categoryName?` <span class="muted">· ${escapeHtml(item.categoryName)}</span>`:""} <a href="javascript:void(0)" onclick="viewSessionPlayItem('${s.id}',${i})" style="color:var(--accent);font-weight:600;text-decoration:none;">👁️ Ver</a></li>`).join("");
     const unread = isItemUnread("playSessions", s);
     return `
@@ -10612,7 +10703,13 @@ function renderSavedPlaySessions(){
       <div class="row" style="margin-top:6px;">
         <input type="text" readonly value="${escapeHtml(publicUrl)}" onclick="this.select()" style="font-size:.78rem;">
         <button type="button" class="btn small ghost" style="flex:0 0 auto;" onclick="copyPublicLink('${s.id}')">🔗 Copiar enlace</button>
-      </div>` : `<p class="muted" style="font-size:.78rem;">Enlace público desactivado para esta sesión.</p>`}
+        ${canManage ? `<button type="button" class="btn small ghost" style="flex:0 0 auto;" title="Genera un enlace nuevo; el actual deja de funcionar" onclick="regenerarPlaySessionPublicLink('${s.id}')">🔄 Cambiar enlace</button>
+        <button type="button" class="btn small danger" style="flex:0 0 auto;" onclick="togglePlaySessionPublic('${s.id}')">🔒 Desactivar enlace</button>` : ""}
+      </div>` : `
+      <div class="row" style="margin-top:6px;align-items:center;">
+        <p class="muted" style="font-size:.78rem;margin:0;">Enlace público desactivado para esta sesión.</p>
+        ${canManage ? `<button type="button" class="btn small ghost" style="flex:0 0 auto;" onclick="togglePlaySessionPublic('${s.id}')">🔓 Activar enlace</button>` : ""}
+      </div>`}
       ${(canManage && sFolderIds.length>1) ? `<p class="muted" style="font-size:.72rem;margin:4px 0 0 0;">ℹ️ Esta sesión está metida en más carpetas: al editar o borrar se te preguntará en cuál, y se creará una copia independiente solo para esa carpeta, sin tocar a las demás.</p>` : ""}
       <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
         ${canManage ? `<button class="btn ghost small" onclick="handleEditPlaySessionClick('${s.id}')">✏️ Editar sesión</button>` : ""}
@@ -10673,12 +10770,22 @@ window.deleteModeloFile = async (id) => {
 
 /* ============================================================
    ENLACE PÚBLICO DE UNA SESIÓN DE ABP (sin necesidad de login)
+   El valor de la URL (#public=<valor>) es el "publicToken" de la sesión, NO su id de Firestore
+   — así el entrenador puede "cambiar el enlace" cuando quiera (🔄/🔒/🔓 en la lista de
+   sesiones) sin más que escribir ese campo, sin tener que borrar y recrear el documento ni
+   arrastrar sus referencias (carpetas, favoritos...). Por eso aquí se busca por ese campo con
+   un where en vez de ir directo por id.
+   Compatibilidad: los enlaces ya repartidos ANTES de que existiera "publicToken" llevan el id
+   del documento tal cual en la URL — de ahí el segundo intento por id si el primero no
+   encuentra nada. Esos enlaces antiguos se "renuevan" solos (empiezan a usar un token) en
+   cuanto el entrenador los desactive y reactive, o pulse "🔄 Cambiar enlace".
 ============================================================= */
-async function loadPublicPlaySession(id){
+async function loadPublicPlaySession(valor){
   document.getElementById("publicScreen").classList.remove("hidden");
   const wrap = document.getElementById("publicWrap");
   try{
-    const snap = await db.collection("playSessions").doc(id).get();
+    const porToken = await db.collection("playSessions").where("publicToken","==",valor).limit(1).get();
+    let snap = porToken.empty ? await db.collection("playSessions").doc(valor).get() : porToken.docs[0];
     if(!snap.exists || !snap.data().public){
       wrap.innerHTML = '<div class="empty">Este enlace no existe o ya no está disponible públicamente.</div>';
       return;
@@ -10710,12 +10817,14 @@ async function loadPublicPlaySession(id){
 }
 /* ---------- Enlace público de UNA jugada individual (mismo mecanismo, distinta
    colección: "plays" en vez de "playSessions", y hash #publicplay= en vez de
-   #public= para no confundir los dos tipos de enlace). ---------- */
-async function loadPublicPlay(id){
+   #public= para no confundir los dos tipos de enlace). Búsqueda por "publicToken" con el
+   mismo fallback por id de siempre — ver el comentario grande junto a loadPublicPlaySession. */
+async function loadPublicPlay(valor){
   document.getElementById("publicScreen").classList.remove("hidden");
   const wrap = document.getElementById("publicWrap");
   try{
-    const snap = await db.collection("plays").doc(id).get();
+    const porToken = await db.collection("plays").where("publicToken","==",valor).limit(1).get();
+    let snap = porToken.empty ? await db.collection("plays").doc(valor).get() : porToken.docs[0];
     if(!snap.exists || !snap.data().public){
       wrap.innerHTML = '<div class="empty">Este enlace no existe o ya no está disponible públicamente.</div>';
       return;
