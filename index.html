@@ -1213,6 +1213,7 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
             <button class="btn ghost small" id="btnNewAbpFolder">📁+ Carpeta</button>
             <button class="btn ghost small" id="btnDebugAbpFolders">🔧 Ver datos de carpetas</button>
             <button class="btn ghost small" id="btnRepairAbpCategoryFolder">🩹 Reparar carpeta Categorías</button>
+            <button class="btn ghost small hidden" id="btnRegenerateAllPublicLinks" title="Genera un enlace nuevo para TODAS las jugadas sueltas y sesiones de ABP que ahora mismo tengan un enlace público activo; los anteriores dejan de funcionar">🔄 Cambiar todos los enlaces</button>
             <button class="btn danger small hidden" id="btnDisableAllPublicLinks" title="Pone en privado TODAS las jugadas sueltas y sesiones de ABP que ahora mismo tengan un enlace público activo">🚨 Desactivar todos los enlaces públicos</button>
           </div>
           <div id="abpBreadcrumb" class="breadcrumb"></div>
@@ -2460,6 +2461,7 @@ function initAppUI(){
   document.getElementById("playEditorPanel").classList.toggle("hidden", !canEditContent);
   document.getElementById("btnNewAbpFolder").classList.toggle("hidden", !canEditContent);
   document.getElementById("btnDisableAllPublicLinks").classList.toggle("hidden", !isGestor);
+  document.getElementById("btnRegenerateAllPublicLinks").classList.toggle("hidden", !isGestor);
   document.getElementById("modeloUploadPanel").classList.toggle("hidden", !canEditContent);
   document.getElementById("plantillaGoTeams").classList.toggle("hidden", !canEditContent);
   updateCompareCardVisibility();
@@ -3022,6 +3024,32 @@ document.getElementById("btnDebugAbpFolders").onclick = () => {
     w.document.write(`<pre style="white-space:pre-wrap;font-family:monospace;font-size:13px;padding:16px;">${report.replace(/[&<>]/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]))}</pre>`);
   } else {
     alert(report);
+  }
+};
+// Igual que el botón de emergencia de abajo (solo gestor), pero en vez de apagar los enlaces
+// los deja ENCENDIDOS y les da a todos un código nuevo de golpe: para cuando se sospecha que
+// algún enlace puede haber circulado más de la cuenta pero se sigue queriendo que las jugadas
+// y sesiones actuales tengan enlace público, solo que uno distinto al de antes.
+document.getElementById("btnRegenerateAllPublicLinks").onclick = async () => {
+  const playsPublicos = plays.filter(p=>p.public);
+  const sesionesPublicas = playSessions.filter(s=>s.public);
+  const total = playsPublicos.length + sesionesPublicas.length;
+  if(total===0){ alert("No hay ninguna jugada ni sesión de ABP con el enlace público activo ahora mismo."); return; }
+  if(!confirm(`Esto genera un enlace NUEVO para ${playsPublicos.length} jugada(s) y ${sesionesPublicas.length} sesión(es) de ABP que ahora mismo son públicas. Todos los enlaces repartidos hasta ahora dejarán de funcionar en el acto; las jugadas y sesiones siguen siendo públicas, pero con enlaces distintos. ¿Continuar?`)) return;
+  try{
+    const CHUNK = 400; // margen bajo el límite de 500 operaciones por batch de Firestore
+    const escrituras = [
+      ...playsPublicos.map(p=>({col:"plays", id:p.id})),
+      ...sesionesPublicas.map(s=>({col:"playSessions", id:s.id}))
+    ];
+    for(let i=0; i<escrituras.length; i+=CHUNK){
+      const batch = db.batch();
+      escrituras.slice(i, i+CHUNK).forEach(({col,id}) => batch.update(db.collection(col).doc(id), {publicToken: nuevoTokenPublico_()}));
+      await batch.commit();
+    }
+    alert("Listo: todos los enlaces públicos de ABP se han renovado. Copia y reparte los nuevos desde cada jugada o sesión.");
+  }catch(err){
+    alert("No se ha podido completar: " + err.message + "\n\nRevisa cuáles han quedado sin cambiar y repite si hace falta.");
   }
 };
 // Red de seguridad (solo gestor, ver initAppUI): pone en privado de golpe TODAS las jugadas
