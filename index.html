@@ -478,6 +478,18 @@ canvas.court{
 .board-fullscreen .muted{color:#e6e0d6;}
 .board-fullscreen .btn.accent{color:#fff;}
 .board-fullscreen .board-toolbar{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.18);}
+/* Botones más compactos SOLO en la pizarra ampliada: son 4 filas de herramientas encima del
+   campo (colores/jugadores, porteros, modos de dibujo, editar selección) más la fila de abajo
+   — con el tamaño normal de botón se comían tanta altura que el campo no cabía entero en la
+   pantalla y había que hacer scroll para verlo completo. Aquí se prioriza que quepa el campo
+   sobre la comodidad de pulsar los botones; la pizarra normal (no ampliada) no se toca. */
+.board-fullscreen{gap:6px;padding:8px;}
+.board-fullscreen .fs-toolbar-group{gap:3px;}
+.board-fullscreen .board-toolbar{padding:3px 5px;margin-bottom:0;gap:4px;}
+.board-fullscreen .board-toolbar .btn{padding:4px 7px;font-size:.62rem;letter-spacing:.01em;}
+.board-fullscreen .board-toolbar .swatch{width:12px;height:12px;margin-right:4px;}
+.board-fullscreen .fs-toolbar .btn{padding:5px 9px;font-size:.68rem;}
+.board-fullscreen canvas.court{max-height:76vh;}
 
 .auth-screen{
   min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;
