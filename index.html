@@ -3877,7 +3877,7 @@ let dragObj = null;     // {kind, id} currently being dragged
 let dragLastPos = null;
 let selected = null;    // {kind, id} currently selected element
 let mode = "select";    // 'select' | 'arrow' | 'dotted' | 'text' | 'circle' | 'pencil'
-let arrowStart = null;
+let arrowDraft = null;  // {x1,y1,x2,y2} mientras se arrastra una flecha/línea de puntos (se ve en vivo, como shapeDraft)
 let shapeDraft = null;  // {x1,y1,x2,y2} while drawing a circle
 let pencilDraft = null; // array of points while drawing freehand
 let animRunning = false;
@@ -4153,6 +4153,9 @@ function redrawBoard(){
   drawArrowsOn(ctx, canvas, arrows);
   drawTokensOn(ctx, canvas, tokens);
   drawTextsOn(ctx, canvas, texts);
+  if(arrowDraft){
+    drawArrowsOn(ctx, canvas, [{...arrowDraft, dashed: mode==="dotted"}]);
+  }
   if(shapeDraft){
     const d = shapeDraft;
     drawShapesOn(ctx, canvas, [{cx:(d.x1+d.x2)/2, cy:(d.y1+d.y2)/2, rx:Math.abs(d.x2-d.x1)/2, ry:Math.abs(d.y2-d.y1)/2}]);
@@ -4236,7 +4239,7 @@ wire2("clearBoard","fsClearBoard", clearBoardFn);
 function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
 function setMode(newMode){
   mode = (mode===newMode) ? "select" : newMode;
-  arrowStart = null; shapeDraft = null; pencilDraft = null; dragObj = null;
+  arrowDraft = null; shapeDraft = null; pencilDraft = null; dragObj = null;
   const map = {arrow:"toggleArrowMode", dotted:"toggleDottedMode", text:"toggleTextMode", circle:"toggleCircleMode", pencil:"togglePencilMode"};
   Object.keys(map).forEach(k=>{
     [document.getElementById(map[k]), document.getElementById("fs"+cap(map[k]))].forEach(el=>{
@@ -4244,8 +4247,8 @@ function setMode(newMode){
     });
   });
   const hints = {
-    arrow:"Toca el punto de inicio y luego el punto final de la flecha.",
-    dotted:"Toca el punto de inicio y luego el punto final de la línea de puntos.",
+    arrow:"Arrastra desde el punto de inicio hasta el punto final de la flecha.",
+    dotted:"Arrastra desde el punto de inicio hasta el punto final de la línea de puntos.",
     text:"Toca la pizarra donde quieras escribir el texto.",
     circle:"Arrastra sobre la pizarra para rodear una zona.",
     pencil:"Mantén pulsado y arrastra para dibujar a mano alzada.",
@@ -4264,17 +4267,17 @@ wire2("toggleTextMode","fsToggleTextMode", ()=>setMode("text"));
 wire2("toggleCircleMode","fsToggleCircleMode", ()=>setMode("circle"));
 wire2("togglePencilMode","fsTogglePencilMode", ()=>setMode("pencil"));
 
-function handleArrowClick(p){
-  if(!arrowStart){ arrowStart = p; }
-  else{
-    pushUndoSnapshot();
-    arrowSeq++;
-    const id = "a"+arrowSeq;
-    arrows.push({id, x1:arrowStart.x, y1:arrowStart.y, x2:p.x, y2:p.y, width:2.5, dashed: mode==="dotted"});
-    pushHistory("arrow", id);
-    arrowStart = null;
-    redrawBoard();
-  }
+function finalizeArrow(){
+  const d = arrowDraft; arrowDraft = null;
+  // Un simple toque sin apenas arrastre no deja flecha (saldría de largo ~0, invisible e
+  // inútil) — a diferencia de finalizeShape(), aquí no tiene sentido forzar un tamaño mínimo.
+  if(Math.hypot(d.x2-d.x1, d.y2-d.y1) < 0.015){ redrawBoard(); return; }
+  pushUndoSnapshot();
+  arrowSeq++;
+  const id = "a"+arrowSeq;
+  arrows.push({id, x1:d.x1, y1:d.y1, x2:d.x2, y2:d.y2, width:2.5, dashed: mode==="dotted"});
+  pushHistory("arrow", id);
+  redrawBoard();
 }
 function handleTextClick(p){
   const txt = prompt("Escribe el texto para la pizarra:");
@@ -4488,18 +4491,20 @@ wire2("deleteSelected","fsDeleteSelected", deleteSelected);
 
 /* ---- Entrada de puntero unificada (ratón + táctil) ---- */
 function boardPointerDown(p){
-  if(mode==="arrow" || mode==="dotted"){ handleArrowClick(p); return; }
+  if(mode==="arrow" || mode==="dotted"){ arrowDraft = {x1:p.x, y1:p.y, x2:p.x, y2:p.y}; return; }
   if(mode==="text"){ handleTextClick(p); return; }
   if(mode==="circle"){ shapeDraft = {x1:p.x, y1:p.y, x2:p.x, y2:p.y}; return; }
   if(mode==="pencil"){ pencilDraft = [p]; return; }
   selectAt(p);
 }
 function boardPointerMove(p){
+  if((mode==="arrow"||mode==="dotted") && arrowDraft){ arrowDraft.x2=p.x; arrowDraft.y2=p.y; redrawBoard(); return; }
   if(mode==="circle" && shapeDraft){ shapeDraft.x2=p.x; shapeDraft.y2=p.y; redrawBoard(); return; }
   if(mode==="pencil" && pencilDraft){ pencilDraft.push(p); redrawBoard(); return; }
   if(dragObj){ moveDragObj(p); redrawBoard(); }
 }
 function boardPointerUp(){
+  if((mode==="arrow"||mode==="dotted") && arrowDraft){ finalizeArrow(); return; }
   if(mode==="circle" && shapeDraft){ finalizeShape(); return; }
   if(mode==="pencil" && pencilDraft){ finalizePencil(); return; }
   dragObj = null;
