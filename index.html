@@ -421,6 +421,9 @@ textarea{resize:vertical;min-height:70px;}
 .board-wrap{display:flex;flex-direction:column;gap:10px;}
 .board-toolbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;background:#faf8f5;border:1px solid var(--border);border-radius:8px;padding:6px 8px;margin-bottom:6px;}
 .board-toolbar .swatch{width:16px;height:16px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:middle;}
+/* Botones de forma (círculo/rectángulo, hueco/relleno): solo icono, sin texto, para que las
+   4 variantes quepan donde antes cabía un único botón "⭕ Rodear" sin añadir una fila más. */
+.board-toolbar .shape-btn{padding:7px 9px;font-size:.9rem;line-height:.72rem;}
 canvas.court{
   width:100%;max-width:560px;aspect-ratio:1.4/1;background:#0f3d2e;border-radius:8px;touch-action:none;display:block;margin:0 auto;
 }
@@ -488,6 +491,9 @@ canvas.court{
 .board-fullscreen .board-toolbar{padding:3px 5px;margin-bottom:0;gap:4px;}
 .board-fullscreen .board-toolbar .btn{padding:4px 7px;font-size:.62rem;letter-spacing:.01em;}
 .board-fullscreen .board-toolbar .swatch{width:12px;height:12px;margin-right:4px;}
+/* Los botones de forma no tienen texto que encoger junto con el icono (a diferencia del resto
+   de botones de esta barra en modo ampliado): con el .62rem general el icono queda diminuto. */
+.board-fullscreen .board-toolbar .shape-btn{font-size:.85rem;padding:4px 8px;}
 .board-fullscreen .fs-toolbar .btn{padding:5px 9px;font-size:.68rem;}
 .board-fullscreen canvas.court{max-height:76vh;}
 
@@ -921,7 +927,10 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
               <button type="button" class="btn small ghost" id="toggleArrowMode">➜ Flecha</button>
               <button type="button" class="btn small ghost" id="toggleDottedMode">┄ Línea de puntos</button>
               <button type="button" class="btn small ghost" id="toggleTextMode">🔤 Texto</button>
-              <button type="button" class="btn small ghost" id="toggleCircleMode">⭕ Rodear</button>
+              <button type="button" class="btn small ghost shape-btn" id="toggleCircleMode" title="Círculo hueco">○</button>
+              <button type="button" class="btn small ghost shape-btn" id="toggleCircleFilledMode" title="Círculo relleno">⬤</button>
+              <button type="button" class="btn small ghost shape-btn" id="toggleRectMode" title="Rectángulo hueco">▭</button>
+              <button type="button" class="btn small ghost shape-btn" id="toggleRectFilledMode" title="Rectángulo relleno">▪</button>
               <button type="button" class="btn small ghost" id="togglePencilMode">✏️ Línea libre</button>
               <button type="button" class="btn small ghost" id="undoLast">↩ Deshacer</button>
               <button type="button" class="btn small ghost" id="redoLast">↪ Rehacer</button>
@@ -2046,7 +2055,10 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
       <button type="button" class="btn small ghost" id="fsToggleArrowMode">➜ Flecha</button>
       <button type="button" class="btn small ghost" id="fsToggleDottedMode">┄ Línea de puntos</button>
       <button type="button" class="btn small ghost" id="fsToggleTextMode">🔤 Texto</button>
-      <button type="button" class="btn small ghost" id="fsToggleCircleMode">⭕ Rodear</button>
+      <button type="button" class="btn small ghost shape-btn" id="fsToggleCircleMode" title="Círculo hueco">○</button>
+      <button type="button" class="btn small ghost shape-btn" id="fsToggleCircleFilledMode" title="Círculo relleno">⬤</button>
+      <button type="button" class="btn small ghost shape-btn" id="fsToggleRectMode" title="Rectángulo hueco">▭</button>
+      <button type="button" class="btn small ghost shape-btn" id="fsToggleRectFilledMode" title="Rectángulo relleno">▪</button>
       <button type="button" class="btn small ghost" id="fsTogglePencilMode">✏️ Línea libre</button>
       <button type="button" class="btn small ghost" id="fsUndoLast">↩ Deshacer</button>
       <button type="button" class="btn small ghost" id="fsRedoLast">↪ Rehacer</button>
@@ -4097,8 +4109,12 @@ function drawShapesOn(cx,cvs,list,alphaFn){
   (list||[]).forEach(s=>{
     cx.globalAlpha = alphaFn ? alphaFn(s) : 1;
     const x=s.cx*cvs.width, y=s.cy*cvs.height, rx=Math.max(4,s.rx*cvs.width), ry=Math.max(4,s.ry*cvs.height);
+    // "kind"/"filled" ausentes = círculo hueco: así una forma guardada antes de que existieran
+    // estas 4 variantes se sigue viendo exactamente igual que siempre.
     cx.beginPath();
-    cx.ellipse(x,y,rx,ry,0,0,Math.PI*2);
+    if(s.kind==="rect") cx.rect(x-rx,y-ry,rx*2,ry*2);
+    else cx.ellipse(x,y,rx,ry,0,0,Math.PI*2);
+    if(s.filled){ cx.fillStyle = "rgba(255,241,118,.35)"; cx.fill(); }
     cx.strokeStyle = "#fff176"; cx.lineWidth = 3; cx.setLineDash([]);
     cx.stroke();
     cx.globalAlpha = 1;
@@ -4133,7 +4149,10 @@ function drawSelectionHighlight(cx,cvs){
   } else if(selected.kind==="shape"){
     const s = shapes.find(x=>x.id===selected.id); if(!s){ selected=null; cx.restore(); return; }
     const x=s.cx*cvs.width, y=s.cy*cvs.height, rx=s.rx*cvs.width+8, ry=s.ry*cvs.height+8;
-    cx.beginPath(); cx.ellipse(x,y,rx,ry,0,0,Math.PI*2); cx.stroke();
+    cx.beginPath();
+    if(s.kind==="rect") cx.rect(x-rx,y-ry,rx*2,ry*2);
+    else cx.ellipse(x,y,rx,ry,0,0,Math.PI*2);
+    cx.stroke();
   } else if(selected.kind==="path"){
     const p = paths.find(x=>x.id===selected.id); if(!p){ selected=null; cx.restore(); return; }
     let minX=1,minY=1,maxX=0,maxY=0;
@@ -4158,7 +4177,9 @@ function redrawBoard(){
   }
   if(shapeDraft){
     const d = shapeDraft;
-    drawShapesOn(ctx, canvas, [{cx:(d.x1+d.x2)/2, cy:(d.y1+d.y2)/2, rx:Math.abs(d.x2-d.x1)/2, ry:Math.abs(d.y2-d.y1)/2}]);
+    const kind = (mode==="rect"||mode==="rectFilled") ? "rect" : "circle";
+    const filled = (mode==="circleFilled"||mode==="rectFilled");
+    drawShapesOn(ctx, canvas, [{cx:(d.x1+d.x2)/2, cy:(d.y1+d.y2)/2, rx:Math.abs(d.x2-d.x1)/2, ry:Math.abs(d.y2-d.y1)/2, kind, filled}]);
   }
   if(pencilDraft && pencilDraft.length>1){
     drawPathsOn(ctx, canvas, [{points:pencilDraft}]);
@@ -4240,7 +4261,7 @@ function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
 function setMode(newMode){
   mode = (mode===newMode) ? "select" : newMode;
   arrowDraft = null; shapeDraft = null; pencilDraft = null; dragObj = null;
-  const map = {arrow:"toggleArrowMode", dotted:"toggleDottedMode", text:"toggleTextMode", circle:"toggleCircleMode", pencil:"togglePencilMode"};
+  const map = {arrow:"toggleArrowMode", dotted:"toggleDottedMode", text:"toggleTextMode", circle:"toggleCircleMode", circleFilled:"toggleCircleFilledMode", rect:"toggleRectMode", rectFilled:"toggleRectFilledMode", pencil:"togglePencilMode"};
   Object.keys(map).forEach(k=>{
     [document.getElementById(map[k]), document.getElementById("fs"+cap(map[k]))].forEach(el=>{
       if(el) el.classList.toggle("accent", mode===k);
@@ -4250,7 +4271,10 @@ function setMode(newMode){
     arrow:"Arrastra desde el punto de inicio hasta el punto final de la flecha.",
     dotted:"Arrastra desde el punto de inicio hasta el punto final de la línea de puntos.",
     text:"Toca la pizarra donde quieras escribir el texto.",
-    circle:"Arrastra sobre la pizarra para rodear una zona.",
+    circle:"Arrastra sobre la pizarra para rodear una zona con un círculo hueco.",
+    circleFilled:"Arrastra sobre la pizarra para dibujar un círculo relleno.",
+    rect:"Arrastra sobre la pizarra para dibujar un rectángulo hueco.",
+    rectFilled:"Arrastra sobre la pizarra para dibujar un rectángulo relleno.",
     pencil:"Mantén pulsado y arrastra para dibujar a mano alzada.",
     select:""
   };
@@ -4265,6 +4289,9 @@ wire2("toggleArrowMode","fsToggleArrowMode", ()=>setMode("arrow"));
 wire2("toggleDottedMode","fsToggleDottedMode", ()=>setMode("dotted"));
 wire2("toggleTextMode","fsToggleTextMode", ()=>setMode("text"));
 wire2("toggleCircleMode","fsToggleCircleMode", ()=>setMode("circle"));
+wire2("toggleCircleFilledMode","fsToggleCircleFilledMode", ()=>setMode("circleFilled"));
+wire2("toggleRectMode","fsToggleRectMode", ()=>setMode("rect"));
+wire2("toggleRectFilledMode","fsToggleRectFilledMode", ()=>setMode("rectFilled"));
 wire2("togglePencilMode","fsTogglePencilMode", ()=>setMode("pencil"));
 
 function finalizeArrow(){
@@ -4297,7 +4324,11 @@ function finalizeShape(){
   const cx = (d.x1+d.x2)/2, cy = (d.y1+d.y2)/2;
   shapeSeq++;
   const id = "c"+shapeSeq;
-  shapes.push({id, cx, cy, rx, ry});
+  // kind/filled ausentes = círculo hueco, el único que existía antes de estas 4 variantes —
+  // así las formas ya guardadas en jugadas antiguas se siguen viendo exactamente igual.
+  const kind = (mode==="rect"||mode==="rectFilled") ? "rect" : "circle";
+  const filled = (mode==="circleFilled"||mode==="rectFilled");
+  shapes.push({id, cx, cy, rx, ry, kind, filled});
   pushHistory("shape", id);
   redrawBoard();
 }
@@ -4381,9 +4412,22 @@ function selectAt(p){
   }
   for(let i=shapes.length-1;i>=0;i--){
     const s = shapes[i];
-    const nx = (p.x-s.cx)/(s.rx+relTol), ny=(p.y-s.cy)/(s.ry+relTol);
-    const d2 = nx*nx+ny*ny;
-    if(d2<=1.25 && d2>=0.55){
+    let hit;
+    if(s.kind==="rect"){
+      const dx = Math.abs(p.x-s.cx), dy = Math.abs(p.y-s.cy);
+      if(s.filled){
+        hit = dx<=s.rx+relTol && dy<=s.ry+relTol;
+      } else {
+        // Solo cerca del borde, no en cualquier punto de dentro — igual que el círculo hueco de
+        // abajo, para poder "atravesar" un rectángulo vacío y seleccionar lo que hay dentro.
+        hit = (Math.abs(dx-s.rx)<=relTol*2.5 && dy<=s.ry+relTol) || (Math.abs(dy-s.ry)<=relTol*2.5 && dx<=s.rx+relTol);
+      }
+    } else {
+      const nx = (p.x-s.cx)/(s.rx+relTol), ny=(p.y-s.cy)/(s.ry+relTol);
+      const d2 = nx*nx+ny*ny;
+      hit = s.filled ? d2<=1.25 : (d2<=1.25 && d2>=0.55);
+    }
+    if(hit){
       selected = {kind:"shape", id:s.id};
       pushUndoSnapshot();
       dragObj = selected; dragLastPos = p;
@@ -4490,22 +4534,25 @@ function deleteSelected(){
 wire2("deleteSelected","fsDeleteSelected", deleteSelected);
 
 /* ---- Entrada de puntero unificada (ratón + táctil) ---- */
+// Las 4 variantes de forma (círculo/rectángulo × hueco/relleno) comparten el mismo arrastre de
+// siempre — solo cambia qué se guarda al soltar, ver finalizeShape().
+function isShapeMode(m){ return m==="circle" || m==="circleFilled" || m==="rect" || m==="rectFilled"; }
 function boardPointerDown(p){
   if(mode==="arrow" || mode==="dotted"){ arrowDraft = {x1:p.x, y1:p.y, x2:p.x, y2:p.y}; return; }
   if(mode==="text"){ handleTextClick(p); return; }
-  if(mode==="circle"){ shapeDraft = {x1:p.x, y1:p.y, x2:p.x, y2:p.y}; return; }
+  if(isShapeMode(mode)){ shapeDraft = {x1:p.x, y1:p.y, x2:p.x, y2:p.y}; return; }
   if(mode==="pencil"){ pencilDraft = [p]; return; }
   selectAt(p);
 }
 function boardPointerMove(p){
   if((mode==="arrow"||mode==="dotted") && arrowDraft){ arrowDraft.x2=p.x; arrowDraft.y2=p.y; redrawBoard(); return; }
-  if(mode==="circle" && shapeDraft){ shapeDraft.x2=p.x; shapeDraft.y2=p.y; redrawBoard(); return; }
+  if(isShapeMode(mode) && shapeDraft){ shapeDraft.x2=p.x; shapeDraft.y2=p.y; redrawBoard(); return; }
   if(mode==="pencil" && pencilDraft){ pencilDraft.push(p); redrawBoard(); return; }
   if(dragObj){ moveDragObj(p); redrawBoard(); }
 }
 function boardPointerUp(){
   if((mode==="arrow"||mode==="dotted") && arrowDraft){ finalizeArrow(); return; }
-  if(mode==="circle" && shapeDraft){ finalizeShape(); return; }
+  if(isShapeMode(mode) && shapeDraft){ finalizeShape(); return; }
   if(mode==="pencil" && pencilDraft){ finalizePencil(); return; }
   dragObj = null;
 }
