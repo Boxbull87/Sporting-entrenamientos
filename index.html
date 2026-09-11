@@ -10158,6 +10158,11 @@ function nuevoTokenPublico_(){
   return (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
     : (Date.now().toString(36) + Math.random().toString(36).slice(2));
 }
+// Valor que va en la URL del enlace público (ver el comentario grande junto a loadPublicPlay
+// sobre por qué lleva el id delante, y no solo el token).
+function publicLinkValue_(item){
+  return item.publicToken ? (item.id+"."+item.publicToken) : item.id;
+}
 
 document.getElementById("playForm").onsubmit = async (e) => {
   e.preventDefault();
@@ -10375,9 +10380,7 @@ function renderPlayList(){
   }
   wrap.innerHTML = list.map(p=>{
     const frameCount = (p.animation && p.animation.frames) ? p.animation.frames.length : 0;
-    // publicToken si ya se generó; si no (jugadas públicas de antes de este cambio), se sigue
-    // usando el id tal cual, ver el comentario grande junto a loadPublicPlay.
-    const publicUrl = location.origin + location.pathname + "#publicplay=" + (p.publicToken || p.id);
+    const publicUrl = location.origin + location.pathname + "#publicplay=" + publicLinkValue_(p);
     return `
     <div class="task-item" style="flex-wrap:wrap;">
       <div>
@@ -10685,7 +10688,7 @@ window.deletePlaySession = async (id, contextFolderId) => {
 
 window.copyPublicLink = (id) => {
   const s = playSessions.find(x=>x.id===id);
-  const url = location.origin + location.pathname + "#public=" + ((s && s.publicToken) || id);
+  const url = location.origin + location.pathname + "#public=" + (s ? publicLinkValue_(s) : id);
   navigator.clipboard.writeText(url).then(()=>{
     alert("Enlace copiado al portapapeles.");
   }).catch(()=>{
@@ -10694,7 +10697,7 @@ window.copyPublicLink = (id) => {
 };
 window.copyPublicPlayLink = (id) => {
   const p = plays.find(x=>x.id===id);
-  const url = location.origin + location.pathname + "#publicplay=" + ((p && p.publicToken) || id);
+  const url = location.origin + location.pathname + "#publicplay=" + (p ? publicLinkValue_(p) : id);
   navigator.clipboard.writeText(url).then(()=>{
     alert("Enlace copiado al portapapeles.");
   }).catch(()=>{
@@ -10773,9 +10776,7 @@ function renderSavedPlaySessions(){
   wrap.innerHTML = list.map(s=>{
     const canManage = currentCoach && (currentCoach.role===ROLE_GESTOR || s.createdBy===currentUser.uid);
     const sFolderIds = playSessionCategoryIds(s);
-    // publicToken si ya se generó; si no (sesiones públicas de antes de este cambio), se sigue
-    // usando el id tal cual, ver el comentario grande junto a loadPublicPlaySession.
-    const publicUrl = location.origin + location.pathname + "#public=" + (s.publicToken || s.id);
+    const publicUrl = location.origin + location.pathname + "#public=" + publicLinkValue_(s);
     const itemsHtml = (s.plays||[]).map((item,i)=>`<li>${escapeHtml(item.title)}${item.categoryName?` <span class="muted">· ${escapeHtml(item.categoryName)}</span>`:""} <a href="javascript:void(0)" onclick="viewSessionPlayItem('${s.id}',${i})" style="color:var(--accent);font-weight:600;text-decoration:none;">👁️ Ver</a></li>`).join("");
     const unread = isItemUnread("playSessions", s);
     return `
@@ -10862,23 +10863,32 @@ window.deleteModeloFile = async (id) => {
 
 /* ============================================================
    ENLACE PÚBLICO DE UNA SESIÓN DE ABP (sin necesidad de login)
-   El valor de la URL (#public=<valor>) es el "publicToken" de la sesión, NO su id de Firestore
-   — así el entrenador puede "cambiar el enlace" cuando quiera (🔄/🔒/🔓 en la lista de
-   sesiones) sin más que escribir ese campo, sin tener que borrar y recrear el documento ni
-   arrastrar sus referencias (carpetas, favoritos...). Por eso aquí se busca por ese campo con
-   un where en vez de ir directo por id.
-   Compatibilidad: los enlaces ya repartidos ANTES de que existiera "publicToken" llevan el id
-   del documento tal cual en la URL — de ahí el segundo intento por id si el primero no
-   encuentra nada. Esos enlaces antiguos se "renuevan" solos (empiezan a usar un token) en
-   cuanto el entrenador los desactive y reactive, o pulse "🔄 Cambiar enlace".
+   El hash lleva "<id>.<publicToken>" (ver publicLinkValue_) — el id de Firestore SIEMPRE
+   delante, seguido del token si la sesión tiene uno generado. Deliberadamente NO se busca el
+   token con un .where(): un intento anterior lo hizo así (buscando SOLO por "publicToken", sin
+   el id delante) y dejó a cualquier visitante sin sesión iniciada sin poder abrir NINGÚN
+   enlace público, viejo o nuevo — reportado en producción, no solo sospechado. Todo apunta a
+   que la regla (allow read: if isActive() || resource.data.public==true) no se puede
+   verificar para una consulta "list" que filtra por un campo distinto al que la regla
+   comprueba (aquí "publicToken" vs. "public"), a diferencia de un get() por id directo, que sí
+   funciona igual de bien autenticado o no — coincide con la lección ya aprendida con
+   matchdays/{id}/private (otra causa, mismo síntoma: una consulta que no sea un get() por ruta
+   directa es un riesgo para el acceso público sin login). Así que la
+   lectura real es SIEMPRE un db.collection(...).doc(id).get() (la misma que ya funcionaba de
+   toda la vida), y el token —si el hash trae uno— se compara en el propio cliente, DESPUÉS de
+   leer el documento, solo para decidir si ese enlace concreto sigue siendo el vigente.
+   Compatibilidad: un hash sin punto (enlaces repartidos antes de que existiera el token) se
+   trata como el id solo, sin comprobar ningún token — exactamente el comportamiento de siempre.
 ============================================================= */
 async function loadPublicPlaySession(valor){
   document.getElementById("publicScreen").classList.remove("hidden");
   const wrap = document.getElementById("publicWrap");
   try{
-    const porToken = await db.collection("playSessions").where("publicToken","==",valor).limit(1).get();
-    let snap = porToken.empty ? await db.collection("playSessions").doc(valor).get() : porToken.docs[0];
-    if(!snap.exists || !snap.data().public){
+    const dot = valor.indexOf(".");
+    const id = dot===-1 ? valor : valor.slice(0,dot);
+    const tokenEsperado = dot===-1 ? null : valor.slice(dot+1);
+    const snap = await db.collection("playSessions").doc(id).get();
+    if(!snap.exists || !snap.data().public || (tokenEsperado!==null && snap.data().publicToken!==tokenEsperado)){
       wrap.innerHTML = '<div class="empty">Este enlace no existe o ya no está disponible públicamente.</div>';
       return;
     }
@@ -10909,15 +10919,17 @@ async function loadPublicPlaySession(valor){
 }
 /* ---------- Enlace público de UNA jugada individual (mismo mecanismo, distinta
    colección: "plays" en vez de "playSessions", y hash #publicplay= en vez de
-   #public= para no confundir los dos tipos de enlace). Búsqueda por "publicToken" con el
-   mismo fallback por id de siempre — ver el comentario grande junto a loadPublicPlaySession. */
+   #public= para no confundir los dos tipos de enlace). Misma lectura por id directo + token
+   comprobado en cliente — ver el comentario grande junto a loadPublicPlaySession. */
 async function loadPublicPlay(valor){
   document.getElementById("publicScreen").classList.remove("hidden");
   const wrap = document.getElementById("publicWrap");
   try{
-    const porToken = await db.collection("plays").where("publicToken","==",valor).limit(1).get();
-    let snap = porToken.empty ? await db.collection("plays").doc(valor).get() : porToken.docs[0];
-    if(!snap.exists || !snap.data().public){
+    const dot = valor.indexOf(".");
+    const id = dot===-1 ? valor : valor.slice(0,dot);
+    const tokenEsperado = dot===-1 ? null : valor.slice(dot+1);
+    const snap = await db.collection("plays").doc(id).get();
+    if(!snap.exists || !snap.data().public || (tokenEsperado!==null && snap.data().publicToken!==tokenEsperado)){
       wrap.innerHTML = '<div class="empty">Este enlace no existe o ya no está disponible públicamente.</div>';
       return;
     }
