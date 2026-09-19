@@ -1669,8 +1669,6 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
                   <textarea id="mdPrematchText" rows="4" style="width:100%;margin-bottom:10px;" placeholder="Escribe aquí lo que quieras sobre el partido antes de jugarlo..."></textarea>
                   <label style="font-size:.85rem;font-weight:600;">Observaciones</label>
                   <textarea id="mdPrematchObservations" rows="3" style="width:100%;margin-bottom:10px;"></textarea>
-                  <label style="font-size:.85rem;font-weight:600;">Notas de jugadores</label>
-                  <div id="mdPrematchPlayerNotes" style="margin-bottom:10px;"></div>
 
                   <h4 style="margin-top:14px;font-size:.85rem;">🎯 Marcadores de éxito</h4>
                   <p class="muted" style="margin-top:-6px;">Objetivos individuales que te propones para este partido. Después, en "Informe del partido", podrás marcar si cada jugador los ha conseguido.</p>
@@ -1683,11 +1681,15 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
                   </div>
                 </div>
 
-                <!-- Informe del rival: a propósito FUERA de mdPrematchPrivateWrap — es información
-                     pública para todos los entrenadores activos (igual que siempre), no una nota
-                     privada del entrenador de este equipo, así que no debe quedar oculta tras el
-                     mismo aviso de "sin acceso" de arriba. -->
-                <details class="acc acc-sub" id="accMatchdayRival">
+                <!-- Informe del rival, copia duplicada aquí a propósito (ver también su copia
+                     original en su propio acordeón de Jornada, más abajo): mismos datos
+                     (m.rivalReport), pero con todos los ids con el prefijo "pm" para no chocar
+                     con los de la otra copia — ver idFor_/RIVAL_CAMPOS_ATAQUE/RIVAL_CAMPOS_DEFENSA.
+                     A propósito FUERA de mdPrematchPrivateWrap: es información pública para
+                     todos los entrenadores activos (igual que siempre), no una nota privada de
+                     este entrenador, así que no debe quedar oculta tras el aviso de "sin acceso"
+                     de arriba. -->
+                <details class="acc acc-sub" id="pmAccMatchdayRival">
                   <summary>🆚 Informe del rival</summary>
                   <div class="acc-body">
                     <p class="muted" style="margin-top:0;">Scouting del rival antes del partido: jugadores a vigilar, sistemas de ataque y de defensa, y sus ABP.</p>
@@ -1695,8 +1697,8 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
                     <details class="acc acc-sub" open>
                       <summary>⭐ Jugadores destacados</summary>
                       <div class="acc-body">
-                        <div id="rivalDestacadosList" style="margin-bottom:8px;"></div>
-                        <button type="button" class="btn ghost small" id="btnAddRivalDestacado">➕ Añadir jugador destacado</button>
+                        <div id="pmRivalDestacadosList" style="margin-bottom:8px;"></div>
+                        <button type="button" class="btn ghost small" id="pmBtnAddRivalDestacado">➕ Añadir jugador destacado</button>
                       </div>
                     </details>
 
@@ -1704,15 +1706,15 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
                       <summary>⚔️ Ataque (sistemas ofensivos del rival)</summary>
                       <div class="acc-body">
                         <label style="font-size:.85rem;font-weight:600;">Sistemas ofensivos</label>
-                        <textarea id="rivAtq_sistemas" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
+                        <textarea id="pmRivAtq_sistemas" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
                         <label style="font-size:.85rem;font-weight:600;">Salidas de presión</label>
-                        <textarea id="rivAtq_salidasPresion" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
+                        <textarea id="pmRivAtq_salidasPresion" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
                         <label style="font-size:.85rem;font-weight:600;">Transiciones</label>
-                        <textarea id="rivAtq_transiciones" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
+                        <textarea id="pmRivAtq_transiciones" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
                         <label style="font-size:.85rem;font-weight:600;">Ataque 4 vs 3</label>
-                        <textarea id="rivAtq_ataque4vs3" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
+                        <textarea id="pmRivAtq_ataque4vs3" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
                         <label style="font-size:.85rem;font-weight:600;">Portero jugador</label>
-                        <textarea id="rivAtq_porteroJugador" rows="2" style="width:100%;"></textarea>
+                        <textarea id="pmRivAtq_porteroJugador" rows="2" style="width:100%;"></textarea>
                       </div>
                     </details>
 
@@ -1720,17 +1722,17 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
                       <summary>🚩 ABP en ataque</summary>
                       <div class="acc-body">
                         <label style="font-size:.85rem;font-weight:600;">Corner — Izquierda</label>
-                        <textarea id="rivAtq_cornerIzq" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
+                        <textarea id="pmRivAtq_cornerIzq" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
                         <label style="font-size:.85rem;font-weight:600;">Corner — Derecha</label>
-                        <textarea id="rivAtq_cornerDer" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
+                        <textarea id="pmRivAtq_cornerDer" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
                         <div class="row">
-                          <div><label style="font-size:.85rem;font-weight:600;">Bandas — Cortas</label><textarea id="rivAtq_bandasCortas" rows="2" style="width:100%;"></textarea></div>
-                          <div><label style="font-size:.85rem;font-weight:600;">Bandas — Medias</label><textarea id="rivAtq_bandasMedias" rows="2" style="width:100%;"></textarea></div>
-                          <div><label style="font-size:.85rem;font-weight:600;">Bandas — Largas</label><textarea id="rivAtq_bandasLargas" rows="2" style="width:100%;"></textarea></div>
+                          <div><label style="font-size:.85rem;font-weight:600;">Bandas — Cortas</label><textarea id="pmRivAtq_bandasCortas" rows="2" style="width:100%;"></textarea></div>
+                          <div><label style="font-size:.85rem;font-weight:600;">Bandas — Medias</label><textarea id="pmRivAtq_bandasMedias" rows="2" style="width:100%;"></textarea></div>
+                          <div><label style="font-size:.85rem;font-weight:600;">Bandas — Largas</label><textarea id="pmRivAtq_bandasLargas" rows="2" style="width:100%;"></textarea></div>
                         </div>
                         <div class="row" style="margin-top:8px;">
-                          <div><label style="font-size:.85rem;font-weight:600;">Faltas — Menos de 10m</label><textarea id="rivAtq_faltasMenos10" rows="2" style="width:100%;"></textarea></div>
-                          <div><label style="font-size:.85rem;font-weight:600;">Faltas — Más de 10m</label><textarea id="rivAtq_faltasMas10" rows="2" style="width:100%;"></textarea></div>
+                          <div><label style="font-size:.85rem;font-weight:600;">Faltas — Menos de 10m</label><textarea id="pmRivAtq_faltasMenos10" rows="2" style="width:100%;"></textarea></div>
+                          <div><label style="font-size:.85rem;font-weight:600;">Faltas — Más de 10m</label><textarea id="pmRivAtq_faltasMas10" rows="2" style="width:100%;"></textarea></div>
                         </div>
                       </div>
                     </details>
@@ -1739,16 +1741,16 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
                       <summary>🛡️ Defensa (altura defensiva del rival)</summary>
                       <div class="acc-body">
                         <div class="row">
-                          <div><label style="font-size:.85rem;font-weight:600;">Ganando</label><textarea id="rivDef_ganando" rows="2" style="width:100%;"></textarea></div>
-                          <div><label style="font-size:.85rem;font-weight:600;">Empatando</label><textarea id="rivDef_empatando" rows="2" style="width:100%;"></textarea></div>
-                          <div><label style="font-size:.85rem;font-weight:600;">Perdiendo</label><textarea id="rivDef_perdiendo" rows="2" style="width:100%;"></textarea></div>
+                          <div><label style="font-size:.85rem;font-weight:600;">Ganando</label><textarea id="pmRivDef_ganando" rows="2" style="width:100%;"></textarea></div>
+                          <div><label style="font-size:.85rem;font-weight:600;">Empatando</label><textarea id="pmRivDef_empatando" rows="2" style="width:100%;"></textarea></div>
+                          <div><label style="font-size:.85rem;font-weight:600;">Perdiendo</label><textarea id="pmRivDef_perdiendo" rows="2" style="width:100%;"></textarea></div>
                         </div>
                         <label style="font-size:.85rem;font-weight:600;margin-top:8px;">Transiciones</label>
-                        <textarea id="rivDef_transiciones" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
+                        <textarea id="pmRivDef_transiciones" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
                         <label style="font-size:.85rem;font-weight:600;">Defensa 4 vs 3</label>
-                        <textarea id="rivDef_defensa4vs3" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
+                        <textarea id="pmRivDef_defensa4vs3" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
                         <label style="font-size:.85rem;font-weight:600;">Portero jugador</label>
-                        <textarea id="rivDef_porteroJugador" rows="2" style="width:100%;"></textarea>
+                        <textarea id="pmRivDef_porteroJugador" rows="2" style="width:100%;"></textarea>
                       </div>
                     </details>
 
@@ -1756,23 +1758,23 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
                       <summary>🚩 ABP en defensa</summary>
                       <div class="acc-body">
                         <label style="font-size:.85rem;font-weight:600;">Corner — Izquierda</label>
-                        <textarea id="rivDef_cornerIzq" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
+                        <textarea id="pmRivDef_cornerIzq" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
                         <label style="font-size:.85rem;font-weight:600;">Corner — Derecha</label>
-                        <textarea id="rivDef_cornerDer" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
+                        <textarea id="pmRivDef_cornerDer" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
                         <div class="row">
-                          <div><label style="font-size:.85rem;font-weight:600;">Bandas — Cortas</label><textarea id="rivDef_bandasCortas" rows="2" style="width:100%;"></textarea></div>
-                          <div><label style="font-size:.85rem;font-weight:600;">Bandas — Medias</label><textarea id="rivDef_bandasMedias" rows="2" style="width:100%;"></textarea></div>
-                          <div><label style="font-size:.85rem;font-weight:600;">Bandas — Largas</label><textarea id="rivDef_bandasLargas" rows="2" style="width:100%;"></textarea></div>
+                          <div><label style="font-size:.85rem;font-weight:600;">Bandas — Cortas</label><textarea id="pmRivDef_bandasCortas" rows="2" style="width:100%;"></textarea></div>
+                          <div><label style="font-size:.85rem;font-weight:600;">Bandas — Medias</label><textarea id="pmRivDef_bandasMedias" rows="2" style="width:100%;"></textarea></div>
+                          <div><label style="font-size:.85rem;font-weight:600;">Bandas — Largas</label><textarea id="pmRivDef_bandasLargas" rows="2" style="width:100%;"></textarea></div>
                         </div>
                         <div class="row" style="margin-top:8px;">
-                          <div><label style="font-size:.85rem;font-weight:600;">Faltas — Menos de 10m</label><textarea id="rivDef_faltasMenos10" rows="2" style="width:100%;"></textarea></div>
-                          <div><label style="font-size:.85rem;font-weight:600;">Faltas — Más de 10m</label><textarea id="rivDef_faltasMas10" rows="2" style="width:100%;"></textarea></div>
+                          <div><label style="font-size:.85rem;font-weight:600;">Faltas — Menos de 10m</label><textarea id="pmRivDef_faltasMenos10" rows="2" style="width:100%;"></textarea></div>
+                          <div><label style="font-size:.85rem;font-weight:600;">Faltas — Más de 10m</label><textarea id="pmRivDef_faltasMas10" rows="2" style="width:100%;"></textarea></div>
                         </div>
                       </div>
                     </details>
 
-                    <button class="btn accent" id="btnSaveRivalReport" style="margin-top:10px;">💾 Guardar informe del rival</button>
-                    <div id="matchdayRivalMsg"></div>
+                    <button class="btn accent" id="pmBtnSaveRivalReport" style="margin-top:10px;">💾 Guardar informe del rival</button>
+                    <div id="pmMatchdayRivalMsg"></div>
                   </div>
                 </details>
               </div>
@@ -1850,6 +1852,98 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
                 <h4 style="margin-top:18px;font-size:.85rem;">🔗 Sesiones de entrenamiento vinculadas</h4>
                 <p class="muted" style="margin-top:-6px;">Marca las sesiones de tus equipos que quieras vincular a este partido (o desmárcalas para desvincularlas) y guarda.</p>
                 <div id="matchdaySessionsLink"></div>
+              </div>
+            </details>
+
+            <!-- Informe del rival, copia "original": misma información que la copia de dentro de
+                 Prepartido (ver comentario grande junto a "pmAccMatchdayRival" ahí), se pidió
+                 duplicada en los dos sitios a propósito. -->
+            <details class="acc" id="accMatchdayRival">
+              <summary>🆚 Informe del rival</summary>
+              <div class="acc-body">
+                <p class="muted" style="margin-top:0;">Scouting del rival antes del partido: jugadores a vigilar, sistemas de ataque y de defensa, y sus ABP.</p>
+
+                <details class="acc acc-sub" open>
+                  <summary>⭐ Jugadores destacados</summary>
+                  <div class="acc-body">
+                    <div id="rivalDestacadosList" style="margin-bottom:8px;"></div>
+                    <button type="button" class="btn ghost small" id="btnAddRivalDestacado">➕ Añadir jugador destacado</button>
+                  </div>
+                </details>
+
+                <details class="acc acc-sub" open>
+                  <summary>⚔️ Ataque (sistemas ofensivos del rival)</summary>
+                  <div class="acc-body">
+                    <label style="font-size:.85rem;font-weight:600;">Sistemas ofensivos</label>
+                    <textarea id="rivAtq_sistemas" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
+                    <label style="font-size:.85rem;font-weight:600;">Salidas de presión</label>
+                    <textarea id="rivAtq_salidasPresion" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
+                    <label style="font-size:.85rem;font-weight:600;">Transiciones</label>
+                    <textarea id="rivAtq_transiciones" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
+                    <label style="font-size:.85rem;font-weight:600;">Ataque 4 vs 3</label>
+                    <textarea id="rivAtq_ataque4vs3" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
+                    <label style="font-size:.85rem;font-weight:600;">Portero jugador</label>
+                    <textarea id="rivAtq_porteroJugador" rows="2" style="width:100%;"></textarea>
+                  </div>
+                </details>
+
+                <details class="acc acc-sub" open>
+                  <summary>🚩 ABP en ataque</summary>
+                  <div class="acc-body">
+                    <label style="font-size:.85rem;font-weight:600;">Corner — Izquierda</label>
+                    <textarea id="rivAtq_cornerIzq" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
+                    <label style="font-size:.85rem;font-weight:600;">Corner — Derecha</label>
+                    <textarea id="rivAtq_cornerDer" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
+                    <div class="row">
+                      <div><label style="font-size:.85rem;font-weight:600;">Bandas — Cortas</label><textarea id="rivAtq_bandasCortas" rows="2" style="width:100%;"></textarea></div>
+                      <div><label style="font-size:.85rem;font-weight:600;">Bandas — Medias</label><textarea id="rivAtq_bandasMedias" rows="2" style="width:100%;"></textarea></div>
+                      <div><label style="font-size:.85rem;font-weight:600;">Bandas — Largas</label><textarea id="rivAtq_bandasLargas" rows="2" style="width:100%;"></textarea></div>
+                    </div>
+                    <div class="row" style="margin-top:8px;">
+                      <div><label style="font-size:.85rem;font-weight:600;">Faltas — Menos de 10m</label><textarea id="rivAtq_faltasMenos10" rows="2" style="width:100%;"></textarea></div>
+                      <div><label style="font-size:.85rem;font-weight:600;">Faltas — Más de 10m</label><textarea id="rivAtq_faltasMas10" rows="2" style="width:100%;"></textarea></div>
+                    </div>
+                  </div>
+                </details>
+
+                <details class="acc acc-sub" open>
+                  <summary>🛡️ Defensa (altura defensiva del rival)</summary>
+                  <div class="acc-body">
+                    <div class="row">
+                      <div><label style="font-size:.85rem;font-weight:600;">Ganando</label><textarea id="rivDef_ganando" rows="2" style="width:100%;"></textarea></div>
+                      <div><label style="font-size:.85rem;font-weight:600;">Empatando</label><textarea id="rivDef_empatando" rows="2" style="width:100%;"></textarea></div>
+                      <div><label style="font-size:.85rem;font-weight:600;">Perdiendo</label><textarea id="rivDef_perdiendo" rows="2" style="width:100%;"></textarea></div>
+                    </div>
+                    <label style="font-size:.85rem;font-weight:600;margin-top:8px;">Transiciones</label>
+                    <textarea id="rivDef_transiciones" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
+                    <label style="font-size:.85rem;font-weight:600;">Defensa 4 vs 3</label>
+                    <textarea id="rivDef_defensa4vs3" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
+                    <label style="font-size:.85rem;font-weight:600;">Portero jugador</label>
+                    <textarea id="rivDef_porteroJugador" rows="2" style="width:100%;"></textarea>
+                  </div>
+                </details>
+
+                <details class="acc acc-sub" open>
+                  <summary>🚩 ABP en defensa</summary>
+                  <div class="acc-body">
+                    <label style="font-size:.85rem;font-weight:600;">Corner — Izquierda</label>
+                    <textarea id="rivDef_cornerIzq" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
+                    <label style="font-size:.85rem;font-weight:600;">Corner — Derecha</label>
+                    <textarea id="rivDef_cornerDer" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
+                    <div class="row">
+                      <div><label style="font-size:.85rem;font-weight:600;">Bandas — Cortas</label><textarea id="rivDef_bandasCortas" rows="2" style="width:100%;"></textarea></div>
+                      <div><label style="font-size:.85rem;font-weight:600;">Bandas — Medias</label><textarea id="rivDef_bandasMedias" rows="2" style="width:100%;"></textarea></div>
+                      <div><label style="font-size:.85rem;font-weight:600;">Bandas — Largas</label><textarea id="rivDef_bandasLargas" rows="2" style="width:100%;"></textarea></div>
+                    </div>
+                    <div class="row" style="margin-top:8px;">
+                      <div><label style="font-size:.85rem;font-weight:600;">Faltas — Menos de 10m</label><textarea id="rivDef_faltasMenos10" rows="2" style="width:100%;"></textarea></div>
+                      <div><label style="font-size:.85rem;font-weight:600;">Faltas — Más de 10m</label><textarea id="rivDef_faltasMas10" rows="2" style="width:100%;"></textarea></div>
+                    </div>
+                  </div>
+                </details>
+
+                <button class="btn accent" id="btnSaveRivalReport" style="margin-top:10px;">💾 Guardar informe del rival</button>
+                <div id="matchdayRivalMsg"></div>
               </div>
             </details>
           </div>
@@ -6782,6 +6876,7 @@ window.openMatchdayStats = (id) => {
   document.getElementById("accMatchdayConvocatoria").open = true;
   document.getElementById("accMatchdayInforme").open = false;
   document.getElementById("accMatchdayRival").open = false;
+  document.getElementById("pmAccMatchdayRival").open = false;
   renderMatchdayStatsTable();
   renderMatchdayGoalEvents_();
   renderMatchdayTimeline_();
@@ -8419,29 +8514,6 @@ function renderMatchdayPrematch(){
   document.getElementById("mdPrematchText").value = priv.prematchText || "";
   document.getElementById("mdPrematchObservations").value = priv.prematchObservations || "";
 
-  // Notas de jugadores: mismo patrón que "Informe del partido" (nota + puntuación por
-  // jugador), pero con sus propias clases (.pm-player-*, no .md-player-*) para que las dos
-  // secciones no se pisen entre sí al leer los inputs con querySelectorAll al guardar.
-  const roster = players.filter(p=>p.teamId===m.teamId).sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
-  const notes = priv.prematchPlayerNotes || {};
-  const ratings = priv.prematchPlayerRatings || {};
-  const notesWrap = document.getElementById("mdPrematchPlayerNotes");
-  if(roster.length===0){
-    notesWrap.innerHTML = '<p class="muted">Este equipo todavía no tiene jugadores en la plantilla.</p>';
-  } else {
-    notesWrap.innerHTML = roster.map(p=>`
-      <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:6px;">
-        <div style="flex:1;">
-          <label style="font-size:.8rem;color:var(--muted-fg,#666);">${jerseyNameHtml_(p.position, (p.dorsal!=null?escapeHtml(String(p.dorsal))+". ":"")+escapeHtml(p.name))}</label>
-          <input type="text" class="pm-player-note" data-player-id="${p.id}" value="${escapeHtml(notes[p.id]||"")}" placeholder="Nota sobre este jugador antes del partido..." style="width:100%;">
-        </div>
-        <div style="width:70px;">
-          <label style="font-size:.8rem;color:var(--muted-fg,#666);">Puntuación</label>
-          <input type="number" class="pm-player-rating" data-player-id="${p.id}" min="0" max="10" step="0.5" value="${ratings[p.id]!=null?ratings[p.id]:""}" placeholder="0-10" style="width:100%;">
-        </div>
-      </div>`).join("");
-  }
-
   successMarkersEditing = Array.isArray(priv.successMarkers) ? priv.successMarkers.map(o=>({...o})) : [];
   renderSuccessMarkersRows_();
   document.getElementById("matchdayPrematchMsg").innerHTML = "";
@@ -8454,22 +8526,10 @@ document.getElementById("btnSaveMatchdayPrematch").onclick = async () => {
     id: o.id,
     text: textInputs[i] ? textInputs[i].value.trim() : ""
   })).filter(o=>o.text);
-  const prematchPlayerNotes = {};
-  document.querySelectorAll(".pm-player-note").forEach(inp=>{
-    const val = inp.value.trim();
-    if(val) prematchPlayerNotes[inp.dataset.playerId] = val;
-  });
-  const prematchPlayerRatings = {};
-  document.querySelectorAll(".pm-player-rating").forEach(inp=>{
-    const val = inp.value.trim();
-    if(val!=="" && !isNaN(Number(val))) prematchPlayerRatings[inp.dataset.playerId] = Number(val);
-  });
   const datosPrivados = {
     prematchPlan: document.getElementById("mdPrematchPlan").value.trim(),
     prematchText: document.getElementById("mdPrematchText").value.trim(),
     prematchObservations: document.getElementById("mdPrematchObservations").value.trim(),
-    prematchPlayerNotes,
-    prematchPlayerRatings,
     successMarkers
   };
   try{
@@ -8488,59 +8548,79 @@ document.getElementById("btnSaveMatchdayPrematch").onclick = async () => {
    sistemas de ataque/defensa y ABP). Mismo patrón que "Informe del partido" de arriba: se
    guarda como un único campo "rivalReport" del documento de la jornada, con .update()
    parcial. Los 24 campos de texto libre (ataque/defensa) se leen/escriben por id a partir
-   de estas dos listas de claves, para no repetir el mismo bloque 24 veces. ---------- */
+   de estas dos listas de claves, para no repetir el mismo bloque 24 veces.
+   DUPLICADO A PROPÓSITO: esta sección aparece dos veces (su propio acordeón de Jornada, y otra
+   copia dentro de "Prepartido"), a petición expresa — misma información en los dos sitios por
+   comodidad, no dos informes distintos. La copia de Prepartido tiene todos los ids con el
+   prefijo "pm" (pmRivAtq_..., pmRivalDestacadosList...); idFor_() calcula el id real según el
+   prefijo, para no duplicar toda esta lógica dos veces. Aviso: si editas las dos copias sin
+   guardar entre medias, guardar desde una de ellas SOBRESCRIBE lo escrito en la otra que
+   todavía no se hubiera guardado — al guardar, se refrescan ambas con lo que quedó grabado de
+   verdad, para que las dos vuelvan a coincidir. ---------- */
 const RIVAL_CAMPOS_ATAQUE = ["sistemas","salidasPresion","transiciones","ataque4vs3","porteroJugador","cornerIzq","cornerDer","bandasCortas","bandasMedias","bandasLargas","faltasMenos10","faltasMas10"];
 const RIVAL_CAMPOS_DEFENSA = ["ganando","empatando","perdiendo","transiciones","defensa4vs3","porteroJugador","cornerIzq","cornerDer","bandasCortas","bandasMedias","bandasLargas","faltasMenos10","faltasMas10"];
-let rivalDestacados = []; // jugadores destacados del rival que se están editando (fila = {dorsal,nombre,posicion,observaciones})
+const RIVAL_PREFIJOS = ["", "pm"]; // "" = acordeón propio de Jornada, "pm" = copia dentro de Prepartido
+function idFor_(prefix, base){ return prefix ? prefix+base.charAt(0).toUpperCase()+base.slice(1) : base; }
+let rivalDestacados = []; // jugadores destacados del rival que se están editando (fila = {dorsal,nombre,posicion,observaciones}) — compartida por las dos copias
 function renderRivalDestacadosRows_(){
-  const wrap = document.getElementById("rivalDestacadosList");
-  if(!wrap) return;
-  if(rivalDestacados.length===0){ wrap.innerHTML = '<p class="muted">Todavía no has añadido jugadores destacados del rival.</p>'; return; }
-  wrap.innerHTML = rivalDestacados.map((j,i)=>`
-    <div class="row" style="align-items:flex-end;margin-bottom:6px;" data-rival-row="${i}">
-      <div><label style="font-size:.72rem;">Nº</label><input type="text" class="riv-dorsal" value="${escapeHtml(j.dorsal||"")}" style="width:100%;"></div>
-      <div style="flex:2;"><label style="font-size:.72rem;">Nombre</label><input type="text" class="riv-nombre" value="${escapeHtml(j.nombre||"")}" style="width:100%;"></div>
-      <div><label style="font-size:.72rem;">Posición</label><input type="text" class="riv-posicion" value="${escapeHtml(j.posicion||"")}" style="width:100%;"></div>
-      <div style="flex:3;"><label style="font-size:.72rem;">Observaciones</label><input type="text" class="riv-obs" value="${escapeHtml(j.observaciones||"")}" style="width:100%;"></div>
-      <button type="button" class="btn danger small" onclick="quitarRivalDestacado_(${i})" style="flex:0 0 auto;" title="Quitar">🗑️</button>
-    </div>`).join("");
+  RIVAL_PREFIJOS.forEach(prefix=>{
+    const wrap = document.getElementById(idFor_(prefix,"rivalDestacadosList"));
+    if(!wrap) return;
+    if(rivalDestacados.length===0){ wrap.innerHTML = '<p class="muted">Todavía no has añadido jugadores destacados del rival.</p>'; return; }
+    wrap.innerHTML = rivalDestacados.map((j,i)=>`
+      <div class="row" style="align-items:flex-end;margin-bottom:6px;" data-rival-row="${i}">
+        <div><label style="font-size:.72rem;">Nº</label><input type="text" class="riv-dorsal" value="${escapeHtml(j.dorsal||"")}" style="width:100%;"></div>
+        <div style="flex:2;"><label style="font-size:.72rem;">Nombre</label><input type="text" class="riv-nombre" value="${escapeHtml(j.nombre||"")}" style="width:100%;"></div>
+        <div><label style="font-size:.72rem;">Posición</label><input type="text" class="riv-posicion" value="${escapeHtml(j.posicion||"")}" style="width:100%;"></div>
+        <div style="flex:3;"><label style="font-size:.72rem;">Observaciones</label><input type="text" class="riv-obs" value="${escapeHtml(j.observaciones||"")}" style="width:100%;"></div>
+        <button type="button" class="btn danger small" onclick="quitarRivalDestacado_(${i})" style="flex:0 0 auto;" title="Quitar">🗑️</button>
+      </div>`).join("");
+  });
 }
 window.quitarRivalDestacado_ = (i) => { rivalDestacados.splice(i,1); renderRivalDestacadosRows_(); };
-document.getElementById("btnAddRivalDestacado").onclick = () => {
-  rivalDestacados.push({dorsal:"", nombre:"", posicion:"", observaciones:""});
-  renderRivalDestacadosRows_();
-};
 function renderMatchdayRivalReport(){
   const m = matchdays.find(x=>x.id===statsMatchdayId);
   if(!m) return;
   const rr = m.rivalReport || {};
   const at = rr.ataque || {}, df = rr.defensa || {};
-  RIVAL_CAMPOS_ATAQUE.forEach(k=>{ const el = document.getElementById("rivAtq_"+k); if(el) el.value = at[k] || ""; });
-  RIVAL_CAMPOS_DEFENSA.forEach(k=>{ const el = document.getElementById("rivDef_"+k); if(el) el.value = df[k] || ""; });
+  RIVAL_PREFIJOS.forEach(prefix=>{
+    RIVAL_CAMPOS_ATAQUE.forEach(k=>{ const el = document.getElementById(idFor_(prefix,"rivAtq_"+k)); if(el) el.value = at[k] || ""; });
+    RIVAL_CAMPOS_DEFENSA.forEach(k=>{ const el = document.getElementById(idFor_(prefix,"rivDef_"+k)); if(el) el.value = df[k] || ""; });
+    const msgEl = document.getElementById(idFor_(prefix,"matchdayRivalMsg"));
+    if(msgEl) msgEl.innerHTML = "";
+  });
   rivalDestacados = Array.isArray(rr.jugadoresDestacados) ? rr.jugadoresDestacados.map(j=>({...j})) : [];
   renderRivalDestacadosRows_();
-  document.getElementById("matchdayRivalMsg").innerHTML = "";
 }
-document.getElementById("btnSaveRivalReport").onclick = async () => {
+async function guardarRivalReport_(prefix){
   if(!statsMatchdayId) return;
-  const msgEl = document.getElementById("matchdayRivalMsg");
-  const jugadoresDestacados = Array.from(document.querySelectorAll("#rivalDestacadosList [data-rival-row]")).map(row=>({
+  const msgEl = document.getElementById(idFor_(prefix,"matchdayRivalMsg"));
+  const jugadoresDestacados = Array.from(document.querySelectorAll("#"+idFor_(prefix,"rivalDestacadosList")+" [data-rival-row]")).map(row=>({
     dorsal: row.querySelector(".riv-dorsal").value.trim(),
     nombre: row.querySelector(".riv-nombre").value.trim(),
     posicion: row.querySelector(".riv-posicion").value.trim(),
     observaciones: row.querySelector(".riv-obs").value.trim()
   })).filter(j=>j.dorsal || j.nombre || j.posicion || j.observaciones);
-  const ataque = {}; RIVAL_CAMPOS_ATAQUE.forEach(k=>{ ataque[k] = (document.getElementById("rivAtq_"+k).value||"").trim(); });
-  const defensa = {}; RIVAL_CAMPOS_DEFENSA.forEach(k=>{ defensa[k] = (document.getElementById("rivDef_"+k).value||"").trim(); });
+  const ataque = {}; RIVAL_CAMPOS_ATAQUE.forEach(k=>{ ataque[k] = (document.getElementById(idFor_(prefix,"rivAtq_"+k)).value||"").trim(); });
+  const defensa = {}; RIVAL_CAMPOS_DEFENSA.forEach(k=>{ defensa[k] = (document.getElementById(idFor_(prefix,"rivDef_"+k)).value||"").trim(); });
   try{
     await db.collection("matchdays").doc(statsMatchdayId).update({
       rivalReport: { jugadoresDestacados, ataque, defensa }
     });
     msgEl.innerHTML = '<p class="ok-msg">Informe del rival guardado.</p>';
+    // Refresca las DOS copias con lo que ha quedado grabado de verdad (ver aviso del comentario
+    // grande de arriba sobre editar ambas sin guardar entre medias).
+    renderMatchdayRivalReport();
   }catch(err){
     msgEl.innerHTML = '<p class="error-msg">Error al guardar: '+err.message+'</p>';
   }
-};
+}
+RIVAL_PREFIJOS.forEach(prefix=>{
+  const addBtn = document.getElementById(idFor_(prefix,"btnAddRivalDestacado"));
+  if(addBtn) addBtn.onclick = () => { rivalDestacados.push({dorsal:"", nombre:"", posicion:"", observaciones:""}); renderRivalDestacadosRows_(); };
+  const saveBtn = document.getElementById(idFor_(prefix,"btnSaveRivalReport"));
+  if(saveBtn) saveBtn.onclick = () => guardarRivalReport_(prefix);
+});
 
 /* ---------- Exportar convocatoria en PDF ---------- */
 async function exportMatchdayReportPDF(matchdayId){
