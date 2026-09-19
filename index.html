@@ -1565,6 +1565,11 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
             <span class="home-card-label">Estadísticas</span>
             <span class="home-card-desc">Resultados y goles por categoría</span>
           </button>
+          <button type="button" class="home-card" id="plantillaGoAttendance">
+            <span class="home-card-icon">🧍</span>
+            <span class="home-card-label">Control de asistencia</span>
+            <span class="home-card-desc">Sesiones, asistencias y faltas por jugador</span>
+          </button>
           <button type="button" class="home-card hidden" id="plantillaGoCompare">
             <span class="home-card-icon">🆚</span>
             <span class="home-card-label">Comparar equipos</span>
@@ -1952,6 +1957,19 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
 
       </div>
 
+      <div id="plantillaAttendanceView" class="hidden">
+        <button type="button" class="btn ghost small" id="plantillaAttendanceBack" style="margin-bottom:10px;">← Volver</button>
+        <div class="card">
+          <h2 style="font-size:1.05rem;">🧍 Control de asistencia</h2>
+          <p class="muted" style="margin-top:-6px;">Acumulado de todas las sesiones de entrenamiento guardadas para este equipo con la asistencia marcada. Incluye también a jugadores de otras categorías que hayan sido convocados puntualmente a alguna sesión.</p>
+          <div class="row" id="attendanceTeamSelectorRow" style="margin-bottom:10px;">
+            <label style="font-size:.8rem;font-weight:600;align-self:center;">🎽 Equipo:</label>
+            <select id="attendanceTeamSelector" style="flex:1;min-width:160px;"></select>
+          </div>
+          <div id="attendanceControlContent"><div class="empty">Elige un equipo arriba.</div></div>
+        </div>
+      </div>
+
       <div id="plantillaSummaryView" class="hidden">
         <button type="button" class="btn ghost small" id="plantillaSummaryBack" style="margin-bottom:10px;">← Volver</button>
         <div class="card" id="teamSummaryCard">
@@ -2171,13 +2189,20 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
 
 <!-- ---------- Control de asistencia de una sesión de entrenamiento ---------- -->
 <div id="attendanceModal" class="modal-bg hidden">
-  <div class="modal" style="max-width:540px;">
+  <div class="modal" style="max-width:560px;">
     <h2 style="font-size:1.05rem;">🧍 Asistencia a la sesión</h2>
     <p class="muted" style="font-size:.8rem;margin-top:2px;">Marca quién ha asistido y, si ha faltado, el motivo.</p>
     <div style="margin:8px 0;">
       <button type="button" class="btn ghost small" id="btnMarkAllAttended">✅ Marcar todos asisten</button>
     </div>
-    <div id="attendanceModalList" style="max-height:48vh;overflow-y:auto;"></div>
+    <div id="attendanceModalList" style="max-height:42vh;overflow-y:auto;"></div>
+    <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
+      <label style="font-size:.8rem;font-weight:600;">¿Se ha convocado a algún jugador de otra categoría a esta sesión?</label>
+      <div style="display:flex;gap:6px;margin-top:6px;">
+        <select id="attendanceAddPlayerSelect" style="flex:1;"></select>
+        <button type="button" class="btn ghost small" id="btnAddAttendanceGuest" style="flex:0 0 auto;">➕ Añadir</button>
+      </div>
+    </div>
     <div style="display:flex;gap:8px;margin-top:14px;">
       <button class="btn ghost" id="btnCloseAttendanceModal" style="flex:1;">Cancelar</button>
       <button class="btn accent" id="btnSaveAttendance" style="flex:1;">Guardar</button>
@@ -5732,6 +5757,7 @@ function showPlantillaView(view){
   document.getElementById("plantillaPlayerView").classList.toggle("hidden", view!=="player");
   document.getElementById("plantillaMatchdaysView").classList.toggle("hidden", view!=="matchdays");
   document.getElementById("plantillaSummaryView").classList.toggle("hidden", view!=="summary");
+  document.getElementById("plantillaAttendanceView").classList.toggle("hidden", view!=="attendance");
   document.getElementById("plantillaTeamsView").classList.toggle("hidden", view!=="teams");
   document.getElementById("plantillaCompareView").classList.toggle("hidden", view!=="compare");
 }
@@ -5752,11 +5778,13 @@ function goBackFromPlantillaDetail_(){
 document.getElementById("plantillaGoRoster").onclick = () => { plantillaBackTarget = "plantilla-home"; showPlantillaView("roster"); renderPlayersList(); };
 document.getElementById("plantillaGoMatchdays").onclick = () => { plantillaBackTarget = "plantilla-home"; showPlantillaView("matchdays"); showMatchdaySub("list"); renderMatchdaysList(); };
 document.getElementById("plantillaGoSummary").onclick = () => { plantillaBackTarget = "plantilla-home"; showPlantillaView("summary"); renderSummaryTeamSelector_(); renderTeamSummary(); };
+document.getElementById("plantillaGoAttendance").onclick = () => { plantillaBackTarget = "plantilla-home"; showPlantillaView("attendance"); renderAttendanceTeamSelector_(); renderAttendanceControlView_(); };
 document.getElementById("plantillaGoTeams").onclick = () => { showPlantillaView("teams"); renderTeamManageList(); };
 document.getElementById("plantillaGoCompare").onclick = () => { showPlantillaView("compare"); renderTeamCompare(); };
 document.getElementById("plantillaRosterBack").onclick = goBackFromPlantillaDetail_;
 document.getElementById("plantillaMatchdaysBack").onclick = goBackFromPlantillaDetail_;
 document.getElementById("plantillaSummaryBack").onclick = goBackFromPlantillaDetail_;
+document.getElementById("plantillaAttendanceBack").onclick = goBackFromPlantillaDetail_;
 document.getElementById("plantillaTeamsBack").onclick = () => showPlantillaView("home");
 document.getElementById("plantillaCompareBack").onclick = () => showPlantillaView("home");
 
@@ -6573,14 +6601,18 @@ window.deleteTeam = async (id) => {
 function applySelectedTeamChange_(){
   const teamSel = document.getElementById("teamSelector");
   const summarySel = document.getElementById("summaryTeamSelector");
+  const attendanceSel = document.getElementById("attendanceTeamSelector");
   if(teamSel && selectedTeamId) teamSel.value = selectedTeamId;
   if(summarySel && selectedTeamId) summarySel.value = selectedTeamId;
+  if(attendanceSel && selectedTeamId) attendanceSel.value = selectedTeamId;
   renderSummaryTeamSelector_();
+  renderAttendanceTeamSelector_();
   renderPlayersList();
   showMatchdaySub("list");
   renderSeasonSelector();
   renderMatchdaysList();
   renderTeamSummary();
+  renderAttendanceControlView_();
 }
 function renderTeamSelector(){
   const sel = document.getElementById("teamSelector");
@@ -6618,6 +6650,23 @@ function renderSummaryTeamSelector_(){
   if(selectedTeamId && visible.some(t=>t.id===selectedTeamId)) sel.value = selectedTeamId;
 }
 document.getElementById("summaryTeamSelector").onchange = (e) => {
+  if(!e.target.value) return;
+  selectedTeamId = e.target.value;
+  selectedSeason = null;
+  applySelectedTeamChange_();
+};
+// Desplegable de equipo propio de "Control de asistencia", mismo patrón que el de Estadísticas.
+function renderAttendanceTeamSelector_(){
+  const sel = document.getElementById("attendanceTeamSelector");
+  const row = document.getElementById("attendanceTeamSelectorRow");
+  if(!sel || !row) return;
+  const visible = coachVisibleTeams_();
+  row.classList.toggle("hidden", visible.length<=1);
+  if(visible.length===0){ sel.innerHTML = '<option value="">Sin equipos asignados</option>'; return; }
+  sel.innerHTML = visible.map(t=>`<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("");
+  if(selectedTeamId && visible.some(t=>t.id===selectedTeamId)) sel.value = selectedTeamId;
+}
+document.getElementById("attendanceTeamSelector").onchange = (e) => {
   if(!e.target.value) return;
   selectedTeamId = e.target.value;
   selectedSeason = null;
@@ -9103,9 +9152,16 @@ function renderTeamSummary(){
 // guardadas que tengan la asistencia marcada (s.attendance, ver openSessionAttendance más
 // abajo). No está ligado a temporada porque las sesiones de entrenamiento no tienen ese campo.
 function computeAttendanceSummary_(teamId){
-  const roster = players.filter(p=>p.teamId===teamId).sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
+  const ownRoster = players.filter(p=>p.teamId===teamId);
   const teamSessions = sessions.filter(s=> Array.isArray(s.attendance) && s.attendance.length && sessionTeams_(s).some(t=>t.id===teamId));
-  return roster.map(p=>{
+  // Además de la plantilla propia, se incluye a cualquier jugador de OTRA categoría que
+  // haya sido añadido a mano como convocado puntual en alguna sesión de este equipo
+  // (ver attendanceExtraPlayerIds / openSessionAttendance más abajo).
+  const ids = new Set(ownRoster.map(p=>p.id));
+  teamSessions.forEach(s=> s.attendance.forEach(a=> ids.add(a.playerId)));
+  const allPlayers = Array.from(ids).map(id=>players.find(p=>p.id===id)).filter(Boolean)
+    .sort((a,b)=> (a.teamId===teamId?0:1)-(b.teamId===teamId?0:1) || (a.dorsal||0)-(b.dorsal||0));
+  return allPlayers.map(p=>{
     let presentes = 0, faltas = 0;
     const motivos = [];
     teamSessions.forEach(s=>{
@@ -9114,14 +9170,40 @@ function computeAttendanceSummary_(teamId){
       if(a.status==="No asiste"){ faltas++; if(a.reason) motivos.push(a.reason); }
       else presentes++;
     });
-    return {player: p, sesiones: presentes+faltas, presentes, faltas, motivos};
+    return {player: p, sesiones: presentes+faltas, presentes, faltas, motivos, guest: p.teamId!==teamId};
   });
+}
+function renderAttendanceControlView_(){
+  const wrap = document.getElementById("attendanceControlContent");
+  if(!wrap) return;
+  if(!selectedTeamId){ wrap.innerHTML = '<div class="empty">Elige un equipo arriba.</div>'; return; }
+  const rows = computeAttendanceSummary_(selectedTeamId).sort((a,b)=> b.faltas-a.faltas || (a.player.dorsal||0)-(b.player.dorsal||0));
+  wrap.innerHTML = `
+    <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:.85rem;min-width:480px;">
+      <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
+        <th style="padding:5px;">Jugador</th><th style="padding:5px;">Sesiones</th><th style="padding:5px;">Asistencias</th><th style="padding:5px;">Faltas</th><th style="padding:5px;">Motivos de las faltas</th>
+      </tr></thead>
+      <tbody>
+      ${rows.length ? rows.map(r=>{
+        const guestTag = r.guest ? ` <span class="badge outline" style="font-size:.68rem;">${escapeHtml((teams.find(t=>t.id===r.player.teamId)||{}).name || "otra categoría")}</span>` : "";
+        return `
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:5px;">${jerseyNameHtml_(r.player.position, (r.player.dorsal!=null?escapeHtml(String(r.player.dorsal))+". ":"")+escapeHtml(r.player.name))}${guestTag}</td>
+          <td style="padding:5px;">${r.sesiones}</td>
+          <td style="padding:5px;">${r.presentes}</td>
+          <td style="padding:5px;${r.faltas>0?"font-weight:600;color:#c0392b;":""}">${r.faltas}</td>
+          <td style="padding:5px;font-size:.78rem;">${r.motivos.length ? escapeHtml(r.motivos.join(" · ")) : ""}</td>
+        </tr>`;
+      }).join("") : `<tr><td colspan="5" style="padding:5px;" class="muted">Todavía no hay ninguna sesión con la asistencia marcada.</td></tr>`}
+      </tbody>
+    </table>
+    </div>`;
 }
 function renderSeasonSummary_(wrap){
   const sum = computeTeamSummary_(selectedTeamId, selectedSeason, summaryDifficultyFilter, summaryCompetitionFilter);
   const outfield = sum.stats.filter(s=>s.player.position!=="Portero").sort((a,b)=> b.goals-a.goals || b.played-a.played);
   const gks = sum.stats.filter(s=>s.player.position==="Portero").sort((a,b)=> b.cleanSheets-a.cleanSheets || a.goalsConceded-b.goalsConceded);
-  const attendanceRows = computeAttendanceSummary_(selectedTeamId).sort((a,b)=> b.faltas-a.faltas || (a.player.dorsal||0)-(b.player.dorsal||0));
   const forAgg = aggregateGoalEvents_(sum.teamMds, "goalsForEvents");
   const againstAgg = aggregateGoalEvents_(sum.teamMds, "goalsAgainstEvents");
   wrap.innerHTML = `
@@ -9175,25 +9257,6 @@ function renderSeasonSummary_(wrap){
           <td style="padding:5px;">${s.red}</td>
           <td style="padding:5px;">${s.avgRating!=null ? s.avgRating.toFixed(1) : "-"}</td>
         </tr>`).join("") : `<tr><td colspan="7" style="padding:5px;" class="muted">Sin porteros en la plantilla.</td></tr>`}
-      </tbody>
-    </table>
-    </div>
-    <h3 style="margin-top:14px;font-size:.9rem;">🧍 Asistencia a entrenamientos</h3>
-    <p class="muted" style="margin-top:-6px;font-size:.8rem;">Acumulado de todas las sesiones de entrenamiento guardadas para este equipo con la asistencia marcada (no depende del filtro de temporada de arriba).</p>
-    <div style="overflow-x:auto;">
-    <table style="width:100%;border-collapse:collapse;font-size:.85rem;min-width:480px;">
-      <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
-        <th style="padding:5px;">Jugador</th><th style="padding:5px;">Sesiones</th><th style="padding:5px;">Asistencias</th><th style="padding:5px;">Faltas</th><th style="padding:5px;">Motivos de las faltas</th>
-      </tr></thead>
-      <tbody>
-      ${attendanceRows.length ? attendanceRows.map(r=>`
-        <tr style="border-bottom:1px solid var(--border);">
-          <td style="padding:5px;">${jerseyNameHtml_(r.player.position, (r.player.dorsal!=null?escapeHtml(String(r.player.dorsal))+". ":"")+escapeHtml(r.player.name))}</td>
-          <td style="padding:5px;">${r.sesiones}</td>
-          <td style="padding:5px;">${r.presentes}</td>
-          <td style="padding:5px;${r.faltas>0?"font-weight:600;color:#c0392b;":""}">${r.faltas}</td>
-          <td style="padding:5px;font-size:.78rem;">${r.motivos.length ? escapeHtml(r.motivos.join(" · ")) : ""}</td>
-        </tr>`).join("") : `<tr><td colspan="5" style="padding:5px;" class="muted">Todavía no hay ninguna sesión con la asistencia marcada.</td></tr>`}
       </tbody>
     </table>
     </div>
@@ -9764,40 +9827,98 @@ document.getElementById("btnSaveSessionObs").onclick = async () => {
 
 // ---------- Control de asistencia por sesión ----------
 // Jugadores que se pueden marcar en una sesión: la unión de las plantillas de TODOS los
-// equipos a los que esté vinculada la sesión (una sesión puede compartirse entre varios
-// equipos). Se guarda en la propia sesión (s.attendance), no en un documento aparte, y se
-// hace .update() parcial igual que el resto de campos de la sesión.
+// equipos a los que esté vinculada la sesión, MÁS los jugadores de otras categorías que se
+// hayan añadido a mano como convocados puntuales para esta sesión concreta (attendanceExtraIds,
+// solo en memoria mientras se edita; se guarda en s.attendanceExtraPlayerIds al pulsar Guardar
+// para que sigan apareciendo la próxima vez que se abra esta misma sesión). Todo se guarda en
+// la propia sesión (s.attendance / s.attendanceExtraPlayerIds), con .update() parcial igual
+// que el resto de campos de la sesión.
 let attendanceTargetSessionId = null;
-function attendanceRoster_(s){
+let attendanceExtraIds = [];
+function attendanceBaseRoster_(s){
   const teamIds = sessionTeams_(s).map(t=>t.id);
   return players.filter(p=>teamIds.includes(p.teamId)).sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
 }
-function renderAttendanceModalRows_(){
-  const s = sessions.find(x=>x.id===attendanceTargetSessionId);
-  const wrap = document.getElementById("attendanceModalList");
-  if(!s){ wrap.innerHTML = ""; return; }
-  const roster = attendanceRoster_(s);
-  if(roster.length===0){ wrap.innerHTML = '<p class="muted">Ninguno de los equipos de esta sesión tiene jugadores en la plantilla.</p>'; return; }
-  const attMap = {};
-  (s.attendance||[]).forEach(a=>{ attMap[a.playerId] = a; });
-  wrap.innerHTML = roster.map(p=>{
-    const a = attMap[p.id] || {};
-    const absent = a.status === "No asiste";
-    return `
+function attendanceGuestPlayers_(s){
+  const baseIds = new Set(attendanceBaseRoster_(s).map(p=>p.id));
+  return attendanceExtraIds
+    .map(id=>players.find(p=>p.id===id))
+    .filter(p=>p && !baseIds.has(p.id))
+    .sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
+}
+function attendanceRowHtml_(p, a, isGuest){
+  const absent = a.status === "No asiste";
+  const team = isGuest ? teams.find(t=>t.id===p.teamId) : null;
+  return `
     <div class="row" data-player-id="${p.id}" style="align-items:center;border-bottom:1px solid var(--border);padding:6px 0;gap:6px;">
-      <div style="flex:1;min-width:130px;">${jerseyNameHtml_(p.position, (p.dorsal!=null?escapeHtml(String(p.dorsal))+". ":"")+escapeHtml(p.name))}</div>
+      <div style="flex:1;min-width:130px;">${jerseyNameHtml_(p.position, (p.dorsal!=null?escapeHtml(String(p.dorsal))+". ":"")+escapeHtml(p.name))}${isGuest ? ` <span class="badge outline" style="font-size:.68rem;">${escapeHtml(team?team.name:"otra categoría")}</span>` : ""}</div>
       <select class="att-status" style="max-width:130px;flex:0 0 auto;">
         <option value="Asiste" ${!absent?"selected":""}>✅ Asiste</option>
         <option value="No asiste" ${absent?"selected":""}>❌ No asiste</option>
       </select>
-      <input type="text" class="att-reason" placeholder="Motivo de la falta" value="${escapeHtml(a.reason||"")}" style="flex:1;min-width:130px;${absent?"":"display:none;"}">
+      <input type="text" class="att-reason" placeholder="Motivo de la falta" value="${escapeHtml(a.reason||"")}" style="flex:1;min-width:110px;${absent?"":"display:none;"}">
+      ${isGuest ? `<button type="button" class="btn danger small" onclick="quitarAttendanceGuest_('${p.id}')" style="flex:0 0 auto;" title="Quitar de esta sesión">🗑️</button>` : ""}
     </div>`;
+}
+function renderAttendanceModalRows_(){
+  const s = sessions.find(x=>x.id===attendanceTargetSessionId);
+  const wrap = document.getElementById("attendanceModalList");
+  if(!s){ wrap.innerHTML = ""; renderAttendanceAddSelect_(); return; }
+  const roster = attendanceBaseRoster_(s);
+  const guests = attendanceGuestPlayers_(s);
+  const attMap = {};
+  (s.attendance||[]).forEach(a=>{ attMap[a.playerId] = a; });
+  if(roster.length===0 && guests.length===0){
+    wrap.innerHTML = '<p class="muted">Ninguno de los equipos de esta sesión tiene jugadores en la plantilla.</p>';
+  } else {
+    wrap.innerHTML =
+      roster.map(p=>attendanceRowHtml_(p, attMap[p.id]||{}, false)).join("") +
+      (guests.length ? `<h4 style="margin:10px 0 2px 0;font-size:.8rem;color:var(--accent);">Convocados de otras categorías</h4>` + guests.map(p=>attendanceRowHtml_(p, attMap[p.id]||{}, true)).join("") : "");
+  }
+  renderAttendanceAddSelect_();
+}
+function renderAttendanceAddSelect_(){
+  const sel = document.getElementById("attendanceAddPlayerSelect");
+  const s = sessions.find(x=>x.id===attendanceTargetSessionId);
+  if(!sel || !s) return;
+  const excluded = new Set([...attendanceBaseRoster_(s), ...attendanceGuestPlayers_(s)].map(p=>p.id));
+  const candidates = players.filter(p=>!excluded.has(p.id)).sort((a,b)=>{
+    const ta = (teams.find(t=>t.id===a.teamId)||{}).name || "";
+    const tb = (teams.find(t=>t.id===b.teamId)||{}).name || "";
+    return ta.localeCompare(tb, 'es') || (a.dorsal||0)-(b.dorsal||0);
+  });
+  if(candidates.length===0){
+    sel.innerHTML = '<option value="">No hay más jugadores en otras plantillas</option>';
+    sel.disabled = true;
+    return;
+  }
+  sel.disabled = false;
+  sel.innerHTML = candidates.map(p=>{
+    const t = teams.find(x=>x.id===p.teamId);
+    return `<option value="${p.id}">${escapeHtml(p.name)} — ${escapeHtml(t?t.name:"?")}</option>`;
   }).join("");
 }
+window.quitarAttendanceGuest_ = (playerId) => {
+  attendanceExtraIds = attendanceExtraIds.filter(id=>id!==playerId);
+  renderAttendanceModalRows_();
+};
+document.getElementById("btnAddAttendanceGuest").onclick = () => {
+  const sel = document.getElementById("attendanceAddPlayerSelect");
+  if(!sel.value) return;
+  attendanceExtraIds.push(sel.value);
+  renderAttendanceModalRows_();
+};
 window.openSessionAttendance = (id) => {
   const s = sessions.find(x=>x.id===id);
   if(!s) return;
   attendanceTargetSessionId = id;
+  const baseIds = new Set(attendanceBaseRoster_(s).map(p=>p.id));
+  // Arranca con los invitados ya guardados de antes; por compatibilidad, también recoge
+  // cualquier jugador que apareciera en s.attendance sin pertenecer a la plantilla propia
+  // (sesiones guardadas antes de que existiera attendanceExtraPlayerIds).
+  const savedExtras = Array.isArray(s.attendanceExtraPlayerIds) ? s.attendanceExtraPlayerIds.slice() : [];
+  (s.attendance||[]).forEach(a=>{ if(!baseIds.has(a.playerId) && !savedExtras.includes(a.playerId)) savedExtras.push(a.playerId); });
+  attendanceExtraIds = savedExtras.filter(pid=>players.some(p=>p.id===pid));
   renderAttendanceModalRows_();
   document.getElementById("attendanceModalMsg").innerHTML = "";
   document.getElementById("attendanceModal").classList.remove("hidden");
@@ -9821,6 +9942,7 @@ document.getElementById("btnMarkAllAttended").onclick = () => {
 document.getElementById("btnCloseAttendanceModal").onclick = () => {
   document.getElementById("attendanceModal").classList.add("hidden");
   attendanceTargetSessionId = null;
+  attendanceExtraIds = [];
 };
 document.getElementById("btnSaveAttendance").onclick = async () => {
   if(!attendanceTargetSessionId) return;
@@ -9832,15 +9954,17 @@ document.getElementById("btnSaveAttendance").onclick = async () => {
     const reason = row.querySelector(".att-reason").value.trim();
     return { playerId, status, reason: status==="No asiste" ? reason : "" };
   });
+  const attendanceExtraPlayerIds = attendanceExtraIds.slice();
   try{
-    await db.collection("sessions").doc(attendanceTargetSessionId).update({attendance});
+    await db.collection("sessions").doc(attendanceTargetSessionId).update({attendance, attendanceExtraPlayerIds});
     const s = sessions.find(x=>x.id===attendanceTargetSessionId);
-    if(s) s.attendance = attendance;
+    if(s){ s.attendance = attendance; s.attendanceExtraPlayerIds = attendanceExtraPlayerIds; }
     msgEl.innerHTML = '<p class="ok-msg">Asistencia guardada.</p>';
     renderSavedSessions();
     setTimeout(()=>{
       document.getElementById("attendanceModal").classList.add("hidden");
       attendanceTargetSessionId = null;
+      attendanceExtraIds = [];
     }, 600);
   }catch(err){ msgEl.innerHTML = '<p class="error-msg">Error al guardar: '+err.message+'</p>'; }
 };
