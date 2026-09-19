@@ -9723,6 +9723,26 @@ window.deleteSession = async (id, contextTeamId) => {
 /* ============================================================
    EXPORTAR SESIÓN A PDF
 ============================================================= */
+// Lista de tareas de la sesión, en el mismo orden en que se ven en el PDF (por bloque
+// calentamiento/principal/vuelta, o por categoría en sesiones antiguas sin bloques) — para el
+// resumen final no importa el porqué del orden, solo que sea el mismo que en el resto del PDF.
+function sessionTasksFlat_(s){
+  const list = [];
+  if(s.blocks){
+    Object.keys(SESSION_BLOCKS).forEach(blockKey=>{
+      (s.blocks[blockKey]||[]).forEach(id=>{
+        const t = tasks.find(x=>x.id===id);
+        if(t) list.push(t);
+      });
+    });
+  } else {
+    (s.taskIds||[]).forEach(id=>{
+      const t = tasks.find(x=>x.id===id);
+      if(t) list.push(t);
+    });
+  }
+  return list;
+}
 function renderFrameToImage(frame){
   const off = document.createElement("canvas");
   off.width = 980; off.height = 700;
@@ -9990,6 +10010,76 @@ function renderSessionIntoDoc(doc, s, opts){
       });
     }
   });
+
+  // ---- Página final: resumen de todas las tareas en una sola tabla compacta ----
+  // Nombre + explicación (recortada con "…" si no cabe) + un dibujo pequeño de la pizarra si la
+  // tarea tiene alguno. El tamaño de letra y el número de líneas de explicación se encogen según
+  // cuántas tareas haya, para intentar que quepan todas en una única página tal como se pidió;
+  // si aun así no cabe (una sesión con muchísimas tareas), sencillamente sigue en una página más
+  // en vez de recortar contenido sin avisar — ensureSpace() ya se encarga de eso solo.
+  function renderTaskSummaryPage(allTasks){
+    if(!allTasks.length) return;
+    newPage();
+    sectionBar("Resumen de tareas");
+
+    const fullW = pageW-margin*2;
+    const nameColW = 40, imgColW = 34;
+    const obsColW = fullW-nameColW-imgColW;
+    const imgH = (imgColW-2)*(700/980);
+
+    const n = allTasks.length;
+    const fontSize = n<=5 ? 8.5 : n<=8 ? 7.5 : n<=12 ? 6.5 : 5.5;
+    const lineH = fontSize*0.484; // mismo factor mm/línea que usa el resto de este PDF (ver fullBox)
+    const maxLines = n<=5 ? 6 : n<=8 ? 5 : n<=12 ? 4 : 3;
+
+    ensureSpace(6);
+    doc.setDrawColor(BORDER[0],BORDER[1],BORDER[2]); doc.setLineWidth(0.25);
+    doc.setFillColor(LABEL_BG[0],LABEL_BG[1],LABEL_BG[2]);
+    doc.rect(margin, y, fullW, 6, 'F');
+    doc.rect(margin, y, nameColW, 6);
+    doc.rect(margin+nameColW, y, obsColW, 6);
+    doc.rect(margin+nameColW+obsColW, y, imgColW, 6);
+    doc.setFont("helvetica","bold"); doc.setFontSize(8); doc.setTextColor(TEXT[0],TEXT[1],TEXT[2]);
+    doc.text("Ejercicio", margin+2, y+4.2);
+    doc.text("Explicación", margin+nameColW+2, y+4.2);
+    doc.text("Dibujo", margin+nameColW+obsColW+2, y+4.2);
+    y += 6;
+
+    allTasks.forEach((t,i)=>{
+      doc.setFont("helvetica","normal"); doc.setFontSize(fontSize);
+      let obsLines = doc.splitTextToSize(t.description||"", obsColW-4);
+      if(obsLines.length>maxLines){
+        obsLines = obsLines.slice(0,maxLines);
+        const combined = obsLines[maxLines-1].replace(/\s+$/,"")+"…";
+        obsLines[maxLines-1] = doc.splitTextToSize(combined, obsColW-4)[0];
+      }
+      const nameLines = doc.splitTextToSize(`${i+1}. ${t.title||"(sin título)"}`, nameColW-4);
+      const frameList = (t.animation && t.animation.frames) || [];
+      const hasImg = frameList.length>0;
+      const rowH = Math.max(Math.max(nameLines.length,obsLines.length)*lineH+3, hasImg?imgH+3:0, 8);
+
+      ensureSpace(rowH);
+      doc.setDrawColor(BORDER[0],BORDER[1],BORDER[2]); doc.setLineWidth(0.2);
+      doc.rect(margin, y, nameColW, rowH);
+      doc.rect(margin+nameColW, y, obsColW, rowH);
+      doc.rect(margin+nameColW+obsColW, y, imgColW, rowH);
+
+      doc.setFont("helvetica","bold"); doc.setFontSize(fontSize); doc.setTextColor(TEXT[0],TEXT[1],TEXT[2]);
+      doc.text(nameLines, margin+2, y+lineH+1);
+      doc.setFont("helvetica","normal");
+      doc.text(obsLines, margin+nameColW+2, y+lineH+1);
+
+      if(hasImg){
+        try{
+          const imgData = renderFrameToImage(frameList[0]);
+          const iw = imgColW-2;
+          doc.addImage(imgData, "PNG", margin+nameColW+obsColW+1, y+(rowH-imgH)/2, iw, imgH);
+        }catch(e){ /* si falla el dibujo de esta tarea en concreto, se deja su celda en blanco */ }
+      }
+      y += rowH;
+    });
+  }
+  renderTaskSummaryPage(sessionTasksFlat_(s));
 }
 
 window.exportSessionPDF = function(sessionId){
