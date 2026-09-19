@@ -1681,10 +1681,11 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
                   </div>
                 </div>
 
-                <!-- Informe del rival, copia duplicada aquí a propósito (ver también su copia
-                     original en su propio acordeón de Jornada, más abajo): mismos datos
-                     (m.rivalReport), pero con todos los ids con el prefijo "pm" para no chocar
-                     con los de la otra copia — ver idFor_/RIVAL_CAMPOS_ATAQUE/RIVAL_CAMPOS_DEFENSA.
+                <!-- Informe del rival, copia INDEPENDIENTE de la de su propio acordeón de
+                     Jornada (más abajo) — a petición expresa, esta copia tiene sus propios datos
+                     (m.prepartidoRivalReport, no m.rivalReport) y sus propios ids con el prefijo
+                     "pm" (pmRivAtq_..., pmRivalDestacadosList...) para no chocar ni compartir
+                     nada con la otra copia — ver idFor_/RIVAL_DATA_FIELD más abajo en el JS.
                      A propósito FUERA de mdPrematchPrivateWrap: es información pública para
                      todos los entrenadores activos (igual que siempre), no una nota privada de
                      este entrenador, así que no debe quedar oculta tras el aviso de "sin acceso"
@@ -1855,9 +1856,9 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
               </div>
             </details>
 
-            <!-- Informe del rival, copia "original": misma información que la copia de dentro de
-                 Prepartido (ver comentario grande junto a "pmAccMatchdayRival" ahí), se pidió
-                 duplicada en los dos sitios a propósito. -->
+            <!-- Informe del rival, copia "original": independiente de la copia de dentro de
+                 Prepartido (ver comentario grande junto a "pmAccMatchdayRival" ahí) — se pidió
+                 duplicada en los dos sitios a propósito, pero cada una con sus propios datos. -->
             <details class="acc" id="accMatchdayRival">
               <summary>🆚 Informe del rival</summary>
               <div class="acc-body">
@@ -8546,51 +8547,50 @@ document.getElementById("btnSaveMatchdayPrematch").onclick = async () => {
 
 /* ---------- Informe del rival: scouting del rival antes del partido (jugadores a vigilar,
    sistemas de ataque/defensa y ABP). Mismo patrón que "Informe del partido" de arriba: se
-   guarda como un único campo "rivalReport" del documento de la jornada, con .update()
-   parcial. Los 24 campos de texto libre (ataque/defensa) se leen/escriben por id a partir
-   de estas dos listas de claves, para no repetir el mismo bloque 24 veces.
-   DUPLICADO A PROPÓSITO: esta sección aparece dos veces (su propio acordeón de Jornada, y otra
-   copia dentro de "Prepartido"), a petición expresa — misma información en los dos sitios por
-   comodidad, no dos informes distintos. La copia de Prepartido tiene todos los ids con el
-   prefijo "pm" (pmRivAtq_..., pmRivalDestacadosList...); idFor_() calcula el id real según el
-   prefijo, para no duplicar toda esta lógica dos veces. Aviso: si editas las dos copias sin
-   guardar entre medias, guardar desde una de ellas SOBRESCRIBE lo escrito en la otra que
-   todavía no se hubiera guardado — al guardar, se refrescan ambas con lo que quedó grabado de
-   verdad, para que las dos vuelvan a coincidir. ---------- */
+   guarda con .update() parcial sobre el documento de la jornada. Los 24 campos de texto libre
+   (ataque/defensa) se leen/escriben por id a partir de estas dos listas de claves, para no
+   repetir el mismo bloque 24 veces.
+   HAY DOS COPIAS INDEPENDIENTES (a petición expresa): su propio acordeón de Jornada, y otra
+   dentro de "Prepartido" — cada una con sus propios datos, SIN relación entre sí; lo que se
+   escribe en una no aparece en la otra. Cada copia tiene su campo del documento
+   (RIVAL_DATA_FIELD) y sus propios ids con prefijo "pm" para la de Prepartido (pmRivAtq_...,
+   pmRivalDestacadosList...) — idFor_() calcula el id real según el prefijo, y
+   RIVAL_DATA_FIELD[prefijo] el campo real, para no duplicar toda esta lógica dos veces sin que
+   por ello compartan datos. ---------- */
 const RIVAL_CAMPOS_ATAQUE = ["sistemas","salidasPresion","transiciones","ataque4vs3","porteroJugador","cornerIzq","cornerDer","bandasCortas","bandasMedias","bandasLargas","faltasMenos10","faltasMas10"];
 const RIVAL_CAMPOS_DEFENSA = ["ganando","empatando","perdiendo","transiciones","defensa4vs3","porteroJugador","cornerIzq","cornerDer","bandasCortas","bandasMedias","bandasLargas","faltasMenos10","faltasMas10"];
-const RIVAL_PREFIJOS = ["", "pm"]; // "" = acordeón propio de Jornada, "pm" = copia dentro de Prepartido
+const RIVAL_PREFIJOS = ["", "pm"]; // "" = acordeón propio de Jornada, "pm" = copia (independiente) dentro de Prepartido
+const RIVAL_DATA_FIELD = {"": "rivalReport", "pm": "prepartidoRivalReport"}; // campo del documento que lee/escribe cada copia
 function idFor_(prefix, base){ return prefix ? prefix+base.charAt(0).toUpperCase()+base.slice(1) : base; }
-let rivalDestacados = []; // jugadores destacados del rival que se están editando (fila = {dorsal,nombre,posicion,observaciones}) — compartida por las dos copias
-function renderRivalDestacadosRows_(){
-  RIVAL_PREFIJOS.forEach(prefix=>{
-    const wrap = document.getElementById(idFor_(prefix,"rivalDestacadosList"));
-    if(!wrap) return;
-    if(rivalDestacados.length===0){ wrap.innerHTML = '<p class="muted">Todavía no has añadido jugadores destacados del rival.</p>'; return; }
-    wrap.innerHTML = rivalDestacados.map((j,i)=>`
-      <div class="row" style="align-items:flex-end;margin-bottom:6px;" data-rival-row="${i}">
-        <div><label style="font-size:.72rem;">Nº</label><input type="text" class="riv-dorsal" value="${escapeHtml(j.dorsal||"")}" style="width:100%;"></div>
-        <div style="flex:2;"><label style="font-size:.72rem;">Nombre</label><input type="text" class="riv-nombre" value="${escapeHtml(j.nombre||"")}" style="width:100%;"></div>
-        <div><label style="font-size:.72rem;">Posición</label><input type="text" class="riv-posicion" value="${escapeHtml(j.posicion||"")}" style="width:100%;"></div>
-        <div style="flex:3;"><label style="font-size:.72rem;">Observaciones</label><input type="text" class="riv-obs" value="${escapeHtml(j.observaciones||"")}" style="width:100%;"></div>
-        <button type="button" class="btn danger small" onclick="quitarRivalDestacado_(${i})" style="flex:0 0 auto;" title="Quitar">🗑️</button>
-      </div>`).join("");
-  });
+let rivalDestacadosPorPrefijo = {"": [], "pm": []}; // jugadores destacados que se están editando, uno por copia (fila = {dorsal,nombre,posicion,observaciones})
+function renderRivalDestacadosRows_(prefix){
+  const wrap = document.getElementById(idFor_(prefix,"rivalDestacadosList"));
+  if(!wrap) return;
+  const lista = rivalDestacadosPorPrefijo[prefix];
+  if(lista.length===0){ wrap.innerHTML = '<p class="muted">Todavía no has añadido jugadores destacados del rival.</p>'; return; }
+  wrap.innerHTML = lista.map((j,i)=>`
+    <div class="row" style="align-items:flex-end;margin-bottom:6px;" data-rival-row="${i}">
+      <div><label style="font-size:.72rem;">Nº</label><input type="text" class="riv-dorsal" value="${escapeHtml(j.dorsal||"")}" style="width:100%;"></div>
+      <div style="flex:2;"><label style="font-size:.72rem;">Nombre</label><input type="text" class="riv-nombre" value="${escapeHtml(j.nombre||"")}" style="width:100%;"></div>
+      <div><label style="font-size:.72rem;">Posición</label><input type="text" class="riv-posicion" value="${escapeHtml(j.posicion||"")}" style="width:100%;"></div>
+      <div style="flex:3;"><label style="font-size:.72rem;">Observaciones</label><input type="text" class="riv-obs" value="${escapeHtml(j.observaciones||"")}" style="width:100%;"></div>
+      <button type="button" class="btn danger small" onclick="quitarRivalDestacado_('${prefix}',${i})" style="flex:0 0 auto;" title="Quitar">🗑️</button>
+    </div>`).join("");
 }
-window.quitarRivalDestacado_ = (i) => { rivalDestacados.splice(i,1); renderRivalDestacadosRows_(); };
+window.quitarRivalDestacado_ = (prefix, i) => { rivalDestacadosPorPrefijo[prefix].splice(i,1); renderRivalDestacadosRows_(prefix); };
 function renderMatchdayRivalReport(){
   const m = matchdays.find(x=>x.id===statsMatchdayId);
   if(!m) return;
-  const rr = m.rivalReport || {};
-  const at = rr.ataque || {}, df = rr.defensa || {};
   RIVAL_PREFIJOS.forEach(prefix=>{
+    const rr = m[RIVAL_DATA_FIELD[prefix]] || {};
+    const at = rr.ataque || {}, df = rr.defensa || {};
     RIVAL_CAMPOS_ATAQUE.forEach(k=>{ const el = document.getElementById(idFor_(prefix,"rivAtq_"+k)); if(el) el.value = at[k] || ""; });
     RIVAL_CAMPOS_DEFENSA.forEach(k=>{ const el = document.getElementById(idFor_(prefix,"rivDef_"+k)); if(el) el.value = df[k] || ""; });
     const msgEl = document.getElementById(idFor_(prefix,"matchdayRivalMsg"));
     if(msgEl) msgEl.innerHTML = "";
+    rivalDestacadosPorPrefijo[prefix] = Array.isArray(rr.jugadoresDestacados) ? rr.jugadoresDestacados.map(j=>({...j})) : [];
+    renderRivalDestacadosRows_(prefix);
   });
-  rivalDestacados = Array.isArray(rr.jugadoresDestacados) ? rr.jugadoresDestacados.map(j=>({...j})) : [];
-  renderRivalDestacadosRows_();
 }
 async function guardarRivalReport_(prefix){
   if(!statsMatchdayId) return;
@@ -8605,19 +8605,17 @@ async function guardarRivalReport_(prefix){
   const defensa = {}; RIVAL_CAMPOS_DEFENSA.forEach(k=>{ defensa[k] = (document.getElementById(idFor_(prefix,"rivDef_"+k)).value||"").trim(); });
   try{
     await db.collection("matchdays").doc(statsMatchdayId).update({
-      rivalReport: { jugadoresDestacados, ataque, defensa }
+      [RIVAL_DATA_FIELD[prefix]]: { jugadoresDestacados, ataque, defensa }
     });
     msgEl.innerHTML = '<p class="ok-msg">Informe del rival guardado.</p>';
-    // Refresca las DOS copias con lo que ha quedado grabado de verdad (ver aviso del comentario
-    // grande de arriba sobre editar ambas sin guardar entre medias).
-    renderMatchdayRivalReport();
+    renderMatchdayRivalReport(); // repinta las dos copias, cada una con su propio dato — no se pisan
   }catch(err){
     msgEl.innerHTML = '<p class="error-msg">Error al guardar: '+err.message+'</p>';
   }
 }
 RIVAL_PREFIJOS.forEach(prefix=>{
   const addBtn = document.getElementById(idFor_(prefix,"btnAddRivalDestacado"));
-  if(addBtn) addBtn.onclick = () => { rivalDestacados.push({dorsal:"", nombre:"", posicion:"", observaciones:""}); renderRivalDestacadosRows_(); };
+  if(addBtn) addBtn.onclick = () => { rivalDestacadosPorPrefijo[prefix].push({dorsal:"", nombre:"", posicion:"", observaciones:""}); renderRivalDestacadosRows_(prefix); };
   const saveBtn = document.getElementById(idFor_(prefix,"btnSaveRivalReport"));
   if(saveBtn) saveBtn.onclick = () => guardarRivalReport_(prefix);
 });
