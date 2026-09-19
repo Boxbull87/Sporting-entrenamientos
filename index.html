@@ -1682,6 +1682,99 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
                     <div id="matchdayPrematchMsg"></div>
                   </div>
                 </div>
+
+                <!-- Informe del rival: a propósito FUERA de mdPrematchPrivateWrap — es información
+                     pública para todos los entrenadores activos (igual que siempre), no una nota
+                     privada del entrenador de este equipo, así que no debe quedar oculta tras el
+                     mismo aviso de "sin acceso" de arriba. -->
+                <details class="acc acc-sub" id="accMatchdayRival">
+                  <summary>🆚 Informe del rival</summary>
+                  <div class="acc-body">
+                    <p class="muted" style="margin-top:0;">Scouting del rival antes del partido: jugadores a vigilar, sistemas de ataque y de defensa, y sus ABP.</p>
+
+                    <details class="acc acc-sub" open>
+                      <summary>⭐ Jugadores destacados</summary>
+                      <div class="acc-body">
+                        <div id="rivalDestacadosList" style="margin-bottom:8px;"></div>
+                        <button type="button" class="btn ghost small" id="btnAddRivalDestacado">➕ Añadir jugador destacado</button>
+                      </div>
+                    </details>
+
+                    <details class="acc acc-sub" open>
+                      <summary>⚔️ Ataque (sistemas ofensivos del rival)</summary>
+                      <div class="acc-body">
+                        <label style="font-size:.85rem;font-weight:600;">Sistemas ofensivos</label>
+                        <textarea id="rivAtq_sistemas" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
+                        <label style="font-size:.85rem;font-weight:600;">Salidas de presión</label>
+                        <textarea id="rivAtq_salidasPresion" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
+                        <label style="font-size:.85rem;font-weight:600;">Transiciones</label>
+                        <textarea id="rivAtq_transiciones" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
+                        <label style="font-size:.85rem;font-weight:600;">Ataque 4 vs 3</label>
+                        <textarea id="rivAtq_ataque4vs3" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
+                        <label style="font-size:.85rem;font-weight:600;">Portero jugador</label>
+                        <textarea id="rivAtq_porteroJugador" rows="2" style="width:100%;"></textarea>
+                      </div>
+                    </details>
+
+                    <details class="acc acc-sub" open>
+                      <summary>🚩 ABP en ataque</summary>
+                      <div class="acc-body">
+                        <label style="font-size:.85rem;font-weight:600;">Corner — Izquierda</label>
+                        <textarea id="rivAtq_cornerIzq" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
+                        <label style="font-size:.85rem;font-weight:600;">Corner — Derecha</label>
+                        <textarea id="rivAtq_cornerDer" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
+                        <div class="row">
+                          <div><label style="font-size:.85rem;font-weight:600;">Bandas — Cortas</label><textarea id="rivAtq_bandasCortas" rows="2" style="width:100%;"></textarea></div>
+                          <div><label style="font-size:.85rem;font-weight:600;">Bandas — Medias</label><textarea id="rivAtq_bandasMedias" rows="2" style="width:100%;"></textarea></div>
+                          <div><label style="font-size:.85rem;font-weight:600;">Bandas — Largas</label><textarea id="rivAtq_bandasLargas" rows="2" style="width:100%;"></textarea></div>
+                        </div>
+                        <div class="row" style="margin-top:8px;">
+                          <div><label style="font-size:.85rem;font-weight:600;">Faltas — Menos de 10m</label><textarea id="rivAtq_faltasMenos10" rows="2" style="width:100%;"></textarea></div>
+                          <div><label style="font-size:.85rem;font-weight:600;">Faltas — Más de 10m</label><textarea id="rivAtq_faltasMas10" rows="2" style="width:100%;"></textarea></div>
+                        </div>
+                      </div>
+                    </details>
+
+                    <details class="acc acc-sub" open>
+                      <summary>🛡️ Defensa (altura defensiva del rival)</summary>
+                      <div class="acc-body">
+                        <div class="row">
+                          <div><label style="font-size:.85rem;font-weight:600;">Ganando</label><textarea id="rivDef_ganando" rows="2" style="width:100%;"></textarea></div>
+                          <div><label style="font-size:.85rem;font-weight:600;">Empatando</label><textarea id="rivDef_empatando" rows="2" style="width:100%;"></textarea></div>
+                          <div><label style="font-size:.85rem;font-weight:600;">Perdiendo</label><textarea id="rivDef_perdiendo" rows="2" style="width:100%;"></textarea></div>
+                        </div>
+                        <label style="font-size:.85rem;font-weight:600;margin-top:8px;">Transiciones</label>
+                        <textarea id="rivDef_transiciones" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
+                        <label style="font-size:.85rem;font-weight:600;">Defensa 4 vs 3</label>
+                        <textarea id="rivDef_defensa4vs3" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
+                        <label style="font-size:.85rem;font-weight:600;">Portero jugador</label>
+                        <textarea id="rivDef_porteroJugador" rows="2" style="width:100%;"></textarea>
+                      </div>
+                    </details>
+
+                    <details class="acc acc-sub" open>
+                      <summary>🚩 ABP en defensa</summary>
+                      <div class="acc-body">
+                        <label style="font-size:.85rem;font-weight:600;">Corner — Izquierda</label>
+                        <textarea id="rivDef_cornerIzq" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
+                        <label style="font-size:.85rem;font-weight:600;">Corner — Derecha</label>
+                        <textarea id="rivDef_cornerDer" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
+                        <div class="row">
+                          <div><label style="font-size:.85rem;font-weight:600;">Bandas — Cortas</label><textarea id="rivDef_bandasCortas" rows="2" style="width:100%;"></textarea></div>
+                          <div><label style="font-size:.85rem;font-weight:600;">Bandas — Medias</label><textarea id="rivDef_bandasMedias" rows="2" style="width:100%;"></textarea></div>
+                          <div><label style="font-size:.85rem;font-weight:600;">Bandas — Largas</label><textarea id="rivDef_bandasLargas" rows="2" style="width:100%;"></textarea></div>
+                        </div>
+                        <div class="row" style="margin-top:8px;">
+                          <div><label style="font-size:.85rem;font-weight:600;">Faltas — Menos de 10m</label><textarea id="rivDef_faltasMenos10" rows="2" style="width:100%;"></textarea></div>
+                          <div><label style="font-size:.85rem;font-weight:600;">Faltas — Más de 10m</label><textarea id="rivDef_faltasMas10" rows="2" style="width:100%;"></textarea></div>
+                        </div>
+                      </div>
+                    </details>
+
+                    <button class="btn accent" id="btnSaveRivalReport" style="margin-top:10px;">💾 Guardar informe del rival</button>
+                    <div id="matchdayRivalMsg"></div>
+                  </div>
+                </details>
               </div>
             </details>
 
@@ -1757,95 +1850,6 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
                 <h4 style="margin-top:18px;font-size:.85rem;">🔗 Sesiones de entrenamiento vinculadas</h4>
                 <p class="muted" style="margin-top:-6px;">Marca las sesiones de tus equipos que quieras vincular a este partido (o desmárcalas para desvincularlas) y guarda.</p>
                 <div id="matchdaySessionsLink"></div>
-              </div>
-            </details>
-
-            <details class="acc" id="accMatchdayRival">
-              <summary>🆚 Informe del rival</summary>
-              <div class="acc-body">
-                <p class="muted" style="margin-top:0;">Scouting del rival antes del partido: jugadores a vigilar, sistemas de ataque y de defensa, y sus ABP.</p>
-
-                <details class="acc acc-sub" open>
-                  <summary>⭐ Jugadores destacados</summary>
-                  <div class="acc-body">
-                    <div id="rivalDestacadosList" style="margin-bottom:8px;"></div>
-                    <button type="button" class="btn ghost small" id="btnAddRivalDestacado">➕ Añadir jugador destacado</button>
-                  </div>
-                </details>
-
-                <details class="acc acc-sub" open>
-                  <summary>⚔️ Ataque (sistemas ofensivos del rival)</summary>
-                  <div class="acc-body">
-                    <label style="font-size:.85rem;font-weight:600;">Sistemas ofensivos</label>
-                    <textarea id="rivAtq_sistemas" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
-                    <label style="font-size:.85rem;font-weight:600;">Salidas de presión</label>
-                    <textarea id="rivAtq_salidasPresion" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
-                    <label style="font-size:.85rem;font-weight:600;">Transiciones</label>
-                    <textarea id="rivAtq_transiciones" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
-                    <label style="font-size:.85rem;font-weight:600;">Ataque 4 vs 3</label>
-                    <textarea id="rivAtq_ataque4vs3" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
-                    <label style="font-size:.85rem;font-weight:600;">Portero jugador</label>
-                    <textarea id="rivAtq_porteroJugador" rows="2" style="width:100%;"></textarea>
-                  </div>
-                </details>
-
-                <details class="acc acc-sub" open>
-                  <summary>🚩 ABP en ataque</summary>
-                  <div class="acc-body">
-                    <label style="font-size:.85rem;font-weight:600;">Corner — Izquierda</label>
-                    <textarea id="rivAtq_cornerIzq" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
-                    <label style="font-size:.85rem;font-weight:600;">Corner — Derecha</label>
-                    <textarea id="rivAtq_cornerDer" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
-                    <div class="row">
-                      <div><label style="font-size:.85rem;font-weight:600;">Bandas — Cortas</label><textarea id="rivAtq_bandasCortas" rows="2" style="width:100%;"></textarea></div>
-                      <div><label style="font-size:.85rem;font-weight:600;">Bandas — Medias</label><textarea id="rivAtq_bandasMedias" rows="2" style="width:100%;"></textarea></div>
-                      <div><label style="font-size:.85rem;font-weight:600;">Bandas — Largas</label><textarea id="rivAtq_bandasLargas" rows="2" style="width:100%;"></textarea></div>
-                    </div>
-                    <div class="row" style="margin-top:8px;">
-                      <div><label style="font-size:.85rem;font-weight:600;">Faltas — Menos de 10m</label><textarea id="rivAtq_faltasMenos10" rows="2" style="width:100%;"></textarea></div>
-                      <div><label style="font-size:.85rem;font-weight:600;">Faltas — Más de 10m</label><textarea id="rivAtq_faltasMas10" rows="2" style="width:100%;"></textarea></div>
-                    </div>
-                  </div>
-                </details>
-
-                <details class="acc acc-sub" open>
-                  <summary>🛡️ Defensa (altura defensiva del rival)</summary>
-                  <div class="acc-body">
-                    <div class="row">
-                      <div><label style="font-size:.85rem;font-weight:600;">Ganando</label><textarea id="rivDef_ganando" rows="2" style="width:100%;"></textarea></div>
-                      <div><label style="font-size:.85rem;font-weight:600;">Empatando</label><textarea id="rivDef_empatando" rows="2" style="width:100%;"></textarea></div>
-                      <div><label style="font-size:.85rem;font-weight:600;">Perdiendo</label><textarea id="rivDef_perdiendo" rows="2" style="width:100%;"></textarea></div>
-                    </div>
-                    <label style="font-size:.85rem;font-weight:600;margin-top:8px;">Transiciones</label>
-                    <textarea id="rivDef_transiciones" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
-                    <label style="font-size:.85rem;font-weight:600;">Defensa 4 vs 3</label>
-                    <textarea id="rivDef_defensa4vs3" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
-                    <label style="font-size:.85rem;font-weight:600;">Portero jugador</label>
-                    <textarea id="rivDef_porteroJugador" rows="2" style="width:100%;"></textarea>
-                  </div>
-                </details>
-
-                <details class="acc acc-sub" open>
-                  <summary>🚩 ABP en defensa</summary>
-                  <div class="acc-body">
-                    <label style="font-size:.85rem;font-weight:600;">Corner — Izquierda</label>
-                    <textarea id="rivDef_cornerIzq" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
-                    <label style="font-size:.85rem;font-weight:600;">Corner — Derecha</label>
-                    <textarea id="rivDef_cornerDer" rows="2" style="width:100%;margin-bottom:8px;"></textarea>
-                    <div class="row">
-                      <div><label style="font-size:.85rem;font-weight:600;">Bandas — Cortas</label><textarea id="rivDef_bandasCortas" rows="2" style="width:100%;"></textarea></div>
-                      <div><label style="font-size:.85rem;font-weight:600;">Bandas — Medias</label><textarea id="rivDef_bandasMedias" rows="2" style="width:100%;"></textarea></div>
-                      <div><label style="font-size:.85rem;font-weight:600;">Bandas — Largas</label><textarea id="rivDef_bandasLargas" rows="2" style="width:100%;"></textarea></div>
-                    </div>
-                    <div class="row" style="margin-top:8px;">
-                      <div><label style="font-size:.85rem;font-weight:600;">Faltas — Menos de 10m</label><textarea id="rivDef_faltasMenos10" rows="2" style="width:100%;"></textarea></div>
-                      <div><label style="font-size:.85rem;font-weight:600;">Faltas — Más de 10m</label><textarea id="rivDef_faltasMas10" rows="2" style="width:100%;"></textarea></div>
-                    </div>
-                  </div>
-                </details>
-
-                <button class="btn accent" id="btnSaveRivalReport" style="margin-top:10px;">💾 Guardar informe del rival</button>
-                <div id="matchdayRivalMsg"></div>
               </div>
             </details>
           </div>
