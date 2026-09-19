@@ -2198,10 +2198,8 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
     <div id="attendanceModalList" style="max-height:42vh;overflow-y:auto;"></div>
     <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
       <label style="font-size:.8rem;font-weight:600;">¿Se ha convocado a algún jugador de otra categoría a esta sesión?</label>
-      <div style="display:flex;gap:6px;margin-top:6px;">
-        <select id="attendanceAddPlayerSelect" style="flex:1;"></select>
-        <button type="button" class="btn ghost small" id="btnAddAttendanceGuest" style="flex:0 0 auto;">➕ Añadir</button>
-      </div>
+      <input type="text" id="attendanceAddPlayerSearch" placeholder="🔍 Escribe el nombre del jugador..." style="margin-top:6px;">
+      <div id="attendanceAddPlayerResults" style="max-height:160px;overflow-y:auto;"></div>
     </div>
     <div style="display:flex;gap:8px;margin-top:14px;">
       <button class="btn ghost" id="btnCloseAttendanceModal" style="flex:1;">Cancelar</button>
@@ -9153,19 +9151,22 @@ function renderTeamSummary(){
 // abajo). No está ligado a temporada porque las sesiones de entrenamiento no tienen ese campo.
 function computeAttendanceSummary_(teamId){
   const ownRoster = players.filter(p=>p.teamId===teamId);
-  const teamSessions = sessions.filter(s=> Array.isArray(s.attendance) && s.attendance.length && sessionTeams_(s).some(t=>t.id===teamId));
+  // La asistencia es independiente por equipo (ver attendanceDataFor_ más abajo): esto
+  // recoge solo las sesiones donde ESTE equipo tiene su propia asistencia marcada, aunque
+  // la sesión esté compartida con otra categoría que la marque por separado.
+  const teamSessions = sessions.filter(s=> sessionTeams_(s).some(t=>t.id===teamId) && attendanceDataFor_(s, teamId).length);
   // Además de la plantilla propia, se incluye a cualquier jugador de OTRA categoría que
   // haya sido añadido a mano como convocado puntual en alguna sesión de este equipo
   // (ver attendanceExtraPlayerIds / openSessionAttendance más abajo).
   const ids = new Set(ownRoster.map(p=>p.id));
-  teamSessions.forEach(s=> s.attendance.forEach(a=> ids.add(a.playerId)));
+  teamSessions.forEach(s=> attendanceDataFor_(s, teamId).forEach(a=> ids.add(a.playerId)));
   const allPlayers = Array.from(ids).map(id=>players.find(p=>p.id===id)).filter(Boolean)
     .sort((a,b)=> (a.teamId===teamId?0:1)-(b.teamId===teamId?0:1) || (a.dorsal||0)-(b.dorsal||0));
   return allPlayers.map(p=>{
     let presentes = 0, faltas = 0;
     const motivos = [];
     teamSessions.forEach(s=>{
-      const a = s.attendance.find(x=>x.playerId===p.id);
+      const a = attendanceDataFor_(s, teamId).find(x=>x.playerId===p.id);
       if(!a) return;
       if(a.status==="No asiste"){ faltas++; if(a.reason) motivos.push(a.reason); }
       else presentes++;
@@ -9826,21 +9827,41 @@ document.getElementById("btnSaveSessionObs").onclick = async () => {
 };
 
 // ---------- Control de asistencia por sesión ----------
-// Jugadores que se pueden marcar en una sesión: la unión de las plantillas de TODOS los
-// equipos a los que esté vinculada la sesión, MÁS los jugadores de otras categorías que se
-// hayan añadido a mano como convocados puntuales para esta sesión concreta (attendanceExtraIds,
-// solo en memoria mientras se edita; se guarda en s.attendanceExtraPlayerIds al pulsar Guardar
-// para que sigan apareciendo la próxima vez que se abra esta misma sesión). Todo se guarda en
-// la propia sesión (s.attendance / s.attendanceExtraPlayerIds), con .update() parcial igual
-// que el resto de campos de la sesión.
+// La asistencia es INDEPENDIENTE por equipo, incluso si la sesión está compartida entre
+// varios (p.ej. Alevín e Infantil usan la misma sesión): se guarda como un mapa por id de
+// equipo, s.attendance = { [teamId]: [{playerId,status,reason}] }, y lo mismo para los
+// convocados de otra categoría, s.attendanceExtraPlayerIds = { [teamId]: [playerId...] }.
+// Así, al abrir "Asistencia" desde la tarjeta de Alevín solo se ve y se guarda la plantilla
+// de Alevín (más quien se haya convocado a mano para ESE equipo), y abrirlo desde Infantil
+// no toca ni mezcla nada de lo de Alevín.
+// Compatibilidad: sesiones guardadas con la versión anterior (antes de este cambio) tenían
+// s.attendance como un array plano compartido por todos los equipos de la sesión. Si esa
+// sesión solo tenía un equipo, ese array se puede seguir usando tal cual (no había ambigüedad
+// posible); si tenía varios, se descarta (no se puede saber a qué equipo pertenecía cada
+// entrada) y hay que volver a marcarla — es justo el caso que se estaba mezclando mal.
 let attendanceTargetSessionId = null;
+let attendanceTargetTeamId = null;
 let attendanceExtraIds = [];
-function attendanceBaseRoster_(s){
-  const teamIds = sessionTeams_(s).map(t=>t.id);
-  return players.filter(p=>teamIds.includes(p.teamId)).sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
+function attendanceKey_(teamId){ return teamId || "_sinequipo"; }
+function attendanceDataFor_(s, teamId){
+  if(s.attendance && !Array.isArray(s.attendance)) return s.attendance[attendanceKey_(teamId)] || [];
+  if(Array.isArray(s.attendance)){
+    if(sessionTeams_(s).length<=1) return s.attendance;
+  }
+  return [];
 }
-function attendanceGuestPlayers_(s){
-  const baseIds = new Set(attendanceBaseRoster_(s).map(p=>p.id));
+function attendanceExtrasFor_(s, teamId){
+  if(s.attendanceExtraPlayerIds && !Array.isArray(s.attendanceExtraPlayerIds)) return s.attendanceExtraPlayerIds[attendanceKey_(teamId)] || [];
+  if(Array.isArray(s.attendanceExtraPlayerIds)){
+    if(sessionTeams_(s).length<=1) return s.attendanceExtraPlayerIds;
+  }
+  return [];
+}
+function attendanceBaseRoster_(teamId){
+  return players.filter(p=>p.teamId===teamId).sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
+}
+function attendanceGuestPlayers_(teamId){
+  const baseIds = new Set(attendanceBaseRoster_(teamId).map(p=>p.id));
   return attendanceExtraIds
     .map(id=>players.find(p=>p.id===id))
     .filter(p=>p && !baseIds.has(p.id))
@@ -9863,63 +9884,63 @@ function attendanceRowHtml_(p, a, isGuest){
 function renderAttendanceModalRows_(){
   const s = sessions.find(x=>x.id===attendanceTargetSessionId);
   const wrap = document.getElementById("attendanceModalList");
-  if(!s){ wrap.innerHTML = ""; renderAttendanceAddSelect_(); return; }
-  const roster = attendanceBaseRoster_(s);
-  const guests = attendanceGuestPlayers_(s);
+  if(!s){ wrap.innerHTML = ""; return; }
+  const roster = attendanceBaseRoster_(attendanceTargetTeamId);
+  const guests = attendanceGuestPlayers_(attendanceTargetTeamId);
   const attMap = {};
-  (s.attendance||[]).forEach(a=>{ attMap[a.playerId] = a; });
+  attendanceDataFor_(s, attendanceTargetTeamId).forEach(a=>{ attMap[a.playerId] = a; });
   if(roster.length===0 && guests.length===0){
-    wrap.innerHTML = '<p class="muted">Ninguno de los equipos de esta sesión tiene jugadores en la plantilla.</p>';
+    wrap.innerHTML = '<p class="muted">Este equipo todavía no tiene jugadores en la plantilla. Puedes convocar a alguien de otra categoría más abajo.</p>';
   } else {
     wrap.innerHTML =
       roster.map(p=>attendanceRowHtml_(p, attMap[p.id]||{}, false)).join("") +
       (guests.length ? `<h4 style="margin:10px 0 2px 0;font-size:.8rem;color:var(--accent);">Convocados de otras categorías</h4>` + guests.map(p=>attendanceRowHtml_(p, attMap[p.id]||{}, true)).join("") : "");
   }
-  renderAttendanceAddSelect_();
+  renderAttendanceAddResults_();
 }
-function renderAttendanceAddSelect_(){
-  const sel = document.getElementById("attendanceAddPlayerSelect");
-  const s = sessions.find(x=>x.id===attendanceTargetSessionId);
-  if(!sel || !s) return;
-  const excluded = new Set([...attendanceBaseRoster_(s), ...attendanceGuestPlayers_(s)].map(p=>p.id));
-  const candidates = players.filter(p=>!excluded.has(p.id)).sort((a,b)=>{
-    const ta = (teams.find(t=>t.id===a.teamId)||{}).name || "";
-    const tb = (teams.find(t=>t.id===b.teamId)||{}).name || "";
-    return ta.localeCompare(tb, 'es') || (a.dorsal||0)-(b.dorsal||0);
-  });
-  if(candidates.length===0){
-    sel.innerHTML = '<option value="">No hay más jugadores en otras plantillas</option>';
-    sel.disabled = true;
-    return;
-  }
-  sel.disabled = false;
-  sel.innerHTML = candidates.map(p=>{
+// Buscador de "convocar jugador de otra categoría": en vez de listar a todos los jugadores
+// del club, se busca escribiendo el nombre; cada resultado muestra su equipo para poder
+// distinguir a jugadores que compartan nombre.
+function renderAttendanceAddResults_(){
+  const wrap = document.getElementById("attendanceAddPlayerResults");
+  if(!wrap) return;
+  const query = (document.getElementById("attendanceAddPlayerSearch").value||"").trim().toLowerCase();
+  if(!query){ wrap.innerHTML = ""; return; }
+  const excluded = new Set([...attendanceBaseRoster_(attendanceTargetTeamId), ...attendanceGuestPlayers_(attendanceTargetTeamId)].map(p=>p.id));
+  const matches = players
+    .filter(p=> !excluded.has(p.id) && p.teamId!==attendanceTargetTeamId && p.name.toLowerCase().includes(query))
+    .sort((a,b)=> a.name.localeCompare(b.name,'es'))
+    .slice(0,15);
+  if(matches.length===0){ wrap.innerHTML = '<p class="muted" style="font-size:.8rem;margin:4px 0;">Sin resultados.</p>'; return; }
+  wrap.innerHTML = matches.map(p=>{
     const t = teams.find(x=>x.id===p.teamId);
-    return `<option value="${p.id}">${escapeHtml(p.name)} — ${escapeHtml(t?t.name:"?")}</option>`;
+    return `
+    <button type="button" class="btn ghost small" style="display:flex;justify-content:space-between;align-items:center;width:100%;margin-top:4px;text-align:left;" onclick="agregarAttendanceGuestDesdeBusqueda_('${p.id}')">
+      <span>${escapeHtml(p.name)}${p.dorsal!=null?` <span class="muted">(${escapeHtml(String(p.dorsal))})</span>`:""}</span>
+      <span class="badge outline" style="font-size:.68rem;flex:0 0 auto;">${escapeHtml(t?t.name:"?")}</span>
+    </button>`;
   }).join("");
 }
+window.agregarAttendanceGuestDesdeBusqueda_ = (playerId) => {
+  if(!attendanceExtraIds.includes(playerId)) attendanceExtraIds.push(playerId);
+  document.getElementById("attendanceAddPlayerSearch").value = "";
+  renderAttendanceModalRows_();
+};
 window.quitarAttendanceGuest_ = (playerId) => {
   attendanceExtraIds = attendanceExtraIds.filter(id=>id!==playerId);
   renderAttendanceModalRows_();
 };
-document.getElementById("btnAddAttendanceGuest").onclick = () => {
-  const sel = document.getElementById("attendanceAddPlayerSelect");
-  if(!sel.value) return;
-  attendanceExtraIds.push(sel.value);
-  renderAttendanceModalRows_();
-};
-window.openSessionAttendance = (id) => {
+document.getElementById("attendanceAddPlayerSearch").oninput = renderAttendanceAddResults_;
+window.openSessionAttendance = (id, contextTeamId) => {
   const s = sessions.find(x=>x.id===id);
   if(!s) return;
   attendanceTargetSessionId = id;
-  const baseIds = new Set(attendanceBaseRoster_(s).map(p=>p.id));
-  // Arranca con los invitados ya guardados de antes; por compatibilidad, también recoge
-  // cualquier jugador que apareciera en s.attendance sin pertenecer a la plantilla propia
-  // (sesiones guardadas antes de que existiera attendanceExtraPlayerIds).
-  const savedExtras = Array.isArray(s.attendanceExtraPlayerIds) ? s.attendanceExtraPlayerIds.slice() : [];
-  (s.attendance||[]).forEach(a=>{ if(!baseIds.has(a.playerId) && !savedExtras.includes(a.playerId)) savedExtras.push(a.playerId); });
-  attendanceExtraIds = savedExtras.filter(pid=>players.some(p=>p.id===pid));
+  attendanceTargetTeamId = contextTeamId || null;
+  const baseIds = new Set(attendanceBaseRoster_(attendanceTargetTeamId).map(p=>p.id));
+  const savedExtras = attendanceExtrasFor_(s, attendanceTargetTeamId);
+  attendanceExtraIds = savedExtras.filter(pid=>players.some(p=>p.id===pid) && !baseIds.has(pid));
   renderAttendanceModalRows_();
+  document.getElementById("attendanceAddPlayerSearch").value = "";
   document.getElementById("attendanceModalMsg").innerHTML = "";
   document.getElementById("attendanceModal").classList.remove("hidden");
 };
@@ -9942,6 +9963,7 @@ document.getElementById("btnMarkAllAttended").onclick = () => {
 document.getElementById("btnCloseAttendanceModal").onclick = () => {
   document.getElementById("attendanceModal").classList.add("hidden");
   attendanceTargetSessionId = null;
+  attendanceTargetTeamId = null;
   attendanceExtraIds = [];
 };
 document.getElementById("btnSaveAttendance").onclick = async () => {
@@ -9955,15 +9977,28 @@ document.getElementById("btnSaveAttendance").onclick = async () => {
     return { playerId, status, reason: status==="No asiste" ? reason : "" };
   });
   const attendanceExtraPlayerIds = attendanceExtraIds.slice();
+  const key = attendanceKey_(attendanceTargetTeamId);
   try{
-    await db.collection("sessions").doc(attendanceTargetSessionId).update({attendance, attendanceExtraPlayerIds});
+    // Se escribe solo la clave de ESTE equipo dentro del mapa (igual que
+    // postObservationsByCoach.<uid> más arriba): así no se toca lo que haya guardado
+    // otro equipo con el que se comparta la sesión.
+    await db.collection("sessions").doc(attendanceTargetSessionId).update({
+      [`attendance.${key}`]: attendance,
+      [`attendanceExtraPlayerIds.${key}`]: attendanceExtraPlayerIds
+    });
     const s = sessions.find(x=>x.id===attendanceTargetSessionId);
-    if(s){ s.attendance = attendance; s.attendanceExtraPlayerIds = attendanceExtraPlayerIds; }
+    if(s){
+      if(!s.attendance || Array.isArray(s.attendance)) s.attendance = {};
+      if(!s.attendanceExtraPlayerIds || Array.isArray(s.attendanceExtraPlayerIds)) s.attendanceExtraPlayerIds = {};
+      s.attendance[key] = attendance;
+      s.attendanceExtraPlayerIds[key] = attendanceExtraPlayerIds;
+    }
     msgEl.innerHTML = '<p class="ok-msg">Asistencia guardada.</p>';
     renderSavedSessions();
     setTimeout(()=>{
       document.getElementById("attendanceModal").classList.add("hidden");
       attendanceTargetSessionId = null;
+      attendanceTargetTeamId = null;
       attendanceExtraIds = [];
     }, 600);
   }catch(err){ msgEl.innerHTML = '<p class="error-msg">Error al guardar: '+err.message+'</p>'; }
@@ -10000,7 +10035,7 @@ function sessionCardHtml(s, contextTeamId){
   } else if(s.postObservations){
     obsEntries.push({text: s.postObservations, coachName: s.createdByName || ""}); // compat sesiones antiguas
   }
-  const attendanceList = s.attendance || [];
+  const attendanceList = attendanceDataFor_(s, contextTeamId);
   const attSi = attendanceList.filter(a=>a.status==="Asiste").length;
   const attNo = attendanceList.filter(a=>a.status==="No asiste").length;
   return `
@@ -10025,7 +10060,7 @@ function sessionCardHtml(s, contextTeamId){
       <button class="btn ghost small" onclick="exportSessionPDF('${s.id}')">📄 Exportar a PDF</button>
       ${s.surveyPublic ? `<button type="button" class="btn ghost small" onclick="copySurveyLink('${s.id}')">🔗 Copiar enlace de encuesta</button>` : ""}
       ${canAddObs ? `<button class="btn ghost small" onclick="openSessionObservations('${s.id}')">📝 Observaciones</button>` : ""}
-      ${canAddObs ? `<button class="btn ghost small" onclick="openSessionAttendance('${s.id}')">🧍 Asistencia</button>` : ""}
+      ${canAddObs ? `<button class="btn ghost small" onclick="openSessionAttendance('${s.id}'${contextTeamId?`,'${contextTeamId}'`:''})">🧍 Asistencia</button>` : ""}
       ${canManage ? `<button class="btn ghost small" onclick="editSession('${s.id}'${contextTeamId?`,'${contextTeamId}'`:''})">✏️ Editar sesión</button>` : ""}
       ${(!canManage && sharedWithMe) ? `<button class="btn ghost small" onclick="forkAndEditSession('${s.id}')">✏️ Editar sesión</button>` : ""}
       ${canManage ? `<button class="btn danger small" onclick="deleteSession('${s.id}'${contextTeamId?`,'${contextTeamId}'`:''})">🗑 Borrar sesión</button>` : ""}
