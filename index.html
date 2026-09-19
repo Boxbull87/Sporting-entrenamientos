@@ -277,6 +277,15 @@ textarea{resize:vertical;min-height:70px;}
 .btn:disabled{opacity:.45;cursor:not-allowed;}
 
 .badge{display:inline-block;background:var(--accent);color:#fff;font-size:.66rem;font-weight:700;padding:3px 9px;border-radius:5px;font-family:'Roboto Mono',monospace;text-transform:uppercase;letter-spacing:.03em;}
+
+/* Marcadores de éxito (Informe del partido): tick/raya/cruz por jugador. Apagados (gris tenue)
+   hasta que se marcan, para que una fila con muchos jugadores sin marcar todavía no parezca
+   ya toda en rojo. */
+.sm-result-btn{background:none;border:none;font-weight:800;font-size:.95rem;line-height:1;cursor:pointer;padding:1px 3px;border-radius:4px;opacity:.3;}
+.sm-result-btn:hover{opacity:.6;}
+.sm-result-btn.active-success{opacity:1;color:#27ae60;background:rgba(39,174,96,.12);}
+.sm-result-btn.active-partial{opacity:1;color:#e0a32e;background:rgba(224,163,46,.14);}
+.sm-result-btn.active-fail{opacity:1;color:#eb5757;background:rgba(235,87,87,.12);}
 .badge.b-phase{background:#2f80ed;}
 .badge.outline{background:transparent;border:1px solid var(--border);color:var(--muted);font-family:'Roboto Mono',monospace;font-size:.66rem;border-radius:5px;text-transform:uppercase;letter-spacing:.03em;}
 .badge.outline.b-level{border-color:#27ae60;color:#1e8449;}
@@ -1649,6 +1658,31 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
 
             <div id="matchdayScoutingWrap" style="margin-bottom:14px;"></div>
 
+            <details class="acc" id="accMatchdayPrepartido">
+              <summary>🧭 Prepartido</summary>
+              <div class="acc-body">
+                <p class="muted" id="mdPrematchNoAccess" style="display:none;">🔒 Esta información solo la puede ver el entrenador asignado a este equipo y los gestores del club.</p>
+                <div id="mdPrematchPrivateWrap">
+                  <label style="font-size:.85rem;font-weight:600;">Planteamiento general</label>
+                  <textarea id="mdPrematchPlan" rows="4" style="width:100%;margin-bottom:10px;" placeholder="¿Cuál va a ser tu planteamiento para este partido?"></textarea>
+                  <label style="font-size:.85rem;font-weight:600;">Informe / texto libre</label>
+                  <textarea id="mdPrematchText" rows="4" style="width:100%;margin-bottom:10px;" placeholder="Escribe aquí lo que quieras sobre el partido antes de jugarlo..."></textarea>
+                  <label style="font-size:.85rem;font-weight:600;">Observaciones</label>
+                  <textarea id="mdPrematchObservations" rows="3" style="width:100%;margin-bottom:10px;"></textarea>
+
+                  <h4 style="margin-top:14px;font-size:.85rem;">🎯 Marcadores de éxito</h4>
+                  <p class="muted" style="margin-top:-6px;">Objetivos individuales que te propones para este partido. Después, en "Informe del partido", podrás marcar si cada jugador los ha conseguido.</p>
+                  <div id="mdSuccessMarkersList" style="margin-bottom:8px;"></div>
+                  <button type="button" class="btn ghost small" id="btnAddSuccessMarker">➕ Añadir objetivo</button>
+
+                  <div style="margin-top:14px;">
+                    <button class="btn accent" id="btnSaveMatchdayPrematch">💾 Guardar prepartido</button>
+                    <div id="matchdayPrematchMsg"></div>
+                  </div>
+                </div>
+              </div>
+            </details>
+
             <details class="acc" id="accMatchdayGoles">
               <summary>⚽ Goles del partido</summary>
               <div class="acc-body">
@@ -1709,6 +1743,11 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
                   <textarea id="mdReportObservations" rows="3" style="width:100%;margin-bottom:10px;" placeholder="Observaciones adicionales..."></textarea>
                   <label style="font-size:.85rem;font-weight:600;">Notas de jugadores</label>
                   <div id="matchdayPlayerNotes" style="margin-bottom:10px;"></div>
+
+                  <h4 style="margin-top:14px;font-size:.85rem;">🎯 Marcadores de éxito — resultado</h4>
+                  <p class="muted" style="margin-top:-6px;">Marca si cada jugador ha conseguido los objetivos que te propusiste en "Prepartido" (✓ conseguido · ➖ a medias · ✗ no conseguido).</p>
+                  <div id="mdSuccessMarkerResults" style="margin-bottom:10px;"></div>
+
                   <button class="btn accent" id="btnSaveMatchdayReport">💾 Guardar informe</button>
                   <div id="matchdayReportMsg"></div>
                 </div>
@@ -6732,6 +6771,7 @@ window.openMatchdayStats = (id) => {
   // Estos acordeones son HTML fijo (nunca se recrean, a diferencia del de "Scouting FS" que
   // se repinta entero), así que sin esto su abierto/cerrado se quedaría pegado de una jornada
   // a otra en vez de volver siempre al mismo estado por defecto al entrar en una jornada.
+  document.getElementById("accMatchdayPrepartido").open = false;
   document.getElementById("accMatchdayGoles").open = false;
   document.getElementById("accMatchdayConvocatoria").open = true;
   document.getElementById("accMatchdayInforme").open = false;
@@ -6740,7 +6780,9 @@ window.openMatchdayStats = (id) => {
   renderMatchdayGoalEvents_();
   renderMatchdayTimeline_();
   renderMatchdaySessionsLink();
+  renderMatchdayPrematch();
   renderMatchdayReport();
+  renderMatchdaySuccessMarkerResults();
   renderMatchdayRivalReport();
   renderMatchdayScouting_();
   document.getElementById("matchdayStatsMsg").innerHTML = "";
@@ -8261,13 +8303,140 @@ document.getElementById("btnSaveMatchdayReport").onclick = async () => {
       reportText: document.getElementById("mdReportText").value.trim(),
       reportObservations: document.getElementById("mdReportObservations").value.trim(),
       playerNotes,
-      playerRatings
+      playerRatings,
+      successMarkerResults: successMarkerResultsEditing
     };
     await refPrivadaJornada_(statsMatchdayId).set(datosPrivados, {merge:true});
     // No hay listener que refresque esto solo (se lee bajo demanda, ver notasPrivadas_):
     // se actualiza la caché a mano para que Estadísticas y el PDF usen ya lo recién guardado.
     matchdayPrivate[statsMatchdayId] = {...(matchdayPrivate[statsMatchdayId]||{}), ...datosPrivados};
     msgEl.innerHTML = '<p class="ok-msg">Informe guardado.</p>';
+  }catch(err){
+    msgEl.innerHTML = '<p class="error-msg">Error al guardar: '+err.message+'</p>';
+  }
+};
+
+/* ---------- Marcadores de éxito: objetivos individuales definidos en "Prepartido" (ver más
+   abajo) y su resultado por jugador, marcado aquí en "Informe del partido". Viven en el mismo
+   subdocumento privado que el resto de esta sección (matchdayPrivate/refPrivadaJornada_):
+   "successMarkers" es la lista de objetivos ({id,text}, sin jugador — se define en Prepartido)
+   y "successMarkerResults" es { [markerId]: { [playerId]: "success"|"partial"|"fail" } },
+   ausente = todavía sin marcar. Se trabaja sobre una copia en memoria (successMarkerResultsEditing)
+   que se guarda junto con el resto del informe al pulsar "💾 Guardar informe" — un clic por
+   jugador y objetivo sería demasiadas escrituras sueltas a Firestore para algo tan pequeño. ---------- */
+let successMarkerResultsEditing = {};
+function pintarSuccessMarkerResults_(markers){
+  const wrap = document.getElementById("mdSuccessMarkerResults");
+  const m = matchdays.find(x=>x.id===statsMatchdayId);
+  if(!wrap || !m) return;
+  const roster = players.filter(p=>p.teamId===m.teamId).sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
+  if(markers.length===0){
+    wrap.innerHTML = '<p class="muted">Todavía no has definido ningún objetivo en "Prepartido".</p>';
+    return;
+  }
+  if(roster.length===0){
+    wrap.innerHTML = '<p class="muted">Este equipo todavía no tiene jugadores en la plantilla.</p>';
+    return;
+  }
+  wrap.innerHTML = markers.map(marker=>{
+    const res = successMarkerResultsEditing[marker.id] || {};
+    return `
+    <div style="margin-bottom:10px;">
+      <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:4px;">${escapeHtml(marker.text)}</label>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;">
+        ${roster.map(p=>{
+          const val = res[p.id] || "";
+          return `
+          <div style="display:flex;align-items:center;gap:2px;border:1px solid var(--border);border-radius:6px;padding:3px 5px;">
+            <span style="font-size:.76rem;white-space:nowrap;margin-right:2px;">${p.dorsal!=null?escapeHtml(String(p.dorsal))+". ":""}${escapeHtml(p.name)}</span>
+            <button type="button" class="sm-result-btn ${val==='success'?'active-success':''}" data-marker="${marker.id}" data-player="${p.id}" data-value="success" title="Conseguido">✓</button>
+            <button type="button" class="sm-result-btn ${val==='partial'?'active-partial':''}" data-marker="${marker.id}" data-player="${p.id}" data-value="partial" title="A medias">➖</button>
+            <button type="button" class="sm-result-btn ${val==='fail'?'active-fail':''}" data-marker="${marker.id}" data-player="${p.id}" data-value="fail" title="No conseguido">✗</button>
+          </div>`;
+        }).join("")}
+      </div>
+    </div>`;
+  }).join("");
+}
+function renderMatchdaySuccessMarkerResults(){
+  const m = matchdays.find(x=>x.id===statsMatchdayId);
+  const wrap = document.getElementById("mdSuccessMarkerResults");
+  if(!m || !wrap) return;
+  if(!puedeVerNotasPrivadas_(m.teamId)){ wrap.innerHTML = ""; return; } // ya cubre el aviso de "sin acceso" de arriba en la sección
+  const priv = notasPrivadas_(m, renderMatchdaySuccessMarkerResults);
+  const markers = Array.isArray(priv.successMarkers) ? priv.successMarkers : [];
+  successMarkerResultsEditing = JSON.parse(JSON.stringify(priv.successMarkerResults || {}));
+  pintarSuccessMarkerResults_(markers);
+}
+document.getElementById("mdSuccessMarkerResults").addEventListener("click", (e)=>{
+  const btn = e.target.closest(".sm-result-btn");
+  if(!btn) return;
+  const {marker, player, value} = btn.dataset;
+  if(!successMarkerResultsEditing[marker]) successMarkerResultsEditing[marker] = {};
+  // Pulsar otra vez el mismo valor lo quita (vuelve a "sin marcar") en vez de dejarlo fijo.
+  if(successMarkerResultsEditing[marker][player]===value) delete successMarkerResultsEditing[marker][player];
+  else successMarkerResultsEditing[marker][player] = value;
+  const m = matchdays.find(x=>x.id===statsMatchdayId);
+  const priv = (m && matchdayPrivate[m.id]) || {};
+  pintarSuccessMarkerResults_(Array.isArray(priv.successMarkers) ? priv.successMarkers : []);
+});
+
+/* ---------- Prepartido: planteamiento, informe/observaciones previos al partido, y la lista
+   de objetivos ("Marcadores de éxito") que luego se evalúan por jugador en "Informe del
+   partido" (ver arriba). Mismo patrón y mismo subdocumento privado que "Informe del partido":
+   solo lo ve el entrenador de este equipo o un gestor (puedeVerNotasPrivadas_). ---------- */
+let successMarkersEditing = []; // objetivos que se están editando en Prepartido: [{id,text}]
+function renderSuccessMarkersRows_(){
+  const wrap = document.getElementById("mdSuccessMarkersList");
+  if(!wrap) return;
+  if(successMarkersEditing.length===0){ wrap.innerHTML = '<p class="muted">Todavía no has añadido ningún objetivo.</p>'; return; }
+  wrap.innerHTML = successMarkersEditing.map((o,i)=>`
+    <div class="row" style="align-items:center;margin-bottom:6px;" data-marker-row="${i}">
+      <input type="text" class="sm-text" value="${escapeHtml(o.text||"")}" style="flex:1;" placeholder="Ej: Presión tras pérdida en campo rival">
+      <button type="button" class="btn danger small" onclick="quitarSuccessMarker_(${i})" style="flex:0 0 auto;" title="Quitar">🗑️</button>
+    </div>`).join("");
+}
+window.quitarSuccessMarker_ = (i) => { successMarkersEditing.splice(i,1); renderSuccessMarkersRows_(); };
+document.getElementById("btnAddSuccessMarker").onclick = () => {
+  successMarkersEditing.push({id: "sm"+Date.now().toString(36)+Math.random().toString(36).slice(2,6), text:""});
+  renderSuccessMarkersRows_();
+};
+function renderMatchdayPrematch(){
+  const m = matchdays.find(x=>x.id===statsMatchdayId);
+  if(!m) return;
+  const puedeVer = puedeVerNotasPrivadas_(m.teamId);
+  document.getElementById("mdPrematchNoAccess").style.display = puedeVer ? "none" : "";
+  document.getElementById("mdPrematchPrivateWrap").style.display = puedeVer ? "" : "none";
+  if(!puedeVer) return;
+  const priv = notasPrivadas_(m, renderMatchdayPrematch);
+  document.getElementById("mdPrematchPlan").value = priv.prematchPlan || "";
+  document.getElementById("mdPrematchText").value = priv.prematchText || "";
+  document.getElementById("mdPrematchObservations").value = priv.prematchObservations || "";
+  successMarkersEditing = Array.isArray(priv.successMarkers) ? priv.successMarkers.map(o=>({...o})) : [];
+  renderSuccessMarkersRows_();
+  document.getElementById("matchdayPrematchMsg").innerHTML = "";
+}
+document.getElementById("btnSaveMatchdayPrematch").onclick = async () => {
+  if(!statsMatchdayId) return;
+  const msgEl = document.getElementById("matchdayPrematchMsg");
+  const textInputs = Array.from(document.querySelectorAll("#mdSuccessMarkersList .sm-text"));
+  const successMarkers = successMarkersEditing.map((o,i)=>({
+    id: o.id,
+    text: textInputs[i] ? textInputs[i].value.trim() : ""
+  })).filter(o=>o.text);
+  const datosPrivados = {
+    prematchPlan: document.getElementById("mdPrematchPlan").value.trim(),
+    prematchText: document.getElementById("mdPrematchText").value.trim(),
+    prematchObservations: document.getElementById("mdPrematchObservations").value.trim(),
+    successMarkers
+  };
+  try{
+    await refPrivadaJornada_(statsMatchdayId).set(datosPrivados, {merge:true});
+    matchdayPrivate[statsMatchdayId] = {...(matchdayPrivate[statsMatchdayId]||{}), ...datosPrivados};
+    msgEl.innerHTML = '<p class="ok-msg">Prepartido guardado.</p>';
+    // Los objetivos han podido cambiar (añadidos/quitados/renombrados): se refresca la tabla de
+    // resultados de "Informe del partido" para que ya muestre la lista actualizada.
+    renderMatchdaySuccessMarkerResults();
   }catch(err){
     msgEl.innerHTML = '<p class="error-msg">Error al guardar: '+err.message+'</p>';
   }
