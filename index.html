@@ -2169,6 +2169,23 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
   </div>
 </div>
 
+<!-- ---------- Control de asistencia de una sesión de entrenamiento ---------- -->
+<div id="attendanceModal" class="modal-bg hidden">
+  <div class="modal" style="max-width:540px;">
+    <h2 style="font-size:1.05rem;">🧍 Asistencia a la sesión</h2>
+    <p class="muted" style="font-size:.8rem;margin-top:2px;">Marca quién ha asistido y, si ha faltado, el motivo.</p>
+    <div style="margin:8px 0;">
+      <button type="button" class="btn ghost small" id="btnMarkAllAttended">✅ Marcar todos asisten</button>
+    </div>
+    <div id="attendanceModalList" style="max-height:48vh;overflow-y:auto;"></div>
+    <div style="display:flex;gap:8px;margin-top:14px;">
+      <button class="btn ghost" id="btnCloseAttendanceModal" style="flex:1;">Cancelar</button>
+      <button class="btn accent" id="btnSaveAttendance" style="flex:1;">Guardar</button>
+    </div>
+    <div id="attendanceModalMsg"></div>
+  </div>
+</div>
+
 <!-- ---------- Board fullscreen overlay (más grande / apaisado en móvil) ---------- -->
 <div id="boardFullscreen" class="board-fullscreen hidden">
   <button class="btn small ghost" id="closeFullscreenBoard">✕ Cerrar</button>
@@ -9082,10 +9099,29 @@ function renderTeamSummary(){
   if(summaryMode==="matchday") renderMatchdaySummary_(wrap);
   else renderSeasonSummary_(wrap);
 }
+// Acumulado de asistencia a entrenamientos de un equipo, a partir de todas sus sesiones
+// guardadas que tengan la asistencia marcada (s.attendance, ver openSessionAttendance más
+// abajo). No está ligado a temporada porque las sesiones de entrenamiento no tienen ese campo.
+function computeAttendanceSummary_(teamId){
+  const roster = players.filter(p=>p.teamId===teamId).sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
+  const teamSessions = sessions.filter(s=> Array.isArray(s.attendance) && s.attendance.length && sessionTeams_(s).some(t=>t.id===teamId));
+  return roster.map(p=>{
+    let presentes = 0, faltas = 0;
+    const motivos = [];
+    teamSessions.forEach(s=>{
+      const a = s.attendance.find(x=>x.playerId===p.id);
+      if(!a) return;
+      if(a.status==="No asiste"){ faltas++; if(a.reason) motivos.push(a.reason); }
+      else presentes++;
+    });
+    return {player: p, sesiones: presentes+faltas, presentes, faltas, motivos};
+  });
+}
 function renderSeasonSummary_(wrap){
   const sum = computeTeamSummary_(selectedTeamId, selectedSeason, summaryDifficultyFilter, summaryCompetitionFilter);
   const outfield = sum.stats.filter(s=>s.player.position!=="Portero").sort((a,b)=> b.goals-a.goals || b.played-a.played);
   const gks = sum.stats.filter(s=>s.player.position==="Portero").sort((a,b)=> b.cleanSheets-a.cleanSheets || a.goalsConceded-b.goalsConceded);
+  const attendanceRows = computeAttendanceSummary_(selectedTeamId).sort((a,b)=> b.faltas-a.faltas || (a.player.dorsal||0)-(b.player.dorsal||0));
   const forAgg = aggregateGoalEvents_(sum.teamMds, "goalsForEvents");
   const againstAgg = aggregateGoalEvents_(sum.teamMds, "goalsAgainstEvents");
   wrap.innerHTML = `
@@ -9139,6 +9175,25 @@ function renderSeasonSummary_(wrap){
           <td style="padding:5px;">${s.red}</td>
           <td style="padding:5px;">${s.avgRating!=null ? s.avgRating.toFixed(1) : "-"}</td>
         </tr>`).join("") : `<tr><td colspan="7" style="padding:5px;" class="muted">Sin porteros en la plantilla.</td></tr>`}
+      </tbody>
+    </table>
+    </div>
+    <h3 style="margin-top:14px;font-size:.9rem;">🧍 Asistencia a entrenamientos</h3>
+    <p class="muted" style="margin-top:-6px;font-size:.8rem;">Acumulado de todas las sesiones de entrenamiento guardadas para este equipo con la asistencia marcada (no depende del filtro de temporada de arriba).</p>
+    <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:.85rem;min-width:480px;">
+      <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
+        <th style="padding:5px;">Jugador</th><th style="padding:5px;">Sesiones</th><th style="padding:5px;">Asistencias</th><th style="padding:5px;">Faltas</th><th style="padding:5px;">Motivos de las faltas</th>
+      </tr></thead>
+      <tbody>
+      ${attendanceRows.length ? attendanceRows.map(r=>`
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:5px;">${jerseyNameHtml_(r.player.position, (r.player.dorsal!=null?escapeHtml(String(r.player.dorsal))+". ":"")+escapeHtml(r.player.name))}</td>
+          <td style="padding:5px;">${r.sesiones}</td>
+          <td style="padding:5px;">${r.presentes}</td>
+          <td style="padding:5px;${r.faltas>0?"font-weight:600;color:#c0392b;":""}">${r.faltas}</td>
+          <td style="padding:5px;font-size:.78rem;">${r.motivos.length ? escapeHtml(r.motivos.join(" · ")) : ""}</td>
+        </tr>`).join("") : `<tr><td colspan="5" style="padding:5px;" class="muted">Todavía no hay ninguna sesión con la asistencia marcada.</td></tr>`}
       </tbody>
     </table>
     </div>
@@ -9707,6 +9762,89 @@ document.getElementById("btnSaveSessionObs").onclick = async () => {
   }catch(err){ alert("No se han podido guardar las observaciones: " + err.message); }
 };
 
+// ---------- Control de asistencia por sesión ----------
+// Jugadores que se pueden marcar en una sesión: la unión de las plantillas de TODOS los
+// equipos a los que esté vinculada la sesión (una sesión puede compartirse entre varios
+// equipos). Se guarda en la propia sesión (s.attendance), no en un documento aparte, y se
+// hace .update() parcial igual que el resto de campos de la sesión.
+let attendanceTargetSessionId = null;
+function attendanceRoster_(s){
+  const teamIds = sessionTeams_(s).map(t=>t.id);
+  return players.filter(p=>teamIds.includes(p.teamId)).sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
+}
+function renderAttendanceModalRows_(){
+  const s = sessions.find(x=>x.id===attendanceTargetSessionId);
+  const wrap = document.getElementById("attendanceModalList");
+  if(!s){ wrap.innerHTML = ""; return; }
+  const roster = attendanceRoster_(s);
+  if(roster.length===0){ wrap.innerHTML = '<p class="muted">Ninguno de los equipos de esta sesión tiene jugadores en la plantilla.</p>'; return; }
+  const attMap = {};
+  (s.attendance||[]).forEach(a=>{ attMap[a.playerId] = a; });
+  wrap.innerHTML = roster.map(p=>{
+    const a = attMap[p.id] || {};
+    const absent = a.status === "No asiste";
+    return `
+    <div class="row" data-player-id="${p.id}" style="align-items:center;border-bottom:1px solid var(--border);padding:6px 0;gap:6px;">
+      <div style="flex:1;min-width:130px;">${jerseyNameHtml_(p.position, (p.dorsal!=null?escapeHtml(String(p.dorsal))+". ":"")+escapeHtml(p.name))}</div>
+      <select class="att-status" style="max-width:130px;flex:0 0 auto;">
+        <option value="Asiste" ${!absent?"selected":""}>✅ Asiste</option>
+        <option value="No asiste" ${absent?"selected":""}>❌ No asiste</option>
+      </select>
+      <input type="text" class="att-reason" placeholder="Motivo de la falta" value="${escapeHtml(a.reason||"")}" style="flex:1;min-width:130px;${absent?"":"display:none;"}">
+    </div>`;
+  }).join("");
+}
+window.openSessionAttendance = (id) => {
+  const s = sessions.find(x=>x.id===id);
+  if(!s) return;
+  attendanceTargetSessionId = id;
+  renderAttendanceModalRows_();
+  document.getElementById("attendanceModalMsg").innerHTML = "";
+  document.getElementById("attendanceModal").classList.remove("hidden");
+};
+document.getElementById("attendanceModalList").addEventListener("change", (e)=>{
+  if(!e.target.classList.contains("att-status")) return;
+  const row = e.target.closest("[data-player-id]");
+  const reasonInput = row.querySelector(".att-reason");
+  const absent = e.target.value === "No asiste";
+  reasonInput.style.display = absent ? "" : "none";
+  if(!absent) reasonInput.value = "";
+});
+document.getElementById("btnMarkAllAttended").onclick = () => {
+  document.querySelectorAll("#attendanceModalList [data-player-id]").forEach(row=>{
+    row.querySelector(".att-status").value = "Asiste";
+    const reasonInput = row.querySelector(".att-reason");
+    reasonInput.style.display = "none";
+    reasonInput.value = "";
+  });
+};
+document.getElementById("btnCloseAttendanceModal").onclick = () => {
+  document.getElementById("attendanceModal").classList.add("hidden");
+  attendanceTargetSessionId = null;
+};
+document.getElementById("btnSaveAttendance").onclick = async () => {
+  if(!attendanceTargetSessionId) return;
+  const msgEl = document.getElementById("attendanceModalMsg");
+  const rows = document.querySelectorAll("#attendanceModalList [data-player-id]");
+  const attendance = Array.from(rows).map(row=>{
+    const playerId = row.dataset.playerId;
+    const status = row.querySelector(".att-status").value;
+    const reason = row.querySelector(".att-reason").value.trim();
+    return { playerId, status, reason: status==="No asiste" ? reason : "" };
+  });
+  try{
+    await db.collection("sessions").doc(attendanceTargetSessionId).update({attendance});
+    const s = sessions.find(x=>x.id===attendanceTargetSessionId);
+    if(s) s.attendance = attendance;
+    msgEl.innerHTML = '<p class="ok-msg">Asistencia guardada.</p>';
+    renderSavedSessions();
+    setTimeout(()=>{
+      document.getElementById("attendanceModal").classList.add("hidden");
+      attendanceTargetSessionId = null;
+    }, 600);
+  }catch(err){ msgEl.innerHTML = '<p class="error-msg">Error al guardar: '+err.message+'</p>'; }
+};
+
 function sessionCardHtml(s, contextTeamId){
   function taskLi(id){
     const t = tasks.find(x=>x.id===id);
@@ -9738,6 +9876,9 @@ function sessionCardHtml(s, contextTeamId){
   } else if(s.postObservations){
     obsEntries.push({text: s.postObservations, coachName: s.createdByName || ""}); // compat sesiones antiguas
   }
+  const attendanceList = s.attendance || [];
+  const attSi = attendanceList.filter(a=>a.status==="Asiste").length;
+  const attNo = attendanceList.filter(a=>a.status==="No asiste").length;
   return `
   <div class="card" style="margin-bottom:10px;">
     <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -9745,6 +9886,7 @@ function sessionCardHtml(s, contextTeamId){
       <span class="muted">${s.date||""}</span>
     </div>
     ${sTeams.length ? sTeams.map(t=>`<span class="badge" style="margin-top:2px;margin-right:4px;display:inline-block;">👕 ${escapeHtml(t.name)}</span>`).join("") : ""}
+    ${attendanceList.length ? `<span class="badge outline" style="margin-top:2px;margin-right:4px;display:inline-block;">🧍 ${attSi} asistieron · ${attNo} ausencias</span>` : ""}
     ${taskListHtml}
     <p class="muted" style="font-size:.78rem;margin-top:-2px;">Toca una tarea para ver sus notas y la pizarra táctica.</p>
     ${s.objectives ? `<p style="font-size:.85rem;white-space:pre-wrap;"><strong>Objetivos:</strong><br>${escapeHtml(s.objectives)}</p>` : ""}
@@ -9759,6 +9901,7 @@ function sessionCardHtml(s, contextTeamId){
       <button class="btn ghost small" onclick="exportSessionPDF('${s.id}')">📄 Exportar a PDF</button>
       ${s.surveyPublic ? `<button type="button" class="btn ghost small" onclick="copySurveyLink('${s.id}')">🔗 Copiar enlace de encuesta</button>` : ""}
       ${canAddObs ? `<button class="btn ghost small" onclick="openSessionObservations('${s.id}')">📝 Observaciones</button>` : ""}
+      ${canAddObs ? `<button class="btn ghost small" onclick="openSessionAttendance('${s.id}')">🧍 Asistencia</button>` : ""}
       ${canManage ? `<button class="btn ghost small" onclick="editSession('${s.id}'${contextTeamId?`,'${contextTeamId}'`:''})">✏️ Editar sesión</button>` : ""}
       ${(!canManage && sharedWithMe) ? `<button class="btn ghost small" onclick="forkAndEditSession('${s.id}')">✏️ Editar sesión</button>` : ""}
       ${canManage ? `<button class="btn danger small" onclick="deleteSession('${s.id}'${contextTeamId?`,'${contextTeamId}'`:''})">🗑 Borrar sesión</button>` : ""}
