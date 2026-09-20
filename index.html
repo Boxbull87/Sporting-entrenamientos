@@ -9572,12 +9572,15 @@ window.toggleTaskGroup_ = (taskId, groupId) => {
 // Selector de jugadores de un grupo: plantilla del equipo con casillas + buscador para añadir
 // a mano jugadores de otras categorías (mismo patrón que el control de asistencia).
 let groupPickerId = null;
-let groupPickerIds = [];
+let groupPickerIds = [];     // jugadores marcados (los que entran en el equipo)
+let groupPickerGuests = [];  // jugadores de otras categorías añadidos a la lista (marcados o no)
 window.openGroupPlayers_ = (id) => {
   const g = sessionGroups.find(x=>x.id===id);
   if(!g) return;
   groupPickerId = id;
   groupPickerIds = [...g.playerIds];
+  const ownIds = new Set(players.filter(p=>p.teamId===g.teamId).map(p=>p.id));
+  groupPickerGuests = g.playerIds.filter(pid=>!ownIds.has(pid));
   const t = teams.find(x=>x.id===g.teamId);
   document.getElementById("groupPlayersTitle").textContent = (g.name||"Equipo") + (t ? " · "+t.name : "");
   document.getElementById("groupPlayersSearch").value = "";
@@ -9591,7 +9594,7 @@ function renderGroupPlayersModal_(){
   const byDorsal = (a,b)=>(a.dorsal||0)-(b.dorsal||0);
   const roster = players.filter(p=>p.teamId===g.teamId).sort(byDorsal);
   const rosterIds = new Set(roster.map(p=>p.id));
-  const guests = groupPickerIds.map(id=>players.find(p=>p.id===id)).filter(p=>p && !rosterIds.has(p.id)).sort(byDorsal);
+  const guests = groupPickerGuests.map(id=>players.find(p=>p.id===id)).filter(p=>p && !rosterIds.has(p.id)).sort(byDorsal);
   const rosterHtml = roster.length ? roster.map(p=>`
     <label style="display:flex;align-items:center;gap:8px;padding:6px 2px;border-bottom:1px solid var(--border);cursor:pointer;">
       <input type="checkbox" ${groupPickerIds.includes(p.id)?"checked":""} style="width:auto;" onchange="toggleGroupPlayer_('${p.id}', this.checked)">
@@ -9600,19 +9603,28 @@ function renderGroupPlayersModal_(){
   const guestsHtml = guests.length ? `
     <h4 style="margin:10px 0 2px 0;font-size:.8rem;color:var(--accent);">De otras categorías</h4>` + guests.map(p=>{
       const t = teams.find(x=>x.id===p.teamId);
+      // Igual que los de la plantilla: con su casilla para marcarlo/desmarcarlo (recién añadido sale
+      // marcado); la papelera lo quita de esta lista del todo.
       return `
       <div style="display:flex;align-items:center;gap:8px;padding:6px 2px;border-bottom:1px solid var(--border);">
-        <span style="flex:1;">${jerseyNameHtml_(p.position, (p.dorsal!=null?escapeHtml(String(p.dorsal))+". ":"")+escapeHtml(p.name))} <span class="badge outline" style="font-size:.68rem;">${escapeHtml(t?t.name:"otra categoría")}</span></span>
-        <button type="button" class="btn danger small" style="flex:0 0 auto;" onclick="toggleGroupPlayer_('${p.id}', false, true)" title="Quitar del equipo">🗑️</button>
+        <label style="flex:1;display:flex;align-items:center;gap:8px;cursor:pointer;">
+          <input type="checkbox" ${groupPickerIds.includes(p.id)?"checked":""} style="width:auto;" onchange="toggleGroupPlayer_('${p.id}', this.checked)">
+          <span>${jerseyNameHtml_(p.position, (p.dorsal!=null?escapeHtml(String(p.dorsal))+". ":"")+escapeHtml(p.name))} <span class="badge outline" style="font-size:.68rem;">${escapeHtml(t?t.name:"otra categoría")}</span></span>
+        </label>
+        <button type="button" class="btn danger small" style="flex:0 0 auto;" onclick="removeGroupGuest_('${p.id}')" title="Quitar de la lista">🗑️</button>
       </div>`;
     }).join("") : "";
   wrap.innerHTML = rosterHtml + guestsHtml;
   renderGroupPlayersResults_();
 }
-window.toggleGroupPlayer_ = (playerId, on, rerender) => {
+window.toggleGroupPlayer_ = (playerId, on) => {
   groupPickerIds = groupPickerIds.filter(id=>id!==playerId);
   if(on) groupPickerIds.push(playerId);
-  if(rerender) renderGroupPlayersModal_();
+};
+window.removeGroupGuest_ = (playerId) => {
+  groupPickerIds = groupPickerIds.filter(id=>id!==playerId);
+  groupPickerGuests = groupPickerGuests.filter(id=>id!==playerId);
+  renderGroupPlayersModal_();
 };
 function renderGroupPlayersResults_(){
   const wrap = document.getElementById("groupPlayersResults");
@@ -9621,7 +9633,7 @@ function renderGroupPlayersResults_(){
   const query = (document.getElementById("groupPlayersSearch").value||"").trim().toLowerCase();
   if(!g || !query){ wrap.innerHTML = ""; return; }
   const matches = players
-    .filter(p=> p.teamId!==g.teamId && !groupPickerIds.includes(p.id) && (p.name||"").toLowerCase().includes(query))
+    .filter(p=> p.teamId!==g.teamId && !groupPickerGuests.includes(p.id) && (p.name||"").toLowerCase().includes(query))
     .sort((a,b)=> (a.name||"").localeCompare(b.name||"",'es'))
     .slice(0,15);
   if(matches.length===0){ wrap.innerHTML = '<p class="muted" style="font-size:.8rem;margin:4px 0;">Sin resultados.</p>'; return; }
@@ -9635,7 +9647,8 @@ function renderGroupPlayersResults_(){
   }).join("");
 }
 window.addGroupGuestFromSearch_ = (playerId) => {
-  if(!groupPickerIds.includes(playerId)) groupPickerIds.push(playerId);
+  if(!groupPickerGuests.includes(playerId)) groupPickerGuests.push(playerId);
+  if(!groupPickerIds.includes(playerId)) groupPickerIds.push(playerId); // entra ya marcado
   document.getElementById("groupPlayersSearch").value = "";
   renderGroupPlayersModal_();
 };
