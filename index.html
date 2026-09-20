@@ -10683,6 +10683,24 @@ function renderSessionIntoDoc(doc, s, opts){
     const gs = taskGroupsFor_(s, id, teamId);
     return gs.length ? gs.map(g=>g.name||"Equipo").join(", ") : "Todos";
   };
+  // Para la página resumen: en vez del nombre de los equipos, los jugadores que hacen la tarea
+  // (los de los equipos asignados, sin repetir, por dorsal). Sin equipos asignados = "Todos".
+  const playersLabelForTask = id => {
+    const gs = taskGroupsFor_(s, id, teamId);
+    if(!gs.length) return "Todos";
+    const seen = new Set(), list = [];
+    gs.forEach(g=>(g.playerIds||[]).forEach(pid=>{
+      if(seen.has(pid)) return;
+      seen.add(pid);
+      const p = players.find(x=>x.id===pid);
+      if(p) list.push(p);
+    }));
+    list.sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
+    // Solo con el dorsal cuando dos jugadores de la lista se llaman igual (p.ej. uno de otra categoría).
+    const count = {};
+    list.forEach(p=>{ count[p.name||""] = (count[p.name||""]||0)+1; });
+    return list.length ? list.map(p=> (p.name||"") + ((count[p.name||""]>1 && p.dorsal!=null) ? " (#"+p.dorsal+")" : "")).join(", ") : "(sin jugadores)";
+  };
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
   const margin = 12;
@@ -10968,9 +10986,9 @@ function renderSessionIntoDoc(doc, s, opts){
     sectionBar("Resumen de tareas");
 
     const fullW = pageW-margin*2;
-    // Con equipos (grupos) definidos, la tabla lleva una columna más: qué equipos hacen cada tarea.
+    // Con equipos (grupos) definidos, la tabla lleva una columna más: los jugadores que hacen cada tarea.
     const hasTeamsCol = pdfGroups.length>0;
-    const nameColW = 40, imgColW = 34, teamColW = hasTeamsCol ? 26 : 0;
+    const nameColW = 40, imgColW = 34, teamColW = hasTeamsCol ? 40 : 0;
     const obsColW = fullW-nameColW-teamColW-imgColW;
     const imgH = (imgColW-2)*(700/980);
 
@@ -10989,7 +11007,7 @@ function renderSessionIntoDoc(doc, s, opts){
     doc.rect(margin+nameColW+teamColW+obsColW, y, imgColW, 6);
     doc.setFont("helvetica","bold"); doc.setFontSize(8); doc.setTextColor(TEXT[0],TEXT[1],TEXT[2]);
     doc.text("Ejercicio", margin+2, y+4.2);
-    if(hasTeamsCol) doc.text("Equipos", margin+nameColW+2, y+4.2);
+    if(hasTeamsCol) doc.text("Jugadores", margin+nameColW+2, y+4.2);
     doc.text("Explicación", margin+nameColW+teamColW+2, y+4.2);
     doc.text("Dibujo", margin+nameColW+teamColW+obsColW+2, y+4.2);
     y += 6;
@@ -11003,7 +11021,7 @@ function renderSessionIntoDoc(doc, s, opts){
         obsLines[maxLines-1] = doc.splitTextToSize(combined, obsColW-4)[0];
       }
       const nameLines = doc.splitTextToSize(`${i+1}. ${t.title||"(sin título)"}`, nameColW-4);
-      const teamLines = hasTeamsCol ? doc.splitTextToSize(teamsLabelForTask(t.id), teamColW-4) : [];
+      const teamLines = hasTeamsCol ? doc.splitTextToSize(playersLabelForTask(t.id), teamColW-4) : [];
       const frameList = (t.animation && t.animation.frames) || [];
       const hasImg = frameList.length>0;
       const rowH = Math.max(Math.max(nameLines.length,obsLines.length,teamLines.length)*lineH+3, hasImg?imgH+3:0, 8);
