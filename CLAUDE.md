@@ -112,13 +112,18 @@ All inside `index.html` — search for these comment banners to jump around:
   across a coach's own multiple teams becomes independent per team the moment it's edited or
   deleted from one of them (`forkSessionForTeams_`, used by `forkAndEditSession`, `editSession`,
   `deleteSession`). Export to PDF via jsPDF (`EXPORTAR SESIÓN A PDF` ~6825).
-  - **Grupos de trabajo ("equipos" dentro del entrenamiento)**: `s.groups` = `[{id,teamId,name,playerIds}]`
-    (cada grupo pertenece a UN equipo de la sesión; sus jugadores pueden ser de otras categorías,
-    añadidos por búsqueda) y `s.taskGroups` = `{taskId:[groupId]}` (sin asignar = la hacen todos).
+  - **Equipos de entrenamiento por tarea** (se crean dentro de "Tareas seleccionadas", en cada tarea,
+    `taskTeamsHtml_`): `s.taskGroups` = `{taskId:[{id,teamId,name,playerIds}]}` (cada equipo pertenece
+    a UN equipo de la sesión; una tarea sin equipos = la hacen todos). Los jugadores pueden ser de
+    otras categorías: al añadir uno (búsqueda) en una tarea entra en el pool `sessionGuestIds`
+    (`collectSessionGuests_` lo reconstruye al cargar) y aparece ya en el selector de las demás
+    tareas para marcarlo, sin volver a buscarlo. Formato anterior (`s.groups` + `taskGroups` con ids)
+    sigue leyéndose vía `sessionTaskTeamsRaw_`; al editar y guardar se migra al actual.
     Independiente por equipo: `sessionGroupsFor_`/`taskGroupsFor_`/`taskAppliesToTeam_` filtran por
     el equipo bajo el que se ve/exporta la sesión (tarjeta y `exportSessionPDF(id, teamId)`), y el
-    desdoblado (`forkSessionForTeams_`) se lleva solo los grupos/tareas/asistencia de ese equipo.
-    Los invitados de otra categoría de un grupo salen convocados de entrada en la asistencia.
+    desdoblado (`forkSessionForTeams_`) se lleva solo los equipos/tareas/asistencia de ese equipo.
+    Los invitados de otra categoría de un equipo salen convocados de entrada en la asistencia.
+    En el PDF, cada tarea muestra sus equipos con jugadores y la hoja resumen los lista por equipo.
   - **Asistencia** por sesión (`s.attendance`/`s.attendanceExtraPlayerIds`, mapas por id de equipo):
     los entrenadores con sesión compartida la escriben, así que esas dos claves están en el
     `hasOnly` de la regla de `sessions` (hay que pegar las reglas en la consola si cambian).

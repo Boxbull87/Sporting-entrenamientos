@@ -1049,11 +1049,6 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
         <p class="muted" style="font-size:.78rem;margin-top:-4px;">Puedes elegir varios equipos, incluso de otros entrenadores, para compartir esta misma sesión con ellos.</p>
         <button type="button" class="btn ghost small" id="btnSessionTeams">+ Añadir equipo</button>
         <div id="sessionTeamChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
-        <div id="sessionGroupsWrap" class="hidden" style="margin-top:12px;">
-          <h3 style="font-size:.9rem;">👥 Equipos del entrenamiento</h3>
-          <p class="muted" style="font-size:.78rem;margin-top:-4px;">Crea los grupos de trabajo de cada equipo (p. ej. "Equipo A", "Equipo B") con sus jugadores; si la sesión es de varios equipos, cada uno tiene los suyos por separado. Luego marca, en cada tarea, qué equipos la hacen (si no marcas ninguno, la hacen todos).</p>
-          <div id="sessionGroupsList"></div>
-        </div>
         <label style="margin-top:10px;">Objetivos de la sesión</label>
         <textarea id="sessionObjectives" placeholder="- Objetivo 1&#10;- Objetivo 2&#10;- Objetivo 3"></textarea>
         <label style="margin-top:10px;">Notas</label>
@@ -1096,6 +1091,7 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
         <div id="sessionTaskBrowser"><p class="muted">Cargando tareas...</p></div>
 
         <h3 style="margin-top:14px;font-size:.9rem;">Tareas seleccionadas</h3>
+        <p class="muted" style="font-size:.78rem;margin-top:-4px;">En cada tarea puedes crear sus propios equipos de entrenamiento (p. ej. "Equipo A", "Equipo B") con sus jugadores; si la sesión es de varios equipos, cada uno tiene los suyos por separado. Si no creas ninguno, la tarea la hacen todos. Los jugadores de otras categorías que añadas en una tarea quedan disponibles en las demás.</p>
         <div id="sessionTaskList"><p class="muted">Ninguna tarea añadida todavía.</p></div>
         <p class="muted" id="sessionTotalTime"></p>
         <div style="margin-top:8px;display:flex;gap:8px;">
@@ -6702,13 +6698,15 @@ document.getElementById("attendanceTeamSelector").onchange = (e) => {
 // a los equipos propios del entrenador — así una sesión se puede compartir con equipos
 // (y por tanto entrenadores) que no son los suyos.
 let sessionTeamIds = [];
-// Grupos de trabajo ("equipos" dentro del entrenamiento) de la sesión que se está editando:
-// cada grupo pertenece a UNO de los equipos de la sesión (teamId) y lleva sus jugadores, que
-// pueden ser de la plantilla de ese equipo o de otras categorías añadidos a mano. Cada tarea
-// se asigna a uno o varios grupos (sessionTaskGroups[taskId]); sin asignar = la hacen todos.
+// Equipos de entrenamiento ("grupos") de CADA TAREA de la sesión que se está editando:
+// sessionTaskGroups[taskId] = [{id, teamId, name, playerIds:[]}]. Cada uno pertenece a UNO de
+// los equipos de la sesión (teamId) y lleva sus jugadores (de la plantilla de ese equipo o de
+// otras categorías añadidos a mano); una tarea sin equipos la hacen todos. sessionGuestIds es
+// la lista de jugadores de otras categorías ya añadidos en cualquier tarea de la sesión: salen
+// disponibles en el selector de todas las demás, sin volver a buscarlos.
 // Se declaran aquí (junto a sessionTeamIds) porque renderSessionTeamChips los usa.
-let sessionGroups = [];       // [{id, teamId, name, playerIds:[]}]
-let sessionTaskGroups = {};   // {taskId: [groupId,...]}
+let sessionTaskGroups = {};   // {taskId: [{id, teamId, name, playerIds}]}
+let sessionGuestIds = [];
 function renderSessionTeamChips(){
   const wrap = document.getElementById("sessionTeamChips");
   if(!wrap) return;
@@ -6718,9 +6716,8 @@ function renderSessionTeamChips(){
       <button type="button" onclick="removeSessionTeamChip('${id}')" style="background:none;border:none;color:inherit;cursor:pointer;font-size:1em;line-height:1;padding:0;">✕</button>
     </span>`;
   }).join("");
-  // Los grupos dependen de los equipos elegidos: al quitar/añadir un equipo se repintan.
+  // Los equipos de cada tarea dependen de los equipos de la sesión: al quitar uno se repintan.
   pruneSessionGroups_();
-  renderSessionGroups_();
   renderSessionTaskList();
 }
 window.removeSessionTeamChip = (id) => {
@@ -9493,21 +9490,21 @@ function renderTeamCompare(){
 let sessionBlocks = { calentamiento: [], principal: [], vuelta: [] };
 let editingSessionId = null;
 
-/* ---------- Grupos de trabajo de la sesión ("equipos" dentro del entrenamiento) ----------
-   Cada equipo de la sesión (p.ej. Alevín e Infantil, si está compartida) tiene sus propios
-   grupos, independientes de los del otro: "Equipo A", "Equipo B"... con sus jugadores (de la
-   plantilla de ese equipo, más los de otras categorías que se añadan a mano buscándolos por
-   nombre). Luego cada tarea se asigna a uno o varios grupos; si no se marca ninguno la hacen
-   todos. El estado en edición vive en sessionGroups / sessionTaskGroups (declarados junto a
-   sessionTeamIds). En la sesión guardada: s.groups = [{id,teamId,name,playerIds}] y
-   s.taskGroups = {taskId:[groupId]}. */
+/* ---------- Equipos de entrenamiento ("grupos") de cada tarea de la sesión ----------
+   En "Tareas seleccionadas", cada tarea tiene sus PROPIOS equipos ("Equipo A", "Equipo B"...) con
+   sus jugadores. Si la sesión es de varios equipos (p.ej. Alevín e Infantil), cada uno tiene los
+   suyos por separado dentro de la tarea. Los jugadores son de la plantilla de ese equipo, más los
+   de otras categorías que se añadan a mano buscándolos por nombre: los que se añadan en una tarea
+   quedan disponibles (sin marcar) en las demás (sessionGuestIds), sin volver a buscarlos. Una tarea
+   sin equipos la hacen todos. Estado en edición: sessionTaskGroups[taskId] (declarado junto a
+   sessionTeamIds). En la sesión guardada: s.taskGroups = {taskId:[{id,teamId,name,playerIds}]}
+   (las sesiones guardadas con el modelo anterior — s.groups + ids en taskGroups — se siguen leyendo,
+   ver sessionTaskTeamsRaw_). */
 function newSessionGroupId_(){ return "g"+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
 function pruneSessionGroups_(){
-  sessionGroups = sessionGroups.filter(g=>sessionTeamIds.includes(g.teamId));
-  const valid = new Set(sessionGroups.map(g=>g.id));
   Object.keys(sessionTaskGroups).forEach(tid=>{
-    const ids = (sessionTaskGroups[tid]||[]).filter(id=>valid.has(id));
-    if(ids.length) sessionTaskGroups[tid] = ids; else delete sessionTaskGroups[tid];
+    const gs = (sessionTaskGroups[tid]||[]).filter(g=>sessionTeamIds.includes(g.teamId));
+    if(gs.length) sessionTaskGroups[tid] = gs; else delete sessionTaskGroups[tid];
   });
 }
 function playerLabel_(p, ownTeamId){
@@ -9516,79 +9513,92 @@ function playerLabel_(p, ownTeamId){
   if(ownTeamId && p.teamId!==ownTeamId) return base + " ("+((teams.find(x=>x.id===p.teamId)||{}).name||"otra categoría")+")";
   return base;
 }
-function renderSessionGroups_(){
-  const wrap = document.getElementById("sessionGroupsWrap");
-  const list = document.getElementById("sessionGroupsList");
-  if(!wrap || !list) return;
-  if(sessionTeamIds.length===0){ wrap.classList.add("hidden"); list.innerHTML = ""; return; }
-  wrap.classList.remove("hidden");
-  list.innerHTML = sessionTeamIds.map(tid=>{
+// Jugadores de otras categorías de la sesión: los añadidos en cualquier tarea + los que ya están
+// dentro de algún equipo sin ser de la plantilla de ese equipo.
+function collectSessionGuests_(){
+  const set = new Set(sessionGuestIds);
+  Object.values(sessionTaskGroups).forEach(gs=>gs.forEach(g=>{
+    const own = new Set(players.filter(p=>p.teamId===g.teamId).map(p=>p.id));
+    (g.playerIds||[]).forEach(pid=>{ if(!own.has(pid)) set.add(pid); });
+  }));
+  return Array.from(set);
+}
+// Bloque de equipos de una tarea dentro de "Tareas seleccionadas".
+function taskTeamsHtml_(taskId){
+  const gs = sessionTaskGroups[taskId] || [];
+  const multiTeam = sessionTeamIds.length>1;
+  const sections = sessionTeamIds.map(tid=>{
     const t = teams.find(x=>x.id===tid);
-    const gs = sessionGroups.filter(g=>g.teamId===tid);
-    const rows = gs.map(g=>{
-      const names = g.playerIds.map(id=>players.find(p=>p.id===id)).filter(Boolean).map(p=>playerLabel_(p, tid));
+    const mine = gs.filter(g=>g.teamId===tid);
+    const rows = mine.map(g=>{
+      const n = (g.playerIds||[]).length;
+      const names = (g.playerIds||[]).map(id=>players.find(p=>p.id===id)).filter(Boolean).map(p=>playerLabel_(p, tid));
       return `
-      <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);">
-        <div class="row" style="align-items:center;gap:6px;">
-          <input type="text" value="${escapeHtml(g.name||"")}" placeholder="Nombre del equipo (ej. Equipo A)" style="flex:1;min-width:140px;"
-            oninput="renameSessionGroup_('${g.id}', this.value)" onchange="renderSessionTaskList()">
-          <button type="button" class="btn ghost small" style="flex:0 0 auto;" onclick="openGroupPlayers_('${g.id}')">👥 ${g.playerIds.length} jugador${g.playerIds.length===1?"":"es"}</button>
-          <button type="button" class="btn danger small" style="flex:0 0 auto;" onclick="removeSessionGroup_('${g.id}')" title="Quitar este equipo">🗑️</button>
-        </div>
-        ${names.length ? `<div class="muted" style="font-size:.74rem;margin-top:3px;">${escapeHtml(names.join(", "))}</div>` : ""}
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-top:4px;">
+        <input type="text" value="${escapeHtml(g.name||"")}" placeholder="Nombre (ej. Equipo A)" style="width:130px;padding:3px 6px;font-size:.78rem;"
+          oninput="renameTaskTeam_('${taskId}','${g.id}', this.value)">
+        <button type="button" class="btn ghost small" style="padding:2px 8px;font-size:.72rem;" onclick="openGroupPlayers_('${taskId}','${g.id}')">👥 ${n} jugador${n===1?"":"es"}</button>
+        <button type="button" class="btn danger small" style="padding:2px 6px;font-size:.72rem;" onclick="removeTaskTeam_('${taskId}','${g.id}')" title="Quitar este equipo de la tarea">🗑️</button>
+        ${names.length ? `<span class="muted" style="font-size:.72rem;flex-basis:100%;">${escapeHtml(names.join(", "))}</span>` : ""}
       </div>`;
     }).join("");
     return `
-    <div class="card" style="margin:8px 0 0 0;padding:10px 12px;">
-      <div style="font-weight:600;">👕 ${escapeHtml(t?t.name:"(equipo eliminado)")}</div>
-      ${rows || '<p class="muted" style="font-size:.78rem;margin:4px 0 0 0;">Todavía no hay equipos creados para este equipo.</p>'}
-      <button type="button" class="btn ghost small" style="margin-top:8px;" onclick="addSessionGroup_('${tid}')">➕ Añadir equipo</button>
+    <div style="margin-top:4px;">
+      ${multiTeam ? `<span class="muted" style="font-size:.74rem;font-weight:600;">👕 ${escapeHtml(t?t.name:"(equipo eliminado)")}</span>` : ""}
+      ${rows}
+      <button type="button" class="btn ghost small" style="margin-top:4px;padding:2px 8px;font-size:.72rem;" onclick="addTaskTeam_('${taskId}','${tid}')">➕ Añadir equipo${multiTeam?" de "+escapeHtml(t?t.name:""):""}</button>
     </div>`;
   }).join("");
+  return `
+  <div style="margin-top:6px;padding:6px 8px;border:1px dashed var(--border);border-radius:8px;">
+    <div style="font-size:.74rem;font-weight:600;">👥 Equipos de esta tarea ${gs.length ? "" : '<span class="muted" style="font-weight:400;">(sin equipos = la hacen todos)</span>'}</div>
+    ${sections}
+  </div>`;
 }
-window.addSessionGroup_ = (teamId) => {
-  const n = sessionGroups.filter(g=>g.teamId===teamId).length + 1;
-  sessionGroups.push({id:newSessionGroupId_(), teamId, name:"Equipo "+n, playerIds:[]});
-  renderSessionGroups_();
+window.addTaskTeam_ = (taskId, teamId) => {
+  const list = sessionTaskGroups[taskId] || (sessionTaskGroups[taskId] = []);
+  const n = list.filter(g=>g.teamId===teamId).length + 1;
+  list.push({id:newSessionGroupId_(), teamId, name:"Equipo "+n, playerIds:[]});
   renderSessionTaskList();
 };
-window.renameSessionGroup_ = (id, value) => {
-  const g = sessionGroups.find(x=>x.id===id);
+window.renameTaskTeam_ = (taskId, groupId, value) => {
+  const g = (sessionTaskGroups[taskId]||[]).find(x=>x.id===groupId);
   if(g) g.name = value;
 };
-window.removeSessionGroup_ = (id) => {
-  sessionGroups = sessionGroups.filter(g=>g.id!==id);
-  pruneSessionGroups_();
-  renderSessionGroups_();
-  renderSessionTaskList();
-};
-window.toggleTaskGroup_ = (taskId, groupId) => {
-  const cur = sessionTaskGroups[taskId] || [];
-  const next = cur.includes(groupId) ? cur.filter(x=>x!==groupId) : [...cur, groupId];
-  if(next.length) sessionTaskGroups[taskId] = next; else delete sessionTaskGroups[taskId];
+window.removeTaskTeam_ = (taskId, groupId) => {
+  const gs = (sessionTaskGroups[taskId]||[]).filter(g=>g.id!==groupId);
+  if(gs.length) sessionTaskGroups[taskId] = gs; else delete sessionTaskGroups[taskId];
   renderSessionTaskList();
 };
 
-// Selector de jugadores de un grupo: plantilla del equipo con casillas + buscador para añadir
-// a mano jugadores de otras categorías (mismo patrón que el control de asistencia).
+// Selector de jugadores de un equipo de una tarea: plantilla del equipo con casillas + buscador para
+// añadir a mano jugadores de otras categorías (mismo patrón que el control de asistencia).
+let groupPickerTaskId = null;
 let groupPickerId = null;
 let groupPickerIds = [];     // jugadores marcados (los que entran en el equipo)
-let groupPickerGuests = [];  // jugadores de otras categorías añadidos a la lista (marcados o no)
-window.openGroupPlayers_ = (id) => {
-  const g = sessionGroups.find(x=>x.id===id);
+let groupPickerGuests = [];  // jugadores de otras categorías en la lista (marcados o no)
+function pickerGroup_(){
+  return (sessionTaskGroups[groupPickerTaskId]||[]).find(x=>x.id===groupPickerId);
+}
+window.openGroupPlayers_ = (taskId, groupId) => {
+  const g = (sessionTaskGroups[taskId]||[]).find(x=>x.id===groupId);
   if(!g) return;
-  groupPickerId = id;
+  groupPickerTaskId = taskId;
+  groupPickerId = groupId;
   groupPickerIds = [...g.playerIds];
   const ownIds = new Set(players.filter(p=>p.teamId===g.teamId).map(p=>p.id));
-  groupPickerGuests = g.playerIds.filter(pid=>!ownIds.has(pid));
+  // Lista de invitados: los de toda la sesión (añadidos en cualquier tarea) + los ya marcados aquí.
+  groupPickerGuests = Array.from(new Set([...collectSessionGuests_(), ...g.playerIds]))
+    .filter(pid=>!ownIds.has(pid) && players.some(p=>p.id===pid));
   const t = teams.find(x=>x.id===g.teamId);
-  document.getElementById("groupPlayersTitle").textContent = (g.name||"Equipo") + (t ? " · "+t.name : "");
+  const task = tasks.find(x=>x.id===taskId);
+  document.getElementById("groupPlayersTitle").textContent = (g.name||"Equipo") + (t ? " · "+t.name : "") + (task ? " — "+task.title : "");
   document.getElementById("groupPlayersSearch").value = "";
   renderGroupPlayersModal_();
   document.getElementById("groupPlayersModal").classList.remove("hidden");
 };
 function renderGroupPlayersModal_(){
-  const g = sessionGroups.find(x=>x.id===groupPickerId);
+  const g = pickerGroup_();
   const wrap = document.getElementById("groupPlayersList");
   if(!g){ wrap.innerHTML = ""; return; }
   const byDorsal = (a,b)=>(a.dorsal||0)-(b.dorsal||0);
@@ -9603,15 +9613,15 @@ function renderGroupPlayersModal_(){
   const guestsHtml = guests.length ? `
     <h4 style="margin:10px 0 2px 0;font-size:.8rem;color:var(--accent);">De otras categorías</h4>` + guests.map(p=>{
       const t = teams.find(x=>x.id===p.teamId);
-      // Igual que los de la plantilla: con su casilla para marcarlo/desmarcarlo (recién añadido sale
-      // marcado); la papelera lo quita de esta lista del todo.
+      // Con su casilla para marcarlo/desmarcarlo (recién añadido sale marcado; los que vienen de
+      // otras tareas salen sin marcar); la papelera lo quita de esta lista.
       return `
       <div style="display:flex;align-items:center;gap:8px;padding:6px 2px;border-bottom:1px solid var(--border);">
         <label style="flex:1;display:flex;align-items:center;gap:8px;cursor:pointer;">
           <input type="checkbox" ${groupPickerIds.includes(p.id)?"checked":""} style="width:auto;" onchange="toggleGroupPlayer_('${p.id}', this.checked)">
           <span>${jerseyNameHtml_(p.position, (p.dorsal!=null?escapeHtml(String(p.dorsal))+". ":"")+escapeHtml(p.name))} <span class="badge outline" style="font-size:.68rem;">${escapeHtml(t?t.name:"otra categoría")}</span></span>
         </label>
-        <button type="button" class="btn danger small" style="flex:0 0 auto;" onclick="removeGroupGuest_('${p.id}')" title="Quitar de la lista">🗑️</button>
+        <button type="button" class="btn danger small" style="flex:0 0 auto;" onclick="removeGroupGuest_('${p.id}')" title="Quitar de esta lista">🗑️</button>
       </div>`;
     }).join("") : "";
   wrap.innerHTML = rosterHtml + guestsHtml;
@@ -9624,12 +9634,13 @@ window.toggleGroupPlayer_ = (playerId, on) => {
 window.removeGroupGuest_ = (playerId) => {
   groupPickerIds = groupPickerIds.filter(id=>id!==playerId);
   groupPickerGuests = groupPickerGuests.filter(id=>id!==playerId);
+  sessionGuestIds = sessionGuestIds.filter(id=>id!==playerId);
   renderGroupPlayersModal_();
 };
 function renderGroupPlayersResults_(){
   const wrap = document.getElementById("groupPlayersResults");
   if(!wrap) return;
-  const g = sessionGroups.find(x=>x.id===groupPickerId);
+  const g = pickerGroup_();
   const query = (document.getElementById("groupPlayersSearch").value||"").trim().toLowerCase();
   if(!g || !query){ wrap.innerHTML = ""; return; }
   const matches = players
@@ -9649,53 +9660,72 @@ function renderGroupPlayersResults_(){
 window.addGroupGuestFromSearch_ = (playerId) => {
   if(!groupPickerGuests.includes(playerId)) groupPickerGuests.push(playerId);
   if(!groupPickerIds.includes(playerId)) groupPickerIds.push(playerId); // entra ya marcado
+  // Queda en la lista de la sesión: sale disponible en el selector de las demás tareas.
+  if(!sessionGuestIds.includes(playerId)) sessionGuestIds.push(playerId);
   document.getElementById("groupPlayersSearch").value = "";
   renderGroupPlayersModal_();
 };
 document.getElementById("groupPlayersSearch").oninput = renderGroupPlayersResults_;
 document.getElementById("btnGroupPlayersAll").onclick = () => {
-  const g = sessionGroups.find(x=>x.id===groupPickerId);
+  const g = pickerGroup_();
   if(!g) return;
   players.filter(p=>p.teamId===g.teamId).forEach(p=>{ if(!groupPickerIds.includes(p.id)) groupPickerIds.push(p.id); });
   renderGroupPlayersModal_();
 };
 document.getElementById("btnGroupPlayersNone").onclick = () => {
-  const g = sessionGroups.find(x=>x.id===groupPickerId);
+  const g = pickerGroup_();
   if(!g) return;
   const rosterIds = new Set(players.filter(p=>p.teamId===g.teamId).map(p=>p.id));
   groupPickerIds = groupPickerIds.filter(id=>!rosterIds.has(id));
   renderGroupPlayersModal_();
 };
-document.getElementById("btnCloseGroupPlayers").onclick = () => {
+function closeGroupPlayersModal_(){
   document.getElementById("groupPlayersModal").classList.add("hidden");
-  groupPickerId = null; groupPickerIds = [];
+  groupPickerTaskId = null; groupPickerId = null; groupPickerIds = []; groupPickerGuests = [];
+}
+document.getElementById("btnCloseGroupPlayers").onclick = () => {
+  // Los invitados añadidos con la búsqueda se quedan disponibles en la sesión aunque canceles.
+  closeGroupPlayersModal_();
+  renderSessionTaskList();
 };
 document.getElementById("btnApplyGroupPlayers").onclick = () => {
-  const g = sessionGroups.find(x=>x.id===groupPickerId);
+  const g = pickerGroup_();
   if(g) g.playerIds = groupPickerIds.filter(id=>players.some(p=>p.id===id));
-  document.getElementById("groupPlayersModal").classList.add("hidden");
-  groupPickerId = null; groupPickerIds = [];
-  renderSessionGroups_();
+  closeGroupPlayersModal_();
+  renderSessionTaskList();
 };
 
 // Ayudas de lectura sobre una sesión GUARDADA (para tarjeta y PDF). "Independiente por equipo":
-// una tarea con grupos asignados solo cuenta para los equipos a los que pertenece alguno de esos
-// grupos; sin grupos asignados (o solo con grupos que ya no existen) es para todos.
-function sessionGroupsFor_(s, teamId){
-  const sTeamIds = Array.isArray(s.teamIds) && s.teamIds.length ? s.teamIds : (s.teamId ? [s.teamId] : []);
-  return (Array.isArray(s.groups)?s.groups:[]).filter(g=> sTeamIds.includes(g.teamId) && (!teamId || g.teamId===teamId));
+// una tarea con equipos solo cuenta para los equipos de la sesión a los que pertenece alguno de
+// ellos; una tarea sin equipos es para todos.
+function sessionTeamIdsOf_(s){
+  return Array.isArray(s.teamIds) && s.teamIds.length ? s.teamIds : (s.teamId ? [s.teamId] : []);
 }
+// Equipos de una tarea tal como están guardados (sea cual sea el equipo): formato actual
+// (objetos dentro de s.taskGroups[taskId]) o el anterior (ids que apuntan a s.groups).
+function sessionTaskTeamsRaw_(s, taskId){
+  const v = (s.taskGroups||{})[taskId];
+  if(!Array.isArray(v)) return [];
+  return v.map(x=> typeof x==="string" ? (Array.isArray(s.groups)?s.groups:[]).find(g=>g.id===x) : x).filter(Boolean);
+}
+// Equipos de una tarea, solo de los equipos que siguen en la sesión (y del equipo pedido, si se da).
 function taskGroupsFor_(s, taskId, teamId){
-  const assigned = ((s.taskGroups||{})[taskId]||[]);
-  return sessionGroupsFor_(s, teamId).filter(g=>assigned.includes(g.id));
+  const sTeamIds = sessionTeamIdsOf_(s);
+  return sessionTaskTeamsRaw_(s, taskId).filter(g=> sTeamIds.includes(g.teamId) && (!teamId || g.teamId===teamId));
+}
+// Todos los equipos de todas las tareas (para el equipo pedido, si se da), sin repetir por id.
+function sessionGroupsFor_(s, teamId){
+  const out = [], seen = new Set();
+  Object.keys(s.taskGroups||{}).forEach(tid=>{
+    taskGroupsFor_(s, tid, teamId).forEach(g=>{ if(!seen.has(g.id)){ seen.add(g.id); out.push(g); } });
+  });
+  return out;
 }
 function taskAppliesToTeam_(s, taskId, teamId){
-  // "Asignada" = a algún grupo que existe en la sesión, aunque su equipo ya no esté en ella
-  // (p.ej. tras desdoblar): una tarea solo de otro equipo NO pasa a ser "para todos" por eso.
-  const existing = new Set((Array.isArray(s.groups)?s.groups:[]).map(g=>g.id));
-  const assigned = ((s.taskGroups||{})[taskId]||[]).filter(id=>existing.has(id));
-  if(assigned.length===0) return true;
-  return sessionGroupsFor_(s, teamId||null).some(g=>assigned.includes(g.id));
+  // "Con equipos" = tiene alguno guardado, aunque su equipo ya no esté en la sesión (p.ej. tras
+  // desdoblar): una tarea solo de otro equipo NO pasa a ser "para todos" por eso.
+  if(sessionTaskTeamsRaw_(s, taskId).length===0) return true;
+  return taskGroupsFor_(s, taskId, teamId||null).length>0;
 }
 
 let sessionFilterFolderIds = []; // carpetas marcadas para filtrar tareas al crear una sesión (intersección)
@@ -9817,19 +9847,9 @@ function renderSessionTaskList(){
       const t = tasks.find(x=>x.id===id);
       if(!t) return "";
       total += (t.duration||0);
-      // Qué equipos (grupos) hacen esta tarea: chips que se marcan/desmarcan; sin marcar = todos.
-      const marked = sessionTaskGroups[id] || [];
-      const multiTeam = sessionTeamIds.length>1;
-      const groupChips = sessionGroups.length ? `
-        <div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
-          <span class="muted" style="font-size:.72rem;">Equipos:</span>
-          ${sessionGroups.map(g=>{
-            const on = marked.includes(g.id);
-            const tn = multiTeam ? " · "+((teams.find(x=>x.id===g.teamId)||{}).name||"") : "";
-            return `<button type="button" class="btn small ${on?"accent":"ghost"}" style="padding:2px 8px;font-size:.72rem;" onclick="toggleTaskGroup_('${id}','${g.id}')">${escapeHtml((g.name||"Equipo")+tn)}</button>`;
-          }).join("")}
-          ${marked.length ? "" : '<span class="muted" style="font-size:.7rem;">(sin marcar = todos)</span>'}
-        </div>` : "";
+      // Equipos de entrenamiento de ESTA tarea (cada tarea tiene los suyos), solo si ya hay algún
+      // equipo de la sesión elegido.
+      const groupChips = sessionTeamIds.length ? taskTeamsHtml_(id) : "";
       return `
       <div class="session-task">
         <div class="order-btns">
@@ -9889,17 +9909,18 @@ document.getElementById("btnSaveSession").onclick = async () => {
     principal: [...sessionBlocks.principal],
     vuelta: [...sessionBlocks.vuelta]
   };
-  // Grupos de trabajo: solo los de los equipos que siguen en la sesión, con nombre por defecto si
-  // se dejó en blanco, y asignaciones de tareas limpias (solo tareas de esta sesión y grupos que existen).
+  // Equipos de entrenamiento de cada tarea: solo los de los equipos que siguen en la sesión y de
+  // tareas que siguen en ella, con nombre por defecto si se dejó en blanco.
   pruneSessionGroups_();
-  const groups = sessionGroups.map((g,i)=>({
-    id: g.id, teamId: g.teamId, name: (g.name||"").trim() || "Equipo "+(i+1), playerIds: [...g.playerIds]
-  }));
   const taskGroups = {};
-  flatIds.forEach(id=>{ if((sessionTaskGroups[id]||[]).length) taskGroups[id] = [...sessionTaskGroups[id]]; });
+  flatIds.forEach(id=>{
+    const gs = sessionTaskGroups[id] || [];
+    if(gs.length) taskGroups[id] = gs.map((g,i)=>({
+      id: g.id, teamId: g.teamId, name: (g.name||"").trim() || "Equipo "+(i+1), playerIds: [...(g.playerIds||[])]
+    }));
+  });
   const payload = {
     name,
-    groups,
     taskGroups,
     teamIds: [...sessionTeamIds],
     date: document.getElementById("sessionDate").value || null,
@@ -9932,8 +9953,8 @@ function resetSessionForm(){
   editingSessionId = null;
   document.getElementById("sessionName").value = "";
   document.getElementById("sessionDate").value = "";
-  sessionGroups = [];
   sessionTaskGroups = {};
+  sessionGuestIds = [];
   populateSessionTeamSelect();
   document.getElementById("sessionObjectives").value = "";
   document.getElementById("sessionNotes").value = "";
@@ -9963,14 +9984,12 @@ async function forkSessionForTeams_(s, teamIdsToFork){
   // los de los equipos desdoblados, y solo con las tareas que les tocan (una tarea asignada
   // únicamente a grupos de otro equipo no pasa a la copia). Sin grupos, se copia todo como siempre.
   const keepTask = id => teamIdsToFork.some(tid=>taskAppliesToTeam_(s, id, tid));
-  const forkGroups = sessionGroupsFor_(s).filter(g=>teamIdsToFork.includes(g.teamId))
-    .map(g=>({id:g.id, teamId:g.teamId, name:g.name||"", playerIds:[...(g.playerIds||[])]}));
-  const forkGroupIds = new Set(forkGroups.map(g=>g.id));
   const forkTaskIds = (s.taskIds||[]).filter(keepTask);
   const forkTaskGroups = {};
   forkTaskIds.forEach(id=>{
-    const ids = ((s.taskGroups||{})[id]||[]).filter(gid=>forkGroupIds.has(gid));
-    if(ids.length) forkTaskGroups[id] = ids;
+    const gs = taskGroupsFor_(s, id, null).filter(g=>teamIdsToFork.includes(g.teamId))
+      .map(g=>({id:g.id, teamId:g.teamId, name:g.name||"", playerIds:[...(g.playerIds||[])]}));
+    if(gs.length) forkTaskGroups[id] = gs;
   });
   const forkBlocks = s.blocks ? {
     calentamiento: (s.blocks.calentamiento||[]).filter(keepTask),
@@ -9993,7 +10012,6 @@ async function forkSessionForTeams_(s, teamIdsToFork){
     linkedPlaySessionIds: [...(s.linkedPlaySessionIds||[])],
     taskIds: forkTaskIds,
     blocks: forkBlocks,
-    groups: forkGroups,
     taskGroups: forkTaskGroups,
     surveyPublic: !!s.surveyPublic,
     blocksSnapshot: s.blocksSnapshot
@@ -10064,11 +10082,14 @@ function populateSessionEditor(id, s){
   document.getElementById("sessionName").value = s.name || "";
   document.getElementById("sessionDate").value = s.date || "";
   sessionTeamIds = Array.isArray(s.teamIds) && s.teamIds.length ? [...s.teamIds] : (s.teamId ? [s.teamId] : []);
-  // Los grupos y sus asignaciones se cargan ANTES de pintar los equipos (renderSessionTeamChips
-  // los repinta y descarta los de equipos que ya no estén en la sesión).
-  sessionGroups = sessionGroupsFor_(s).map(g=>({id:g.id, teamId:g.teamId, name:g.name||"", playerIds:[...(g.playerIds||[])]}));
+  // Los equipos de cada tarea se cargan ANTES de pintar los equipos de la sesión (renderSessionTeamChips
+  // descarta los de equipos que ya no estén en ella). Se copian (no se editan los de la sesión guardada).
   sessionTaskGroups = {};
-  Object.keys(s.taskGroups||{}).forEach(tid=>{ sessionTaskGroups[tid] = [...s.taskGroups[tid]]; });
+  Object.keys(s.taskGroups||{}).forEach(tid=>{
+    const gs = taskGroupsFor_(s, tid, null).map(g=>({id:g.id, teamId:g.teamId, name:g.name||"", playerIds:[...(g.playerIds||[])]}));
+    if(gs.length) sessionTaskGroups[tid] = gs;
+  });
+  sessionGuestIds = collectSessionGuests_();
   renderSessionTeamChips();
   document.getElementById("sessionObjectives").value = s.objectives || "";
   document.getElementById("sessionNotes").value = s.notes || "";
@@ -10328,10 +10349,14 @@ function sessionCardHtml(s, contextTeamId){
   function taskLi(id){
     const t = tasks.find(x=>x.id===id);
     if(!t) return '<li class="muted">(tarea eliminada)</li>';
-    // Equipos (grupos) que hacen esta tarea — solo los del equipo bajo el que se está viendo la sesión.
-    const groupTags = taskGroupsFor_(s, id, contextTeamId)
-      .map(g=>`<span class="badge outline" style="font-size:.68rem;margin-left:4px;">👥 ${escapeHtml(g.name||"Equipo")}</span>`).join("");
-    return `<li><a href="javascript:void(0)" onclick="viewTask('${id}')" style="color:var(--accent);font-weight:600;text-decoration:none;">${escapeHtml(t.title)}</a>${t.duration?` <span class="muted">· ${t.duration} min</span>`:""}${groupTags}</li>`;
+    // Equipos de entrenamiento de esta tarea con sus jugadores — solo los del equipo bajo el que se
+    // está viendo la sesión.
+    const gs = taskGroupsFor_(s, id, contextTeamId);
+    const groupLines = gs.length ? `<div style="font-size:.76rem;margin:2px 0 4px 0;">${gs.map(g=>{
+      const names = (g.playerIds||[]).map(pid=>players.find(p=>p.id===pid)).filter(Boolean).map(p=>playerLabel_(p, g.teamId));
+      return `<div>👥 <strong>${escapeHtml(g.name||"Equipo")}</strong>${names.length?` <span class="muted">— ${escapeHtml(names.join(", "))}</span>`:""}</div>`;
+    }).join("")}</div>` : "";
+    return `<li><a href="javascript:void(0)" onclick="viewTask('${id}')" style="color:var(--accent);font-weight:600;text-decoration:none;">${escapeHtml(t.title)}</a>${t.duration?` <span class="muted">· ${t.duration} min</span>`:""}${groupLines}</li>`;
   }
   // Independiente por equipo: una tarea asignada solo a grupos de OTRO equipo no sale aquí.
   const appliesHere = id => taskAppliesToTeam_(s, id, contextTeamId);
@@ -10346,12 +10371,6 @@ function sessionCardHtml(s, contextTeamId){
   } else {
     taskListHtml = `<ol style="margin:0 0 6px 18px;padding:0;font-size:.88rem;">${(s.taskIds||[]).filter(appliesHere).map(taskLi).join("")}</ol>`;
   }
-  // Resumen de los equipos (grupos) de este equipo con sus jugadores.
-  const cardGroups = sessionGroupsFor_(s, contextTeamId);
-  const groupsHtml = cardGroups.length ? `<div style="font-size:.8rem;margin:6px 0 2px 0;">${cardGroups.map(g=>{
-    const names = (g.playerIds||[]).map(pid=>players.find(p=>p.id===pid)).filter(Boolean).map(p=>playerLabel_(p, g.teamId));
-    return `<div><strong>👥 ${escapeHtml(g.name||"Equipo")}</strong>${names.length?` <span class="muted">— ${escapeHtml(names.join(", "))}</span>`:""}</div>`;
-  }).join("")}</div>` : "";
   const canManage = currentCoach && (currentCoach.role===ROLE_GESTOR || s.createdBy===currentUser.uid);
   const unread = isItemUnread("sessions", s);
   const sTeams = sessionTeams_(s);
@@ -10377,7 +10396,6 @@ function sessionCardHtml(s, contextTeamId){
     </div>
     ${sTeams.length ? sTeams.map(t=>`<span class="badge" style="margin-top:2px;margin-right:4px;display:inline-block;">👕 ${escapeHtml(t.name)}</span>`).join("") : ""}
     ${attendanceList.length ? `<span class="badge outline" style="margin-top:2px;margin-right:4px;display:inline-block;">🧍 ${attSi} asistieron · ${attNo} ausencias</span>` : ""}
-    ${groupsHtml}
     ${taskListHtml}
     <p class="muted" style="font-size:.78rem;margin-top:-2px;">Toca una tarea para ver sus notas y la pizarra táctica.</p>
     ${s.objectives ? `<p style="font-size:.85rem;white-space:pre-wrap;"><strong>Objetivos:</strong><br>${escapeHtml(s.objectives)}</p>` : ""}
@@ -10837,22 +10855,20 @@ function renderSessionIntoDoc(doc, s, opts){
   fullBox("Notas", s.notes || "");
   y += 4;
 
-  // ---- EQUIPOS DEL ENTRENAMIENTO (grupos de trabajo y sus jugadores) ----
-  if(pdfGroups.length){
-    sectionBar("Equipos del entrenamiento");
-    pdfGroups.forEach(g=>{
-      const names = (g.playerIds||[]).map(pid=>players.find(p=>p.id===pid)).filter(Boolean).map(p=>playerLabel_(p, g.teamId));
-      const tn = !teamId && sessionTeams_(s).length>1 ? " ("+((teams.find(x=>x.id===g.teamId)||{}).name||"")+")" : "";
-      fullBox((g.name||"Equipo")+tn, names.length ? names.join(", ") : "(sin jugadores)");
-    });
-    y += 4;
-  }
-
   // ---- Tareas, agrupadas por bloque de sesión (Calentamiento / Parte principal / Vuelta a la calma) ----
   function renderTaskPDF(t, i){
     sectionBar("Detalles del ejercicio");
     labelValueRow("Título", `${i+1}. ${t.title || "(sin título)"}`);
-    if(pdfGroups.length) labelValueRow("Equipos", teamsLabelForTask(t.id));
+    if(pdfGroups.length){
+      // Equipos de esta tarea, cada uno con sus jugadores (varias sesiones-equipo: se indica de cuál).
+      const gs = taskGroupsFor_(s, t.id, teamId);
+      labelValueRow("Equipos", teamsLabelForTask(t.id));
+      gs.forEach(g=>{
+        const names = (g.playerIds||[]).map(pid=>players.find(p=>p.id===pid)).filter(Boolean).map(p=>playerLabel_(p, g.teamId));
+        const tn = !teamId && sessionTeams_(s).length>1 ? " ("+((teams.find(x=>x.id===g.teamId)||{}).name||"")+")" : "";
+        fullBox((g.name||"Equipo")+tn, names.length ? names.join(", ") : "(sin jugadores)");
+      });
+    }
     labelValueRow("Estrategia", "");
     fullBox("Objetivos", t.objectives || "");
     multiColHeader(["Categoría (edad)","Tiempo","Situación de Juego","Nº Jugadores"]);
