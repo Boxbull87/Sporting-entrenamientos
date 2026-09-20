@@ -10377,6 +10377,7 @@ function sessionCardHtml(s, contextTeamId){
     ${(canManage && sTeams.length>1 && contextTeamId) ? `<p class="muted" style="font-size:.72rem;margin:4px 0 0 0;">ℹ️ Esta sesión se comparte con más equipos: al editar o borrar aquí se creará una copia independiente solo para ${escapeHtml((teams.find(t=>t.id===contextTeamId)||{}).name || "este equipo")}, sin tocar a los demás.</p>` : ""}
     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
       <button class="btn ghost small" onclick="exportSessionPDF('${s.id}'${contextTeamId?`,'${contextTeamId}'`:''})">📄 Exportar a PDF</button>
+      <button class="btn ghost small" onclick="exportSessionSummaryPDF('${s.id}'${contextTeamId?`,'${contextTeamId}'`:''})" title="Solo la tabla resumen de tareas, en un PDF aparte">📋 Resumen (PDF)</button>
       ${s.surveyPublic ? `<button type="button" class="btn ghost small" onclick="copySurveyLink('${s.id}')">🔗 Copiar enlace de encuesta</button>` : ""}
       ${canAddObs ? `<button class="btn ghost small" onclick="openSessionObservations('${s.id}')">📝 Observaciones</button>` : ""}
       ${canAddObs ? `<button class="btn ghost small" onclick="openSessionAttendance('${s.id}'${contextTeamId?`,'${contextTeamId}'`:''})">🧍 Asistencia</button>` : ""}
@@ -10807,6 +10808,9 @@ function renderSessionIntoDoc(doc, s, opts){
     y += 6;
   }
 
+  // opts.soloResumen: PDF aparte con solo la tabla resumen (sin detalles, tareas ni ABP); se
+  // salta todo lo de aquí hasta "Página final" y esa tabla se pinta en la primera página.
+  if(!opts.soloResumen){
   // ---- DETALLES DE LA SESIÓN ----
   sectionBar("Detalles de la sesión");
   labelValueRow("Título", s.name || "");
@@ -10972,6 +10976,7 @@ function renderSessionIntoDoc(doc, s, opts){
       });
     }
   });
+  } // fin de !opts.soloResumen
 
   // ---- Página final: resumen de todas las tareas en una sola tabla compacta ----
   // Nombre + explicación (recortada con "…" si no cabe) + un dibujo pequeño de la pizarra si la
@@ -10981,8 +10986,14 @@ function renderSessionIntoDoc(doc, s, opts){
   // en vez de recortar contenido sin avisar — ensureSpace() ya se encarga de eso solo.
   function renderTaskSummaryPage(allTasks){
     if(!allTasks.length) return;
-    newPage();
+    if(!opts.soloResumen) newPage();
     sectionBar("Resumen de tareas");
+    if(opts.soloResumen){
+      // Sin el resto del PDF delante, la hoja se identifica sola: título y fecha de la sesión.
+      labelValueRow("Sesión", s.name || "");
+      if(s.date) labelValueRow("Fecha", s.date);
+      y += 3;
+    }
 
     const fullW = pageW-margin*2;
     // Con equipos (grupos) definidos, la tabla lleva una columna más: los jugadores que hacen cada tarea.
@@ -11050,6 +11061,20 @@ function renderSessionIntoDoc(doc, s, opts){
   }
   renderTaskSummaryPage(sessionTasksFlat_(s, teamId));
 }
+
+// PDF aparte con SOLO la tabla resumen de tareas (la misma que va de última página en el PDF
+// completo). teamId igual que en exportSessionPDF.
+window.exportSessionSummaryPDF = function(sessionId, teamId){
+  const s = sessions.find(x=>x.id===sessionId);
+  if(!s) return;
+  if(!window.jspdf){ alert("No se ha podido cargar el generador de PDF. Comprueba tu conexión e inténtalo de nuevo."); return; }
+  if(sessionTasksFlat_(s, teamId || null).length===0){ alert("Esta sesión no tiene tareas que resumir."); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({unit:"mm", format:"a4"});
+  renderSessionIntoDoc(doc, s, {newPageFirst:false, teamId: teamId || null, soloResumen:true});
+  const safeName = (s.name || "sesion").normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^\w\-]+/g,"_");
+  doc.save(`${safeName}_resumen.pdf`);
+};
 
 // teamId (opcional): el equipo bajo el que se pulsó "Exportar a PDF" — el PDF sale "de ese equipo"
 // (solo sus grupos y sus tareas), como su sesión independiente.
