@@ -112,6 +112,16 @@ All inside `index.html` — search for these comment banners to jump around:
   across a coach's own multiple teams becomes independent per team the moment it's edited or
   deleted from one of them (`forkSessionForTeams_`, used by `forkAndEditSession`, `editSession`,
   `deleteSession`). Export to PDF via jsPDF (`EXPORTAR SESIÓN A PDF` ~6825).
+  - **Grupos de trabajo ("equipos" dentro del entrenamiento)**: `s.groups` = `[{id,teamId,name,playerIds}]`
+    (cada grupo pertenece a UN equipo de la sesión; sus jugadores pueden ser de otras categorías,
+    añadidos por búsqueda) y `s.taskGroups` = `{taskId:[groupId]}` (sin asignar = la hacen todos).
+    Independiente por equipo: `sessionGroupsFor_`/`taskGroupsFor_`/`taskAppliesToTeam_` filtran por
+    el equipo bajo el que se ve/exporta la sesión (tarjeta y `exportSessionPDF(id, teamId)`), y el
+    desdoblado (`forkSessionForTeams_`) se lleva solo los grupos/tareas/asistencia de ese equipo.
+    Los invitados de otra categoría de un grupo salen convocados de entrada en la asistencia.
+  - **Asistencia** por sesión (`s.attendance`/`s.attendanceExtraPlayerIds`, mapas por id de equipo):
+    los entrenadores con sesión compartida la escriben, así que esas dos claves están en el
+    `hasOnly` de la regla de `sessions` (hay que pegar las reglas en la consola si cambian).
 - **Modelo de juego** (~7804): just external doc links (Drive/Dropbox/etc.), no file storage.
 - **ABP** (`ABP · BANCO DE JUGADAS` ~7243, `ABP · SESIONES` ~7471): set-piece plays bank +
   sessions built from them, with public share links (`#public=<id>`, no login required). An ABP
