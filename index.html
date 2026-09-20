@@ -10685,21 +10685,20 @@ function renderSessionIntoDoc(doc, s, opts){
   };
   // Para la página resumen: en vez del nombre de los equipos, los jugadores que hacen la tarea
   // (los de los equipos asignados, sin repetir, por dorsal). Sin equipos asignados = "Todos".
-  const playersLabelForTask = id => {
+  // Devuelve una línea por equipo asignado: "Equipo 1: Juan, Luis" (cada equipo por separado, no
+  // todos los nombres mezclados).
+  const playersLinesForTask = id => {
     const gs = taskGroupsFor_(s, id, teamId);
-    if(!gs.length) return "Todos";
-    const seen = new Set(), list = [];
-    gs.forEach(g=>(g.playerIds||[]).forEach(pid=>{
-      if(seen.has(pid)) return;
-      seen.add(pid);
-      const p = players.find(x=>x.id===pid);
-      if(p) list.push(p);
-    }));
-    list.sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
-    // Solo con el dorsal cuando dos jugadores de la lista se llaman igual (p.ej. uno de otra categoría).
-    const count = {};
-    list.forEach(p=>{ count[p.name||""] = (count[p.name||""]||0)+1; });
-    return list.length ? list.map(p=> (p.name||"") + ((count[p.name||""]>1 && p.dorsal!=null) ? " (#"+p.dorsal+")" : "")).join(", ") : "(sin jugadores)";
+    if(!gs.length) return ["Todos"];
+    return gs.map(g=>{
+      const list = (g.playerIds||[]).map(pid=>players.find(x=>x.id===pid)).filter(Boolean)
+        .sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
+      // Solo con el dorsal cuando dos jugadores del equipo se llaman igual (p.ej. uno de otra categoría).
+      const count = {};
+      list.forEach(p=>{ count[p.name||""] = (count[p.name||""]||0)+1; });
+      const names = list.map(p=> (p.name||"") + ((count[p.name||""]>1 && p.dorsal!=null) ? " (#"+p.dorsal+")" : "")).join(", ");
+      return (g.name||"Equipo") + ": " + (names || "(sin jugadores)");
+    });
   };
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
@@ -10988,7 +10987,7 @@ function renderSessionIntoDoc(doc, s, opts){
     const fullW = pageW-margin*2;
     // Con equipos (grupos) definidos, la tabla lleva una columna más: los jugadores que hacen cada tarea.
     const hasTeamsCol = pdfGroups.length>0;
-    const nameColW = 40, imgColW = 34, teamColW = hasTeamsCol ? 40 : 0;
+    const nameColW = 40, imgColW = 34, teamColW = hasTeamsCol ? 52 : 0;
     const obsColW = fullW-nameColW-teamColW-imgColW;
     const imgH = (imgColW-2)*(700/980);
 
@@ -11021,7 +11020,7 @@ function renderSessionIntoDoc(doc, s, opts){
         obsLines[maxLines-1] = doc.splitTextToSize(combined, obsColW-4)[0];
       }
       const nameLines = doc.splitTextToSize(`${i+1}. ${t.title||"(sin título)"}`, nameColW-4);
-      const teamLines = hasTeamsCol ? doc.splitTextToSize(playersLabelForTask(t.id), teamColW-4) : [];
+      const teamLines = hasTeamsCol ? playersLinesForTask(t.id).flatMap(l=>doc.splitTextToSize(l, teamColW-4)) : [];
       const frameList = (t.animation && t.animation.frames) || [];
       const hasImg = frameList.length>0;
       const rowH = Math.max(Math.max(nameLines.length,obsLines.length,teamLines.length)*lineH+3, hasImg?imgH+3:0, 8);
