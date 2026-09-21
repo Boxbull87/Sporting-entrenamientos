@@ -4170,7 +4170,51 @@ const COURT_IMG = new Image();
 COURT_IMG.src = COURT_DATA_URI;
 COURT_IMG.onload = () => { try { redrawBoard(); } catch(e){} };
 
+// Modo "blanco y negro para imprimir con poca tinta" (solo lo activa renderFrameToImage(frame, true)):
+// pista en blanco con las líneas en negro y todo lo demás (fichas, flechas, formas, textos) sin
+// colores ni rellenos fuertes. Con esto en false todo se dibuja exactamente como siempre.
+let drawBW = false;
+
+// Pista vacía sobre fondo blanco, con las medidas de la imagen de la pista (980x700): las fichas y
+// flechas se guardan en fracciones del lienzo, así que las líneas tienen que caer en el mismo sitio.
+function drawCourtBWOn(cx,cvs){
+  const w=cvs.width,h=cvs.height, k=w/980;
+  cx.save();
+  cx.setTransform(k,0,0,h/700,0,0);
+  cx.fillStyle="#fff"; cx.fillRect(0,0,980,700);
+  cx.strokeStyle="#000"; cx.fillStyle="#000"; cx.lineWidth=2.2; cx.lineJoin="round"; cx.lineCap="round";
+  const L=67, R=916, T=48, B=629, MX=(L+R)/2, MY=(T+B)/2;
+  cx.strokeRect(L,T,R-L,B-T);
+  cx.beginPath(); cx.moveTo(MX,T); cx.lineTo(MX,B); cx.stroke();
+  cx.beginPath(); cx.arc(MX,MY,99,0,Math.PI*2); cx.stroke();
+  cx.beginPath(); cx.arc(MX,MY,3.5,0,Math.PI*2); cx.fill();
+  // áreas: cuartos de elipse desde los postes + tramo recto
+  [[L,1],[R,-1]].forEach(([gx,d])=>{
+    const rx=130, ry=146, py1=MY-45, py2=MY+45;
+    cx.beginPath();
+    if(d===1) cx.ellipse(gx,py1,rx,ry,0,-Math.PI/2,0,false);
+    else cx.ellipse(gx,py1,rx,ry,0,Math.PI,Math.PI*1.5,false);
+    cx.stroke();
+    cx.beginPath();
+    if(d===1) cx.ellipse(gx,py2,rx,ry,0,0,Math.PI/2,false);
+    else cx.ellipse(gx,py2,rx,ry,0,Math.PI/2,Math.PI,false);
+    cx.stroke();
+    cx.beginPath(); cx.moveTo(gx+d*rx,py1); cx.lineTo(gx+d*rx,py2); cx.stroke();
+    // punto de penalti
+    cx.beginPath(); cx.arc(gx+d*195,MY,4,0,Math.PI*2); cx.stroke();
+    // portería
+    cx.strokeRect(d===1?gx-26:gx, MY-56, 26, 112);
+  });
+  // córners
+  cx.lineWidth=1.6;
+  [[L,T,0,Math.PI/2],[R,T,Math.PI/2,Math.PI],[R,B,Math.PI,Math.PI*1.5],[L,B,Math.PI*1.5,Math.PI*2]].forEach(([x,y,a0,a1])=>{
+    cx.beginPath(); cx.arc(x,y,15,a0,a1); cx.stroke();
+  });
+  cx.restore();
+}
+
 function drawCourtOn(cx,cvs){
+  if(drawBW){ drawCourtBWOn(cx,cvs); return; }
   const w=cvs.width,h=cvs.height;
   cx.clearRect(0,0,w,h);
   if(COURT_IMG.complete && COURT_IMG.naturalWidth>0){
@@ -4190,24 +4234,33 @@ function drawGoalOn(cx, x, y, dir, scl){
   cx.save();
   cx.translate(x,y);
   cx.rotate(angle);
-  cx.fillStyle = "rgba(255,255,255,0.18)";
+  cx.fillStyle = drawBW ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.18)";
   cx.fillRect(-hw, -dep, hw*2, dep);
-  cx.strokeStyle = "rgba(255,255,255,0.55)"; cx.lineWidth = 1;
+  cx.strokeStyle = drawBW ? "rgba(0,0,0,0.4)" : "rgba(255,255,255,0.55)"; cx.lineWidth = 1;
   for(let i=-hw+6;i<hw;i+=8){ cx.beginPath(); cx.moveTo(i,-dep); cx.lineTo(i,0); cx.stroke(); }
   for(let j=-dep+6;j<0;j+=6){ cx.beginPath(); cx.moveTo(-hw,j); cx.lineTo(hw,j); cx.stroke(); }
-  cx.strokeStyle = "#fff"; cx.lineWidth = 3;
+  cx.strokeStyle = drawBW ? "#000" : "#fff"; cx.lineWidth = 3;
   cx.beginPath();
   cx.moveTo(-hw, 0);
   cx.lineTo(-hw, -dep);
   cx.lineTo(hw, -dep);
   cx.lineTo(hw, 0);
   cx.stroke();
-  cx.setLineDash([4,3]); cx.strokeStyle = "#fff176"; cx.lineWidth = 2;
+  cx.setLineDash([4,3]); cx.strokeStyle = drawBW ? "#666" : "#fff176"; cx.lineWidth = 2;
   cx.beginPath(); cx.moveTo(-hw,0); cx.lineTo(hw,0); cx.stroke();
   cx.setLineDash([]);
   cx.restore();
 }
 function tokenColor(type){
+  if(drawBW){
+    // Cada equipo un tono de gris distinto (de menos a más tinta) para poder distinguirlos impresos.
+    if(type==="A"||type==="GA") return "#ffffff";
+    if(type==="B"||type==="GB") return "#d2d2d2";
+    if(type==="C"||type==="GC") return "#999999";
+    if(type==="D"||type==="GD") return "#5e5e5e";
+    if(type==="ball") return "#ffffff";
+    return "#ffffff";
+  }
   if(type==="A"||type==="GA") return "#2f80ed"; // azul
   if(type==="B"||type==="GB") return "#eb5757"; // rojo
   if(type==="C"||type==="GC") return "#27ae60"; // verde
@@ -4216,6 +4269,11 @@ function tokenColor(type){
   return "#ccc";
 }
 function darkLabel(type){ return type==="D" || type==="GD"; }
+// Color del número/letra de una ficha: en blanco y negro, oscuro salvo sobre el gris más oscuro.
+function tokenLabelColor(type){
+  if(drawBW) return (type==="D"||type==="GD") ? "#fff" : "#000";
+  return darkLabel(type) ? "#3a2f00" : "#fff";
+}
 
 function drawTokensOn(cx,cvs,list){
   (list||[]).forEach(t=>{
@@ -4228,9 +4286,9 @@ function drawTokensOn(cx,cvs,list){
       cx.lineTo(x-s, y+s*0.8);
       cx.lineTo(x+s, y+s*0.8);
       cx.closePath();
-      cx.fillStyle = "#ff7a30";
+      cx.fillStyle = drawBW ? "#e6e6e6" : "#ff7a30";
       cx.fill();
-      cx.lineWidth = 1.5; cx.strokeStyle = "#fff"; cx.stroke();
+      cx.lineWidth = 1.5; cx.strokeStyle = drawBW ? "#000" : "#fff"; cx.stroke();
       return;
     }
     if(t.type==="goal"){
@@ -4241,7 +4299,9 @@ function drawTokensOn(cx,cvs,list){
       const r = tokenRadius(t.type)*scl;
       cx.font = Math.round(r*1.8)+"px sans-serif";
       cx.textAlign = "center"; cx.textBaseline = "middle";
+      if(drawBW){ cx.save(); cx.filter = "grayscale(1)"; }
       cx.fillText(t.type==="weight" ? "🏋️" : "🏃", x, y);
+      if(drawBW) cx.restore();
       return;
     }
     if(t.type==="ball"){
@@ -4264,9 +4324,9 @@ function drawTokensOn(cx,cvs,list){
     const isGK = (t.type==="GA"||t.type==="GB"||t.type==="GC"||t.type==="GD");
     cx.beginPath(); cx.arc(x,y, r, 0, Math.PI*2);
     cx.fillStyle = tokenColor(t.type);
-    cx.fill(); cx.lineWidth=2; cx.strokeStyle="#fff"; cx.stroke();
+    cx.fill(); cx.lineWidth=2; cx.strokeStyle=drawBW?"#000":"#fff"; cx.stroke();
     cx.font = "bold "+Math.round(15*scl)+"px sans-serif"; cx.textAlign="center"; cx.textBaseline="middle";
-    cx.fillStyle = darkLabel(t.type) ? "#3a2f00" : "#fff";
+    cx.fillStyle = tokenLabelColor(t.type);
     cx.fillText(isGK ? "P" : t.num, x, y);
   });
 }
@@ -4275,7 +4335,7 @@ function drawArrowsOn(cx,cvs,list,alphaFn){
     cx.globalAlpha = alphaFn ? alphaFn(a) : 1;
     const x1=a.x1*cvs.width, y1=a.y1*cvs.height, x2=a.x2*cvs.width, y2=a.y2*cvs.height;
     const w = a.width || 2.5;
-    cx.strokeStyle = "#fff176"; cx.lineWidth = w;
+    cx.strokeStyle = drawBW ? "#000" : "#fff176"; cx.lineWidth = w;
     if(a.dashed){
       cx.setLineDash([Math.max(4, w*2.2), Math.max(4, w*1.8)]);
       cx.lineCap = "round";
@@ -4291,7 +4351,7 @@ function drawArrowsOn(cx,cvs,list,alphaFn){
       cx.lineTo(x2-headLen*Math.cos(angle-Math.PI/6), y2-headLen*Math.sin(angle-Math.PI/6));
       cx.lineTo(x2-headLen*Math.cos(angle+Math.PI/6), y2-headLen*Math.sin(angle+Math.PI/6));
       cx.closePath();
-      cx.fillStyle = "#fff176";
+      cx.fillStyle = drawBW ? "#000" : "#fff176";
       cx.fill();
     }
     cx.globalAlpha = 1;
@@ -4303,8 +4363,8 @@ function drawTextsOn(cx,cvs,list,alphaFn){
     const x=t.x*cvs.width, y=t.y*cvs.height;
     cx.font = "bold "+Math.round(16*(t.scale||1))+"px sans-serif";
     cx.textAlign = "left"; cx.textBaseline = "alphabetic";
-    cx.lineWidth = 3; cx.strokeStyle = "#000"; cx.strokeText(t.text, x, y);
-    cx.fillStyle = "#fff"; cx.fillText(t.text, x, y);
+    cx.lineWidth = 3; cx.strokeStyle = drawBW ? "#fff" : "#000"; cx.strokeText(t.text, x, y);
+    cx.fillStyle = drawBW ? "#000" : "#fff"; cx.fillText(t.text, x, y);
     cx.globalAlpha = 1;
   });
 }
@@ -4317,8 +4377,8 @@ function drawShapesOn(cx,cvs,list,alphaFn){
     cx.beginPath();
     if(s.kind==="rect") cx.rect(x-rx,y-ry,rx*2,ry*2);
     else cx.ellipse(x,y,rx,ry,0,0,Math.PI*2);
-    if(s.filled){ cx.fillStyle = "rgba(255,241,118,.35)"; cx.fill(); }
-    cx.strokeStyle = "#fff176"; cx.lineWidth = 3; cx.setLineDash([]);
+    if(s.filled){ cx.fillStyle = drawBW ? "rgba(0,0,0,.08)" : "rgba(255,241,118,.35)"; cx.fill(); }
+    cx.strokeStyle = drawBW ? "#000" : "#fff176"; cx.lineWidth = 3; cx.setLineDash([]);
     cx.stroke();
     cx.globalAlpha = 1;
   });
@@ -4330,7 +4390,7 @@ function drawPathsOn(cx,cvs,list,alphaFn){
     cx.beginPath();
     cx.moveTo(p.points[0].x*cvs.width, p.points[0].y*cvs.height);
     for(let i=1;i<p.points.length;i++) cx.lineTo(p.points[i].x*cvs.width, p.points[i].y*cvs.height);
-    cx.strokeStyle = "#ffffff"; cx.lineWidth = 3; cx.lineCap="round"; cx.lineJoin="round"; cx.stroke();
+    cx.strokeStyle = drawBW ? "#000" : "#ffffff"; cx.lineWidth = 3; cx.lineCap="round"; cx.lineJoin="round"; cx.stroke();
     cx.globalAlpha = 1;
   });
 }
@@ -10687,16 +10747,20 @@ function sessionTasksFlat_(s, teamId){
   }
   return list;
 }
-function renderFrameToImage(frame){
+// bw = true: pista en blanco y todo en blanco y negro (para imprimir gastando poca tinta).
+function renderFrameToImage(frame, bw){
   const off = document.createElement("canvas");
   off.width = 980; off.height = 700;
   const ox = off.getContext("2d");
-  drawCourtOn(ox, off);
-  drawShapesOn(ox, off, frameShapes(frame));
-  drawPathsOn(ox, off, framePaths(frame));
-  drawArrowsOn(ox, off, frameArrows(frame));
-  drawTokensOn(ox, off, frameTokens(frame));
-  drawTextsOn(ox, off, frameTexts(frame));
+  drawBW = !!bw;
+  try{
+    drawCourtOn(ox, off);
+    drawShapesOn(ox, off, frameShapes(frame));
+    drawPathsOn(ox, off, framePaths(frame));
+    drawArrowsOn(ox, off, frameArrows(frame));
+    drawTokensOn(ox, off, frameTokens(frame));
+    drawTextsOn(ox, off, frameTexts(frame));
+  } finally { drawBW = false; }
   return off.toDataURL("image/png");
 }
 
@@ -10736,13 +10800,25 @@ function renderSessionIntoDoc(doc, s, opts){
   const pageH = doc.internal.pageSize.getHeight();
   const margin = 12;
   const headerH = 20;
+  // opts.bw: versión en blanco y negro para imprimir con poca tinta (sin rellenos de color ni gris,
+  // solo líneas y texto negros; los dibujos de las tareas van sobre pista blanca).
+  const BW = !!opts.bw;
   const RED = [216,30,44];
-  const LABEL_BG = [236,236,236];
-  const BORDER = [50,50,50];
-  const TEXT = [20,20,20];
+  const LABEL_BG = BW ? [255,255,255] : [236,236,236];
+  const BORDER = BW ? [0,0,0] : [50,50,50];
+  const TEXT = BW ? [0,0,0] : [20,20,20];
   let y = headerH + 8;
 
   function drawBanner(){
+    if(BW){
+      doc.setFont("helvetica","bold"); doc.setFontSize(14);
+      doc.setTextColor(0,0,0);
+      doc.text("ENTREGA SESIÓN", margin, headerH/2+1.6);
+      doc.setDrawColor(0,0,0); doc.setLineWidth(0.5);
+      doc.line(margin, headerH-2, pageW-margin, headerH-2);
+      doc.setFont("helvetica","normal"); doc.setFontSize(9.5);
+      return;
+    }
     doc.setFillColor(RED[0],RED[1],RED[2]);
     doc.rect(0,0,pageW,headerH,'F');
     const cy = headerH/2, r = 7, cx = margin + r;
@@ -10774,10 +10850,15 @@ function renderSessionIntoDoc(doc, s, opts){
 
   function sectionBar(text){
     ensureSpace(9);
-    doc.setFillColor(RED[0],RED[1],RED[2]);
-    doc.rect(margin, y, pageW-margin*2, 7, 'F');
+    if(BW){
+      doc.setDrawColor(0,0,0); doc.setLineWidth(0.5);
+      doc.rect(margin, y, pageW-margin*2, 7);
+    } else {
+      doc.setFillColor(RED[0],RED[1],RED[2]);
+      doc.rect(margin, y, pageW-margin*2, 7, 'F');
+    }
     doc.setFont("helvetica","bold"); doc.setFontSize(9.5);
-    doc.setTextColor(255,255,255);
+    if(BW) doc.setTextColor(0,0,0); else doc.setTextColor(255,255,255);
     doc.text(text.toUpperCase(), margin+3, y+5);
     y += 7;
   }
@@ -11080,7 +11161,7 @@ function renderSessionIntoDoc(doc, s, opts){
 
       if(hasImg){
         try{
-          const imgData = renderFrameToImage(frameList[0]);
+          const imgData = renderFrameToImage(frameList[0], BW);
           const iw = imgColW-2;
           doc.addImage(imgData, "PNG", margin+nameColW+teamColW+obsColW+1, y+(rowH-imgH)/2, iw, imgH);
         }catch(e){ /* si falla el dibujo de esta tarea en concreto, se deja su celda en blanco */ }
@@ -11099,8 +11180,11 @@ window.exportSessionSummaryPDF = function(sessionId, teamId){
   if(!window.jspdf){ alert("No se ha podido cargar el generador de PDF. Comprueba tu conexión e inténtalo de nuevo."); return; }
   if(sessionTasksFlat_(s, teamId || null).length===0){ alert("Esta sesión no tiene tareas que resumir."); return; }
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({unit:"mm", format:"a4"});
+  // compress: los dibujos son PNG grandes y sin esto jsPDF los mete sin comprimir (varios MB).
+  const doc = new jsPDF({unit:"mm", format:"a4", compress:true});
   renderSessionIntoDoc(doc, s, {newPageFirst:false, teamId: teamId || null, soloResumen:true});
+  // Hoja aparte con lo mismo en blanco y negro (pista blanca) para imprimir gastando poca tinta.
+  renderSessionIntoDoc(doc, s, {newPageFirst:true, teamId: teamId || null, soloResumen:true, bw:true});
   const safeName = (s.name || "sesion").normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^\w\-]+/g,"_");
   doc.save(`${safeName}_resumen.pdf`);
 };
