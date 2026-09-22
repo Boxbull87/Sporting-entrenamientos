@@ -6084,7 +6084,7 @@ document.getElementById("btnCloseMiEquipoCalDay").onclick = () => {
 };
 window.viewMiEquipoCalSession_ = (id) => {
   document.getElementById("miEquipoCalDayModal").classList.add("hidden");
-  viewLinkedSession(id);
+  viewLinkedSession(id, selectedTeamId);
 };
 window.viewMiEquipoCalMatchday_ = (id) => {
   document.getElementById("miEquipoCalDayModal").classList.add("hidden");
@@ -9532,7 +9532,7 @@ function renderMatchdaySummary_(wrap){
     ${linkedSessions.length ? `
       <h3 style="font-size:.9rem;">🔗 Sesiones de entrenamiento de esa semana</h3>
       <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
-        ${linkedSessions.map(s=>`<button type="button" class="btn ghost small" onclick="viewLinkedSession('${s.id}')">📋 ${escapeHtml(s.date||"")} — ${escapeHtml(s.name||"(sin título)")}</button>`).join("")}
+        ${linkedSessions.map(s=>`<button type="button" class="btn ghost small" onclick="viewLinkedSession('${s.id}','${m.teamId}')">📋 ${escapeHtml(s.date||"")} — ${escapeHtml(s.name||"(sin título)")}</button>`).join("")}
       </div>` : ""}
     <div style="overflow-x:auto;">
     <table style="width:100%;border-collapse:collapse;font-size:.85rem;min-width:480px;">
@@ -10310,10 +10310,13 @@ function populateSessionEditor(id, s){
   document.getElementById("sessionEditorPanel").scrollIntoView({behavior:"smooth"});
 }
 
-window.viewLinkedSession = (id) => {
+// contextTeamId (opcional): el equipo bajo el que se está viendo la sesión (calendario de "Mi
+// equipo", resumen de una jornada...). Sin él, la tarjeta sale "sin equipo" y sus botones (p.ej.
+// "🧍 Asistencia") no saben de qué equipo son los jugadores y salen sin nadie que marcar.
+window.viewLinkedSession = (id, contextTeamId) => {
   const s = sessions.find(x=>x.id===id);
   if(!s){ alert("Esta sesión ya no existe (puede que se haya borrado)."); return; }
-  document.getElementById("viewSessionContent").innerHTML = sessionCardHtml(s);
+  document.getElementById("viewSessionContent").innerHTML = sessionCardHtml(s, contextTeamId || null);
   document.getElementById("viewSessionModal").classList.remove("hidden");
 };
 document.getElementById("btnCloseViewSessionModal").onclick = () => {
