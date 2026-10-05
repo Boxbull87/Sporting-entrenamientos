@@ -6938,7 +6938,7 @@ function renderMatchdaysList(){
         <td style="padding:6px;">${escapeHtml(m.date||"-")}</td>
         <td style="padding:6px;">${escapeHtml(m.rival||"-")}${m.homeAway?` (${m.homeAway==="Local"?"L":"V"})`:""}${m.videoUrl?" 🎥":""}</td>
         <td style="padding:6px;">${escapeHtml(m.competition||"-")}</td>
-        <td style="padding:6px;">${m.goalsFor!=null && m.goalsAgainst!=null ? (m.goalsFor+"-"+m.goalsAgainst) : "-"}</td>
+        <td style="padding:6px;">${m.goalsFor!=null && m.goalsAgainst!=null ? matchScoreText_(m) : "-"}</td>
         <td style="padding:6px;text-align:right;white-space:nowrap;">
           <button type="button" class="btn ghost small" onclick="event.stopPropagation(); editMatchdayInfo('${m.id}')">✏️</button>
           <button type="button" class="btn danger small" onclick="event.stopPropagation(); quickDeleteMatchday('${m.id}')">🗑️</button>
@@ -7923,7 +7923,7 @@ function renderMatchdayStatsTable(){
   const wrap = document.getElementById("matchdayStatsTable");
   if(!m){ wrap.innerHTML = ""; document.getElementById("matchdayVideoWrap").innerHTML = ""; return; }
   document.getElementById("matchdayStatsTitle").textContent =
-    `Jornada ${m.number} — vs ${m.rival||"?"} (${m.goalsFor!=null?m.goalsFor:"-"}-${m.goalsAgainst!=null?m.goalsAgainst:"-"})`;
+    `Jornada ${m.number} — vs ${m.rival||"?"} (${matchScoreText_(m)})`;
   document.getElementById("matchdayVideoWrap").innerHTML = m.videoUrl ? videoEmbedHtml(m.videoUrl) : "";
   const roster = players.filter(p=>p.teamId===m.teamId).sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
   if(roster.length===0){ wrap.innerHTML = '<p class="muted">Este equipo todavía no tiene jugadores en la plantilla.</p>'; return; }
@@ -8241,7 +8241,7 @@ function matchdayTimelineListHtml_(m, editable){
     return `
     <div style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;margin-bottom:6px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-        <span style="font-size:.85rem;">${ev.direction==="for"?"⚽":"🥅"} <strong>${minuteLabel}</strong> — marcador ${goalsFor}-${goalsAgainst}${scorer?` · Marca: ${escapeHtml(scorer.name)}`:""}</span>
+        <span style="font-size:.85rem;">${ev.direction==="for"?"⚽":"🥅"} <strong>${minuteLabel}</strong> — marcador ${matchScoreText_(m, goalsFor, goalsAgainst)}${scorer?` · Marca: ${escapeHtml(scorer.name)}`:""}</span>
         ${editable ? `<button type="button" onclick="removeTimelineEvent_('${ev.id}')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:1em;line-height:1;padding:0;flex:0 0 auto;">✕</button>` : ""}
       </div>
       ${onField.length ? `<div style="margin-top:4px;">${onField.map(p=>goalPlayerChip_(p, p.id===ev.scorer)).join("")}</div>` : '<p class="muted" style="margin:4px 0 0;font-size:.75rem;">Sin jugadores marcados.</p>'}
@@ -8497,6 +8497,13 @@ const MATCH_DIFFICULTY_LEVELS = [
   {id:"rojo",     label:"Difícil",   bg:"#eb5757", fg:"#ffffff", border:"#eb5757"},
   {id:"negro",    label:"Muy difícil", bg:"#1a1a1a", fg:"#ffffff", border:"#1a1a1a"}
 ];
+// Marcador en el orden en que se escribe un resultado: LOCAL primero, VISITANTE después. goalsFor/
+// goalsAgainst son siempre "de mi equipo"/"del rival", así que si jugamos de visitante se invierten.
+function matchScoreText_(m, forVal, againstVal){
+  const f = forVal!==undefined ? forVal : m.goalsFor, a = againstVal!==undefined ? againstVal : m.goalsAgainst;
+  const fTxt = f!=null ? f : "-", aTxt = a!=null ? a : "-";
+  return m.homeAway==="Visitante" ? aTxt+"-"+fTxt : fTxt+"-"+aTxt;
+}
 function matchDifficultyInfo_(id){ return MATCH_DIFFICULTY_LEVELS.find(d=>d.id===id) || null; }
 let selectedMatchDifficulty = null;
 function renderMatchdayDifficultyPicker(){
@@ -9513,7 +9520,7 @@ function renderMatchdaySummary_(wrap){
       <div class="badge outline" style="padding:8px 12px;">🗓️ Jornada ${m.number}${m.date?` · ${escapeHtml(m.date)}`:""}</div>
       <div class="badge outline" style="padding:8px 12px;">🆚 ${escapeHtml(m.rival||"?")} (${m.homeAway||"-"})</div>
       <div class="badge outline" style="padding:8px 12px;">🏆 ${escapeHtml(m.competition||"-")}</div>
-      <div class="badge outline" style="padding:8px 12px;">${m.goalsFor!=null&&m.goalsAgainst!=null ? `⚽ ${m.goalsFor}-${m.goalsAgainst}` : "Sin resultado"}</div>
+      <div class="badge outline" style="padding:8px 12px;">${m.goalsFor!=null&&m.goalsAgainst!=null ? `⚽ ${matchScoreText_(m)}` : "Sin resultado"}</div>
       ${diff ? `<div class="badge outline" title="${diff.label}" style="padding:8px 10px;display:flex;align-items:center;gap:0;"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:${diff.bg};border:1px solid ${diff.border};"></span></div>` : ""}
     </div>
     <button type="button" class="btn ghost small" onclick="goToMatchdayReport('${m.id}')" style="margin-bottom:12px;">📋 Ir al informe del partido</button>
