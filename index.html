@@ -1825,6 +1825,11 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
                   <button type="button" class="btn small ghost" id="btnMarkAllUncalled">🚫 Marcar todos No convocado</button>
                 </div>
                 <div id="matchdayStatsTable" style="overflow-x:auto;"></div>
+                <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px;">
+                  <label style="font-size:.8rem;font-weight:600;">¿Se ha convocado a algún jugador de otra categoría a este partido?</label>
+                  <input type="text" id="mdAddPlayerSearch" placeholder="🔍 Escribe el nombre del jugador..." style="margin-top:6px;">
+                  <div id="mdAddPlayerResults" style="max-height:160px;overflow-y:auto;"></div>
+                </div>
                 <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
                   <button class="btn accent" id="btnSaveMatchdayStats">💾 Guardar convocatoria</button>
                   <button class="btn ghost" id="btnExportConvocatoriaPDF">🖨️ Exportar informe del partido (PDF)</button>
@@ -7026,6 +7031,11 @@ document.getElementById("btnSaveMatchday").onclick = async () => {
 
 window.openMatchdayStats = (id) => {
   statsMatchdayId = id;
+  // Copia de trabajo de los invitados de otras categorías (ver matchdayRoster_): se parte de
+  // lo que ya haya guardado en la jornada y se descarta el buscador de la anterior.
+  matchdayExtraIdsEditing = matchdayExtraIds_(matchdays.find(x=>x.id===id));
+  const mdAddSearch = document.getElementById("mdAddPlayerSearch");
+  if(mdAddSearch) mdAddSearch.value = "";
   // Las notas privadas se releen enteras al abrir la jornada: así se ve lo último que haya
   // guardado otro dispositivo, y es el punto natural para reintentar si una lectura anterior
   // falló (ver cargarNotasPrivadas_, que cachea vacío ante un error para no entrar en bucle).
@@ -7918,6 +7928,85 @@ async function renderMatchdayScouting_(){
   document.getElementById("btnRefreshScouting").onclick = renderMatchdayScouting_;
   renderScoutingEnContenedor_("matchdayScoutingInner", () => cargarScoutingDeJornada_(m.id));
 }
+/* ---------- Convocatoria de la jornada: jugadores de OTRAS categorías ----------
+   Igual que en "Control de asistencia" (ver attendanceExtraPlayerIds, más abajo), una jornada
+   puede convocar puntualmente a jugadores de otros equipos del club (p.ej. un juvenil que sube
+   con el sénior). Se guardan en el campo "extraPlayerIds" de la jornada (array de ids) y
+   matchdayRoster_() es el ÚNICO punto que mezcla la plantilla del equipo con esos invitados:
+   la convocatoria/estadísticas, la cronología del partido, el informe con notas y puntuaciones,
+   los marcadores de éxito, el PDF del partido, el Resumen de temporada y la ficha individual
+   del jugador usan todos esa misma lista, así que un invitado sale en todos ellos.
+   Un jugador deja de contar como invitado (y no lleva marca) en cuanto su "teamId" es el del
+   equipo de la jornada. */
+function matchdayExtraIds_(m){
+  return (m && Array.isArray(m.extraPlayerIds)) ? m.extraPlayerIds : [];
+}
+function matchdayIsGuest_(m, p){
+  return !!p && !!m && p.teamId !== m.teamId;
+}
+function matchdayGuestBadgeHtml_(m, p){
+  if(!matchdayIsGuest_(m, p)) return "";
+  const t = teams.find(x=>x.id===p.teamId);
+  return ` <span class="badge outline" style="font-size:.68rem;">${escapeHtml(t?t.name:"otra categoría")}</span>`;
+}
+// Plantilla del equipo de la jornada + invitados de otras categorías, ordenados por dorsal.
+function matchdayRoster_(m){
+  if(!m) return [];
+  const base = players.filter(p=>p.teamId===m.teamId);
+  const baseIds = new Set(base.map(p=>p.id));
+  const extras = matchdayExtraIds_(m)
+    .map(id=>players.find(p=>p.id===id))
+    .filter(p=>p && !baseIds.has(p.id));
+  return base.concat(extras).sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
+}
+function matchdayRosterIds_(m){
+  return new Set(matchdayRoster_(m).map(p=>p.id));
+}
+// Copia de trabajo de los invitados mientras se edita la convocatoria: no se guarda en
+// Firestore hasta pulsar "💾 Guardar convocatoria" (mismo patrón que la asistencia de sesión).
+let matchdayExtraIdsEditing = [];
+function matchdayExtraPlayersEditing_(){
+  const m = matchdays.find(x=>x.id===statsMatchdayId);
+  return matchdayExtraIdsEditing
+    .map(id=>players.find(p=>p.id===id))
+    .filter(p=>p && (!m || p.teamId!==m.teamId))
+    .sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
+}
+// Buscador de "convocar jugador de otra categoría": mismo método que el de Control de
+// asistencia (renderAttendanceAddResults_) — se busca por nombre y cada resultado muestra su
+// equipo, para poder distinguir a jugadores que compartan nombre.
+function renderMatchdayAddResults_(){
+  const wrap = document.getElementById("mdAddPlayerResults");
+  if(!wrap) return;
+  const m = matchdays.find(x=>x.id===statsMatchdayId);
+  const input = document.getElementById("mdAddPlayerSearch");
+  const query = ((input && input.value) || "").trim().toLowerCase();
+  if(!m || !query){ wrap.innerHTML = ""; return; }
+  const excluded = new Set([...players.filter(p=>p.teamId===m.teamId), ...matchdayExtraPlayersEditing_()].map(p=>p.id));
+  const matches = players
+    .filter(p=> !excluded.has(p.id) && p.teamId!==m.teamId && p.name.toLowerCase().includes(query))
+    .sort((a,b)=> a.name.localeCompare(b.name,'es'))
+    .slice(0,15);
+  if(matches.length===0){ wrap.innerHTML = '<p class="muted" style="font-size:.8rem;margin:4px 0;">Sin resultados.</p>'; return; }
+  wrap.innerHTML = matches.map(p=>{
+    const t = teams.find(x=>x.id===p.teamId);
+    return `
+    <button type="button" class="btn ghost small" style="display:flex;justify-content:space-between;align-items:center;width:100%;margin-top:4px;text-align:left;" onclick="agregarMatchdayGuestDesdeBusqueda_('${p.id}')">
+      <span>${escapeHtml(p.name)}${p.dorsal!=null?` <span class="muted">(${escapeHtml(String(p.dorsal))})</span>`:""}</span>
+      <span class="badge outline" style="font-size:.68rem;flex:0 0 auto;">${escapeHtml(t?t.name:"?")}</span>
+    </button>`;
+  }).join("");
+}
+window.agregarMatchdayGuestDesdeBusqueda_ = (playerId) => {
+  if(!matchdayExtraIdsEditing.includes(playerId)) matchdayExtraIdsEditing.push(playerId);
+  const input = document.getElementById("mdAddPlayerSearch");
+  if(input) input.value = "";
+  renderMatchdayStatsTable();
+};
+window.quitarMatchdayGuest_ = (playerId) => {
+  matchdayExtraIdsEditing = matchdayExtraIdsEditing.filter(id=>id!==playerId);
+  renderMatchdayStatsTable();
+};
 function renderMatchdayStatsTable(){
   const m = matchdays.find(x=>x.id===statsMatchdayId);
   const wrap = document.getElementById("matchdayStatsTable");
@@ -7926,37 +8015,48 @@ function renderMatchdayStatsTable(){
     `Jornada ${m.number} — vs ${m.rival||"?"} (${matchScoreText_(m)})`;
   document.getElementById("matchdayVideoWrap").innerHTML = m.videoUrl ? videoEmbedHtml(m.videoUrl) : "";
   const roster = players.filter(p=>p.teamId===m.teamId).sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
-  if(roster.length===0){ wrap.innerHTML = '<p class="muted">Este equipo todavía no tiene jugadores en la plantilla.</p>'; return; }
+  const guests = matchdayExtraPlayersEditing_();
+  if(roster.length===0 && guests.length===0){
+    wrap.innerHTML = '<p class="muted">Este equipo todavía no tiene jugadores en la plantilla. Puedes convocar a alguien de otra categoría más abajo.</p>';
+    renderMatchdayAddResults_();
+    return;
+  }
   const statsMap = {};
   (m.playerStats||[]).forEach(s=>{ statsMap[s.playerId] = s; });
   wrap.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:.85rem;min-width:520px;">
     <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
-      <th style="padding:4px;">Jugador</th><th style="padding:4px;">Estado</th><th style="padding:4px;">Motivo</th><th style="padding:4px;">Goles / Encajados</th><th style="padding:4px;">🟨</th><th style="padding:4px;">🟥</th>
+      <th style="padding:4px;">Jugador</th><th style="padding:4px;">Estado</th><th style="padding:4px;">Motivo</th><th style="padding:4px;">Goles / Encajados</th><th style="padding:4px;">🟨</th><th style="padding:4px;">🟥</th><th style="padding:4px;"></th>
     </tr></thead>
     <tbody>
-    ${roster.map(p=>{
-      const s = statsMap[p.id] || {};
-      const isGk = p.position === "Portero";
-      const goalsShown = isGk ? s.goalsConceded : s.goals;
-      return `
-      <tr data-player-id="${p.id}" data-is-gk="${isGk?"1":"0"}" style="border-bottom:1px solid var(--border);">
-        <td style="padding:4px;">${jerseyNameHtml_(p.position, (p.dorsal!=null?escapeHtml(String(p.dorsal))+". ":"")+escapeHtml(p.name))}</td>
-        <td style="padding:4px;">
-          <select class="md-status">
-            <option value="Titular" ${s.status==="Titular"?"selected":""}>Titular</option>
-            <option value="Suplente" ${s.status==="Suplente"?"selected":""}>Suplente</option>
-            <option value="No convocado" ${(!s.status||s.status==="No convocado")?"selected":""}>No convocado</option>
-          </select>
-        </td>
-        <td style="padding:4px;"><input type="text" class="md-reason" value="${escapeHtml(s.reason||"")}" placeholder="Motivo" style="width:110px;"></td>
-        <td style="padding:4px;"><input type="number" min="0" class="md-goals" value="${goalsShown!=null?goalsShown:""}" style="width:60px;"></td>
-        <td style="padding:4px;"><input type="number" min="0" max="2" class="md-yellow" value="${s.yellow!=null?s.yellow:""}" style="width:48px;"></td>
-        <td style="padding:4px;"><input type="number" min="0" max="1" class="md-red" value="${s.red!=null?s.red:""}" style="width:48px;"></td>
-      </tr>`;
-    }).join("")}
+    ${roster.map(p=>matchdayStatsRowHtml_(p, statsMap[p.id]||{}, false)).join("")}
+    ${guests.length ? `
+      <tr><td colspan="7" style="padding:8px 4px 2px;font-size:.8rem;font-weight:600;color:var(--accent);">Convocados de otras categorías</td></tr>
+      ${guests.map(p=>matchdayStatsRowHtml_(p, statsMap[p.id]||{}, true)).join("")}` : ""}
     </tbody>
   </table>`;
+  renderMatchdayAddResults_();
 }
+function matchdayStatsRowHtml_(p, s, isGuest){
+  const isGk = p.position === "Portero";
+  const goalsShown = isGk ? s.goalsConceded : s.goals;
+  return `
+  <tr data-player-id="${p.id}" data-is-gk="${isGk?"1":"0"}" data-guest="${isGuest?"1":"0"}" style="border-bottom:1px solid var(--border);">
+    <td style="padding:4px;">${jerseyNameHtml_(p.position, (p.dorsal!=null?escapeHtml(String(p.dorsal))+". ":"")+escapeHtml(p.name))}${isGuest?` <span class="badge outline" style="font-size:.68rem;">${escapeHtml((teams.find(t=>t.id===p.teamId)||{}).name||"otra categoría")}</span>`:""}</td>
+    <td style="padding:4px;">
+      <select class="md-status">
+        <option value="Titular" ${s.status==="Titular"?"selected":""}>Titular</option>
+        <option value="Suplente" ${s.status==="Suplente"?"selected":""}>Suplente</option>
+        <option value="No convocado" ${(!s.status||s.status==="No convocado")?"selected":""}>No convocado</option>
+      </select>
+    </td>
+    <td style="padding:4px;"><input type="text" class="md-reason" value="${escapeHtml(s.reason||"")}" placeholder="Motivo" style="width:110px;"></td>
+    <td style="padding:4px;"><input type="number" min="0" class="md-goals" value="${goalsShown!=null?goalsShown:""}" style="width:60px;"></td>
+    <td style="padding:4px;"><input type="number" min="0" max="2" class="md-yellow" value="${s.yellow!=null?s.yellow:""}" style="width:48px;"></td>
+    <td style="padding:4px;"><input type="number" min="0" max="1" class="md-red" value="${s.red!=null?s.red:""}" style="width:48px;"></td>
+    <td style="padding:4px;">${isGuest?`<button type="button" class="btn danger small" onclick="quitarMatchdayGuest_('${p.id}')" title="Quitar de esta convocatoria">🗑️</button>`:""}</td>
+  </tr>`;
+}
+document.getElementById("mdAddPlayerSearch").oninput = renderMatchdayAddResults_;
 document.getElementById("btnStatsBack").onclick = () => showMatchdaySub("list");
 document.getElementById("btnMarkAllStarters").onclick = () => {
   document.querySelectorAll("#matchdayStatsTable .md-status").forEach(sel=> sel.value = "Titular");
@@ -7987,8 +8087,18 @@ document.getElementById("btnSaveMatchdayStats").onclick = async () => {
     else entry.goals = goalsVal!=="" ? Number(goalsVal) : 0;
     playerStats.push(entry);
   });
+  // Los invitados de otras categorías se guardan aparte (campo "extraPlayerIds", ver
+  // matchdayRoster_): la tabla los lee de ahí al repintarse. Se descartan ids de jugadores
+  // que ya no existen en la plantilla del club.
+  const extraPlayerIds = matchdayExtraIdsEditing.filter(id=>players.some(p=>p.id===id));
   try{
-    await db.collection("matchdays").doc(statsMatchdayId).update({playerStats});
+    await db.collection("matchdays").doc(statsMatchdayId).update({playerStats, extraPlayerIds});
+    matchdayExtraIdsEditing = extraPlayerIds.slice();
+    // Los invitados acaban de cambiar: se refrescan las secciones que usan matchdayRoster_
+    // para no tener que reabrir la jornada (la tabla se repinta sola con el snapshot).
+    renderMatchdayReport();
+    renderMatchdaySuccessMarkerResults();
+    if(!document.getElementById("timelinePickerModal").classList.contains("hidden")) renderTimelinePickerBody_();
     msgEl.innerHTML = '<p class="ok-msg">Convocatoria guardada.</p>';
   }catch(err){
     msgEl.innerHTML = '<p class="error-msg">Error al guardar: '+err.message+'</p>';
@@ -8281,7 +8391,7 @@ function openTimelinePicker_(direction){
 function renderTimelinePickerBody_(){
   const wrap = document.getElementById("timelinePickerBody");
   const m = matchdays.find(x=>x.id===statsMatchdayId);
-  const roster = (m ? players.filter(p=>p.teamId===m.teamId) : []).slice().sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
+  const roster = matchdayRoster_(m);
   wrap.innerHTML = `
     <label>Minuto aproximado</label>
     <input type="number" min="0" max="60" value="${timelineMinute!=null?timelineMinute:""}" oninput="timelineSetMinute_(this.value)" placeholder="Ej: 23">
@@ -8290,7 +8400,7 @@ function renderTimelinePickerBody_(){
       ${roster.length===0 ? '<p class="muted">Este equipo todavía no tiene jugadores en la plantilla.</p>' : roster.map(p=>`
         <label style="display:flex;align-items:center;gap:8px;padding:4px 0;text-transform:none;font-family:inherit;font-weight:400;">
           <input type="checkbox" style="width:auto;" ${timelinePlayers.includes(p.id)?"checked":""} onchange="timelineTogglePlayer_('${p.id}')">
-          ${escapeHtml(p.name)}${p.position==="Portero"?' <span class="badge outline">P</span>':""}
+          ${escapeHtml(p.name)}${p.position==="Portero"?' <span class="badge outline">P</span>':""}${matchdayGuestBadgeHtml_(m,p)}
         </label>`).join("")}
     </div>
     ${timelineDirection==="for" ? `
@@ -8300,7 +8410,7 @@ function renderTimelinePickerBody_(){
         if(!p) return "";
         return `<label style="display:flex;align-items:center;gap:8px;padding:4px 0;text-transform:none;font-family:inherit;font-weight:400;">
           <input type="radio" name="timelineScorer" style="width:auto;" ${timelineScorer===pid?"checked":""} onchange="timelineSetScorer_('${pid}')">
-          ${escapeHtml(p.name)}${p.position==="Portero"?' <span class="badge outline">P</span>':""}
+          ${escapeHtml(p.name)}${p.position==="Portero"?' <span class="badge outline">P</span>':""}${matchdayGuestBadgeHtml_(m,p)}
         </label>`;
       }).join("")}
     ` : ""}
@@ -8532,7 +8642,7 @@ function renderMatchdayReport(){
   const priv = notasPrivadas_(m, renderMatchdayReport);
   document.getElementById("mdReportText").value = priv.reportText || "";
   document.getElementById("mdReportObservations").value = priv.reportObservations || "";
-  const roster = players.filter(p=>p.teamId===m.teamId).sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
+  const roster = matchdayRoster_(m);
   const notes = priv.playerNotes || {};
   const ratings = priv.playerRatings || {};
   const wrap = document.getElementById("matchdayPlayerNotes");
@@ -8540,7 +8650,7 @@ function renderMatchdayReport(){
   wrap.innerHTML = roster.map(p=>`
     <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:6px;">
       <div style="flex:1;">
-        <label style="font-size:.8rem;color:var(--muted-fg,#666);">${jerseyNameHtml_(p.position, (p.dorsal!=null?escapeHtml(String(p.dorsal))+". ":"")+escapeHtml(p.name))}</label>
+        <label style="font-size:.8rem;color:var(--muted-fg,#666);">${jerseyNameHtml_(p.position, (p.dorsal!=null?escapeHtml(String(p.dorsal))+". ":"")+escapeHtml(p.name))}${matchdayGuestBadgeHtml_(m,p)}</label>
         <input type="text" class="md-player-note" data-player-id="${p.id}" value="${escapeHtml(notes[p.id]||"")}" placeholder="Nota sobre este jugador en el partido..." style="width:100%;">
       </div>
       <div style="width:70px;">
@@ -8599,7 +8709,7 @@ function pintarSuccessMarkerResults_(markers){
   const wrap = document.getElementById("mdSuccessMarkerResults");
   const m = matchdays.find(x=>x.id===statsMatchdayId);
   if(!wrap || !m) return;
-  const roster = players.filter(p=>p.teamId===m.teamId).sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
+  const roster = matchdayRoster_(m);
   if(markers.length===0){
     wrap.innerHTML = '<p class="muted">Todavía no has definido ningún objetivo en "Prepartido".</p>';
     return;
@@ -8618,7 +8728,7 @@ function pintarSuccessMarkerResults_(markers){
           const val = res[p.id] || "";
           return `
           <div style="display:flex;align-items:center;gap:2px;border:1px solid var(--border);border-radius:6px;padding:3px 5px;">
-            <span style="font-size:.76rem;white-space:nowrap;margin-right:2px;">${p.dorsal!=null?escapeHtml(String(p.dorsal))+". ":""}${escapeHtml(p.name)}</span>
+            <span style="font-size:.76rem;white-space:nowrap;margin-right:2px;">${p.dorsal!=null?escapeHtml(String(p.dorsal))+". ":""}${escapeHtml(p.name)}${matchdayIsGuest_(m,p)?` (${escapeHtml((teams.find(t=>t.id===p.teamId)||{}).name||"otra categoría")})`:""}</span>
             <button type="button" class="sm-result-btn ${val==='success'?'active-success':''}" data-marker="${marker.id}" data-player="${p.id}" data-value="success" title="Conseguido">✓</button>
             <button type="button" class="sm-result-btn ${val==='partial'?'active-partial':''}" data-marker="${marker.id}" data-player="${p.id}" data-value="partial" title="A medias">➖</button>
             <button type="button" class="sm-result-btn ${val==='fail'?'active-fail':''}" data-marker="${marker.id}" data-player="${p.id}" data-value="fail" title="No conseguido">✗</button>
@@ -8798,7 +8908,7 @@ async function exportMatchdayReportPDF(matchdayId){
   if(!m){ alert("No se ha encontrado la jornada."); return; }
   if(!window.jspdf){ alert("No se ha podido cargar el generador de PDF. Comprueba tu conexión e inténtalo de nuevo."); return; }
   const team = teams.find(t=>t.id===m.teamId);
-  const roster = players.filter(p=>p.teamId===m.teamId).sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
+  const roster = matchdayRoster_(m);
   const statsMap = {};
   (m.playerStats||[]).forEach(s=>{ statsMap[s.playerId] = s; });
   // Informe/observaciones/notas/puntuaciones: solo si este entrenador tiene acceso a las
@@ -8900,7 +9010,7 @@ async function exportMatchdayReportPDF(matchdayId){
     doc.rect(margin, y, pageW-margin*2, rowH);
     doc.setFont("helvetica","normal"); doc.setFontSize(9.5);
     doc.text(String(p.dorsal!=null?p.dorsal:"-"), dorsalX, y+4.8);
-    doc.text(fitText(`${p.name}${p.position==="Portero"?" (P)":""}`, jugadorMaxW), jugadorX, y+4.8);
+    doc.text(fitText(`${p.name}${p.position==="Portero"?" (P)":""}${matchdayIsGuest_(m,p)?` · ${(teams.find(t=>t.id===p.teamId)||{}).name||"otra categoría"}`:""}`, jugadorMaxW), jugadorX, y+4.8);
     doc.text(s.status || "No convocado", estadoX, y+4.8);
     doc.text(s.reason || "", motivoX, y+4.8);
     y += rowH;
@@ -9196,14 +9306,14 @@ document.getElementById("btnExportSummaryPDF").onclick = () => {
   doc.text("Jugadores", margin, y); y += 3;
   drawSimpleTable(
     ["Jugador","PJ","Titular","Suplente","Convoc.","Goles","Am.","Roj.","Nota"],
-    outfield.map(s=>[`${s.player.dorsal!=null?s.player.dorsal+". ":""}${s.player.name}`, s.played, s.starts, s.subs, s.called, s.goals, s.yellow, s.red, s.avgRating!=null?s.avgRating.toFixed(1):"-"])
+    outfield.map(s=>[`${s.player.dorsal!=null?s.player.dorsal+". ":""}${s.player.name}${s.guest?` (${(teams.find(t=>t.id===s.player.teamId)||{}).name||"otra categoría"})`:""}`, s.played, s.starts, s.subs, s.called, s.goals, s.yellow, s.red, s.avgRating!=null?s.avgRating.toFixed(1):"-"])
   );
 
   doc.setFont("helvetica","bold"); doc.setFontSize(10.5);
   doc.text("Porteros", margin, y); y += 3;
   drawSimpleTable(
     ["Portero","PJ","Encajados","Porterías a 0","Am.","Roj.","Nota"],
-    gks.map(s=>[`${s.player.dorsal!=null?s.player.dorsal+". ":""}${s.player.name}`, s.gkMatches, s.goalsConceded, s.cleanSheets, s.yellow, s.red, s.avgRating!=null?s.avgRating.toFixed(1):"-"])
+    gks.map(s=>[`${s.player.dorsal!=null?s.player.dorsal+". ":""}${s.player.name}${s.guest?` (${(teams.find(t=>t.id===s.player.teamId)||{}).name||"otra categoría"})`:""}`, s.gkMatches, s.goalsConceded, s.cleanSheets, s.yellow, s.red, s.avgRating!=null?s.avgRating.toFixed(1):"-"])
   );
 
   doc.save(`Estadisticas_${(team?team.name:"equipo").replace(/[^a-zA-Z0-9]+/g,"_")}.pdf`);
@@ -9218,12 +9328,12 @@ document.getElementById("btnExportSummaryExcel").onclick = () => {
   const gks = sum.stats.filter(s=>s.player.position==="Portero").sort((a,b)=> b.cleanSheets-a.cleanSheets || a.goalsConceded-b.goalsConceded);
 
   const outHeader = ["Dorsal","Jugador","PJ","Titular","Suplente","Convocatorias","Goles","Amarillas","Rojas","Nota media"];
-  const outRows = outfield.map(s=>[s.player.dorsal!=null?s.player.dorsal:"", s.player.name, s.played, s.starts, s.subs, s.called, s.goals, s.yellow, s.red, s.avgRating!=null?Number(s.avgRating.toFixed(1)):""]);
+  const outRows = outfield.map(s=>[s.player.dorsal!=null?s.player.dorsal:"", `${s.player.name}${s.guest?` (${(teams.find(t=>t.id===s.player.teamId)||{}).name||"otra categoría"})`:""}`, s.played, s.starts, s.subs, s.called, s.goals, s.yellow, s.red, s.avgRating!=null?Number(s.avgRating.toFixed(1)):""]);
   const wsOut = XLSX.utils.aoa_to_sheet([outHeader, ...outRows]);
   wsOut["!cols"] = [{wch:8},{wch:26},{wch:6},{wch:8},{wch:9},{wch:12},{wch:8},{wch:10},{wch:8},{wch:10}];
 
   const gkHeader = ["Dorsal","Portero","PJ","Encajados","Porterías a cero","Amarillas","Rojas","Nota media"];
-  const gkRows = gks.map(s=>[s.player.dorsal!=null?s.player.dorsal:"", s.player.name, s.gkMatches, s.goalsConceded, s.cleanSheets, s.yellow, s.red, s.avgRating!=null?Number(s.avgRating.toFixed(1)):""]);
+  const gkRows = gks.map(s=>[s.player.dorsal!=null?s.player.dorsal:"", `${s.player.name}${s.guest?` (${(teams.find(t=>t.id===s.player.teamId)||{}).name||"otra categoría"})`:""}`, s.gkMatches, s.goalsConceded, s.cleanSheets, s.yellow, s.red, s.avgRating!=null?Number(s.avgRating.toFixed(1)):""]);
   const wsGk = XLSX.utils.aoa_to_sheet([gkHeader, ...gkRows]);
   wsGk["!cols"] = [{wch:8},{wch:26},{wch:6},{wch:12},{wch:16},{wch:10},{wch:8},{wch:10}];
 
@@ -9235,13 +9345,20 @@ document.getElementById("btnExportSummaryExcel").onclick = () => {
 
 /* ---------- Resumen automático ---------- */
 function computeTeamSummary_(teamId, season, difficultyFilter, competitionFilter){
-  const roster = players.filter(p=>p.teamId===teamId);
   const team = teams.find(t=>t.id===teamId);
   const teamMds = matchdays.filter(m=>m.teamId===teamId && (!season || matchdaySeason_(m, team)===season) && (!difficultyFilter || m.difficulty===difficultyFilter) && (!competitionFilter || (m.competition||"").trim()===competitionFilter));
+  // Plantilla propia + invitados de otras categorías convocados en alguna de estas jornadas
+  // (ver matchdayRoster_): igual que en "Control de asistencia", un invitado que juega con
+  // este equipo cuenta aquí para ESTE equipo. Los jugadores propios van primero y, dentro de
+  // cada grupo, por dorsal.
+  const ids = new Set(players.filter(p=>p.teamId===teamId).map(p=>p.id));
+  teamMds.forEach(m=> matchdayExtraIds_(m).forEach(id=>ids.add(id)));
+  const roster = players.filter(p=>ids.has(p.id))
+    .sort((a,b)=> (a.teamId===teamId?0:1)-(b.teamId===teamId?0:1) || (a.dorsal||0)-(b.dorsal||0));
   const stats = {};
   roster.forEach(p=>{
     stats[p.id] = {
-      player: p, played:0, starts:0, subs:0, called:0,
+      player: p, guest: p.teamId!==teamId, played:0, starts:0, subs:0, called:0,
       goals:0, yellow:0, red:0, goalsConceded:0, cleanSheets:0, gkMatches:0,
       ratingSum:0, ratingCount:0
     };
@@ -9460,7 +9577,7 @@ function renderSeasonSummary_(wrap){
       <tbody>
       ${outfield.length ? outfield.map(s=>`
         <tr style="border-bottom:1px solid var(--border);">
-          <td style="padding:5px;">${jerseyNameHtml_(s.player.position, (s.player.dorsal!=null?escapeHtml(String(s.player.dorsal))+". ":"")+escapeHtml(s.player.name))}</td>
+          <td style="padding:5px;">${jerseyNameHtml_(s.player.position, (s.player.dorsal!=null?escapeHtml(String(s.player.dorsal))+". ":"")+escapeHtml(s.player.name))}${s.guest?` <span class="badge outline" style="font-size:.68rem;">${escapeHtml((teams.find(t=>t.id===s.player.teamId)||{}).name||"otra categoría")}</span>`:""}</td>
           <td style="padding:5px;">${s.played}</td>
           <td style="padding:5px;">${s.starts}</td>
           <td style="padding:5px;">${s.subs}</td>
@@ -9482,7 +9599,7 @@ function renderSeasonSummary_(wrap){
       <tbody>
       ${gks.length ? gks.map(s=>`
         <tr style="border-bottom:1px solid var(--border);">
-          <td style="padding:5px;">${jerseyNameHtml_(s.player.position, (s.player.dorsal!=null?escapeHtml(String(s.player.dorsal))+". ":"")+escapeHtml(s.player.name))}</td>
+          <td style="padding:5px;">${jerseyNameHtml_(s.player.position, (s.player.dorsal!=null?escapeHtml(String(s.player.dorsal))+". ":"")+escapeHtml(s.player.name))}${s.guest?` <span class="badge outline" style="font-size:.68rem;">${escapeHtml((teams.find(t=>t.id===s.player.teamId)||{}).name||"otra categoría")}</span>`:""}</td>
           <td style="padding:5px;">${s.gkMatches}</td>
           <td style="padding:5px;">${s.goalsConceded}</td>
           <td style="padding:5px;">${s.cleanSheets}</td>
@@ -9502,7 +9619,7 @@ function renderSeasonSummary_(wrap){
 function renderMatchdaySummary_(wrap){
   const m = matchdays.find(x=>x.id===summarySelectedMatchdayId);
   if(!m){ wrap.innerHTML = '<div class="empty">Elige una jornada.</div>'; return; }
-  const roster = players.filter(p=>p.teamId===selectedTeamId).sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
+  const roster = matchdayRoster_(m);
   const statsMap = {};
   (m.playerStats||[]).forEach(s=>{ statsMap[s.playerId] = s; });
   const linkedIds = m.linkedSessionIds || [];
@@ -9553,7 +9670,7 @@ function renderMatchdaySummary_(wrap){
         const goalsShown = isGk ? s.goalsConceded : s.goals;
         return `
         <tr style="border-bottom:1px solid var(--border);">
-          <td style="padding:5px;">${jerseyNameHtml_(p.position, (p.dorsal!=null?escapeHtml(String(p.dorsal))+". ":"")+escapeHtml(p.name))}</td>
+          <td style="padding:5px;">${jerseyNameHtml_(p.position, (p.dorsal!=null?escapeHtml(String(p.dorsal))+". ":"")+escapeHtml(p.name))}${matchdayGuestBadgeHtml_(m,p)}</td>
           <td style="padding:5px;">${escapeHtml(s.status||"No convocado")}</td>
           <td style="padding:5px;">${escapeHtml(s.reason||"")}</td>
           <td style="padding:5px;">${goalsShown!=null?goalsShown:"-"}</td>
@@ -9593,7 +9710,10 @@ window.openPlayerProfile = (id) => {
     jerseyNameHtml_(p.position, (p.dorsal!=null ? escapeHtml(String(p.dorsal))+". " : "")+escapeHtml(p.name));
   const wrap = document.getElementById("playerProfileContent");
   const team = teams.find(t=>t.id===p.teamId);
-  const teamMds = matchdays.filter(m=>m.teamId===p.teamId && matchdaySeason_(m, team)===selectedSeason).sort((a,b)=>(a.number||0)-(b.number||0));
+  // Jornadas en las que este jugador aparece en la convocatoria de SU equipo o de otro equipo
+  // del club al que se le convocó puntualmente (ver matchdayRoster_): así su ficha recoge
+  // también esos partidos jugados con otra categoría.
+  const teamMds = matchdays.filter(m=> matchdayRosterIds_(m).has(p.id) && matchdaySeason_(m, team)===selectedSeason).sort((a,b)=>(a.number||0)-(b.number||0));
   const isGk = p.position === "Portero";
   let played=0, starts=0, subs=0, called=0, goals=0, yellow=0, red=0, goalsConceded=0, cleanSheets=0, gkMatches=0;
   const rows = teamMds.map(m=>{
@@ -9630,7 +9750,7 @@ window.openPlayerProfile = (id) => {
       ${rows.length ? rows.map(r=>`
         <tr style="border-bottom:1px solid var(--border);">
           <td style="padding:5px;">${r.m.number}</td>
-          <td style="padding:5px;">${escapeHtml(r.m.rival||"-")}</td>
+          <td style="padding:5px;">${escapeHtml(r.m.rival||"-")}${r.m.teamId!==p.teamId?` <span class="badge outline" style="font-size:.68rem;">${escapeHtml((teams.find(t=>t.id===r.m.teamId)||{}).name||"otro equipo")}</span>`:""}</td>
           <td style="padding:5px;">${escapeHtml(r.s.status||"No convocado")}</td>
           <td style="padding:5px;">${isGk ? (r.s.goalsConceded!=null?r.s.goalsConceded:"-") : (r.s.goals||0)}</td>
           <td style="padding:5px;">${r.s.yellow||0}</td>
