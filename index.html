@@ -993,6 +993,7 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
               <button class="btn ghost small" id="btnDebugTaskFolders">🔧 Ver datos de carpetas</button>
               <button class="btn ghost small" id="btnRepairTaskFolders">🩹 Reparar carpetas fijas</button>
               <button class="btn ghost small" id="btnExportTasksExcel">📊 Exportar a Excel</button>
+              <button class="btn ghost small" id="btnTaskSelectMode" title="Marcar varias tareas y añadirlas de golpe a una sesión">☑️ Seleccionar varias</button>
             </div>
           </div>
           <div id="taskBreadcrumb" class="breadcrumb"></div>
@@ -1000,6 +1001,11 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
           <div class="filterbar" style="margin-top:10px;">
             <input type="text" id="filterSearch" placeholder="Buscar por título...">
             <label class="fav-filter"><input type="checkbox" id="filterFavOnly"> ⭐ Solo favoritas</label>
+          </div>
+          <div id="taskSelectBar" class="hidden" style="align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:#faf8f5;">
+            <strong id="taskSelectCount" style="font-size:.82rem;">0 seleccionadas</strong>
+            <button type="button" class="btn accent small" id="btnTaskSelectAdd">➕ Añadir a sesión</button>
+            <button type="button" class="btn ghost small" id="btnTaskSelectCancel">Cancelar selección</button>
           </div>
           <div id="taskList"><div class="empty">Cargando tareas...</div></div>
         </div>
@@ -2124,7 +2130,34 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
     <div id="viewTaskVideoWrap" style="margin-bottom:8px;"></div>
     <p id="viewTaskDesc" style="white-space:pre-wrap;font-size:.9rem;"></p>
     <div id="viewTaskBoardWrap"></div>
-    <button class="btn ghost" id="btnCloseViewModal" style="margin-top:14px;width:100%;">Cerrar</button>
+    <div style="display:flex;gap:8px;margin-top:14px;">
+      <button class="btn accent" id="viewTaskAddToSession" style="flex:1;" title="Meter esta tarea en una sesión de entrenamiento">➕ Añadir a sesión</button>
+      <button class="btn ghost" id="btnCloseViewModal" style="flex:1;">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ---------- Añadir una o varias tareas del banco a una sesión de entrenamiento ---------- -->
+<div id="addToSessionModal" class="modal-bg hidden">
+  <div class="modal" style="max-width:560px;">
+    <h2 style="font-size:1.05rem;">➕ Añadir a una sesión</h2>
+    <p class="muted" style="font-size:.8rem;margin-top:2px;" id="addToSessionSubtitle"></p>
+    <div id="addToSessionTasks" style="max-height:18vh;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:6px 10px;margin-top:8px;"></div>
+
+    <label style="margin-top:12px;display:block;font-size:.8rem;font-weight:600;">¿En qué bloque de la sesión?</label>
+    <select id="addToSessionBlock" style="margin-top:4px;">
+      <option value="calentamiento">Calentamiento</option>
+      <option value="principal" selected>Parte principal</option>
+      <option value="vuelta">Vuelta a la calma</option>
+    </select>
+
+    <label style="margin-top:14px;display:block;font-size:.8rem;font-weight:600;">¿A qué sesión?</label>
+    <p class="muted" style="font-size:.75rem;margin-top:2px;">Solo aparecen las sesiones que puedes editar: las tuyas y, si eres gestor, todas.</p>
+    <button type="button" class="btn accent small" id="addToSessionNew" style="margin-top:6px;width:100%;">➕ Crear sesión nueva con estas tareas</button>
+    <input type="text" id="addToSessionSearch" placeholder="🔍 Buscar sesión por nombre, equipo o fecha..." style="margin-top:8px;">
+    <div id="addToSessionList" style="max-height:30vh;overflow-y:auto;margin-top:6px;"></div>
+    <div id="addToSessionMsg"></div>
+    <button class="btn ghost" id="btnCloseAddToSession" style="margin-top:14px;width:100%;">Cerrar</button>
   </div>
 </div>
 
@@ -5429,8 +5462,217 @@ window.toggleFavoritePlay = async (id) => {
 document.getElementById("filterSearch").oninput = renderTaskList;
 document.getElementById("filterFavOnly").onchange = renderTaskList;
 
+/* ============================================================
+   BANCO DE TAREAS · AÑADIR TAREAS A UNA SESIÓN DE ENTRENAMIENTO
+   Manda una tarea (o varias, con el modo selección) desde el Banco de tareas a una sesión,
+   sin tener que entrar antes en la sesión y buscarla allí.
+   - Modo selección (taskSelectMode/taskSelectIds): casillas en las tarjetas del banco.
+   - openAddToSessionModal: ventana con las sesiones que ESTE entrenador puede editar (espejo
+     de la regla de Firestore de "sessions": solo el creador o un gestor pueden tocar
+     taskIds/blocks/blocksSnapshot), con buscador y con la opción de crear una sesión nueva
+     con esas tareas ya puestas.
+   - addTasksToSession_: añade al bloque elegido sin duplicar y deja el documento consistente
+     (blocks, taskIds y blocksSnapshot, que es lo que usa la encuesta pública de Cargas).
+============================================================ */
+let taskSelectMode = false;         // ¿está activo el modo "marcar varias"?
+let taskSelectIds = [];             // ids de las tareas marcadas en ese modo
+let addToSessionTaskIds = [];       // tareas que se están mandando a una sesión
+let addToSessionAnySuccess = false; // ¿se ha añadido ya algo en esta apertura de la ventana?
+function updateTaskSelectBar_(){
+  const bar = document.getElementById("taskSelectBar");
+  if(!bar) return;
+  bar.classList.toggle("hidden", !taskSelectMode);
+  if(!taskSelectMode) return;
+  document.getElementById("taskSelectCount").textContent =
+    taskSelectIds.length===1 ? "1 tarea seleccionada" : taskSelectIds.length + " tareas seleccionadas";
+  document.getElementById("btnTaskSelectAdd").disabled = taskSelectIds.length===0;
+}
+window.toggleTaskSelect = (id, checked) => {
+  taskSelectIds = checked ? [...new Set([...taskSelectIds, id])] : taskSelectIds.filter(x=>x!==id);
+  updateTaskSelectBar_();
+};
+// Pulsar la tarjeta (fuera de sus botones) también marca/desmarca, sin repintar la lista.
+window.toggleTaskSelectFromCard = (id) => {
+  const on = !taskSelectIds.includes(id);
+  toggleTaskSelect(id, on);
+  const cb = document.querySelector(`.task-select-cb[data-task-id="${id}"]`);
+  if(cb) cb.checked = on;
+};
+document.getElementById("btnTaskSelectMode").onclick = () => {
+  taskSelectMode = !taskSelectMode;
+  taskSelectIds = [];
+  document.getElementById("btnTaskSelectMode").classList.toggle("accent", taskSelectMode);
+  updateTaskSelectBar_();
+  renderTaskList();
+};
+document.getElementById("btnTaskSelectCancel").onclick = () => {
+  taskSelectMode = false;
+  taskSelectIds = [];
+  document.getElementById("btnTaskSelectMode").classList.remove("accent");
+  updateTaskSelectBar_();
+  renderTaskList();
+};
+document.getElementById("btnTaskSelectAdd").onclick = () => {
+  if(taskSelectIds.length===0) return;
+  openAddToSessionModal(taskSelectIds);
+};
+
+// Bloque por defecto de una tarea: su fase, si la tiene (Calentamiento / Principal / Vuelta).
+function sessionBlockForTask_(t){
+  return (t && t.phase && SESSION_BLOCKS[t.phase]) ? t.phase : "principal";
+}
+// Espejo de la regla de Firestore de "sessions": un entrenador con la sesión compartida solo
+// puede tocar observaciones y asistencia, así que las sesiones que no se pueden editar no se
+// listan (en vez de ofrecer algo que fallaría al guardar).
+function canEditSession_(s){
+  return !!currentUser && !!s && (s.createdBy === currentUser.uid || currentCoach.role === ROLE_GESTOR);
+}
+// Todas las tareas de una sesión, se haya guardado con "blocks" o solo con "taskIds".
+function sessionAllTaskIds_(s){
+  const ids = [];
+  if(s && s.blocks){
+    ids.push(...(s.blocks.calentamiento||[]), ...(s.blocks.principal||[]), ...(s.blocks.vuelta||[]));
+  }
+  if(s && Array.isArray(s.taskIds)) ids.push(...s.taskIds);
+  return new Set(ids);
+}
+function renderAddToSessionTasks_(){
+  const tks = addToSessionTaskIds.map(id=>tasks.find(t=>t.id===id)).filter(Boolean);
+  document.getElementById("addToSessionSubtitle").textContent =
+    tks.length===1 ? "Vas a añadir esta tarea:" : `Vas a añadir estas ${tks.length} tareas:`;
+  document.getElementById("addToSessionTasks").innerHTML = tks.map(t=>`
+    <div style="padding:3px 0;font-size:.85rem;">• ${escapeHtml(t.title)}
+      <span class="muted" style="font-size:.78rem;">${t.duration?t.duration+" min":""}${phaseLabel(t)?(t.duration?" · ":"")+escapeHtml(phaseLabel(t)):""}</span>
+    </div>`).join("");
+}
+function renderAddToSessionList_(){
+  const wrap = document.getElementById("addToSessionList");
+  const q = document.getElementById("addToSessionSearch").value.trim().toLowerCase();
+  const editable = sessions.filter(canEditSession_);
+  if(editable.length===0){
+    wrap.innerHTML = '<p class="muted" style="font-size:.82rem;">Todavía no tienes ninguna sesión guardada. Usa «Crear sesión nueva con estas tareas».</p>';
+    return;
+  }
+  const list = editable.filter(s=>{
+    if(!q) return true;
+    const teamNames = sessionTeams_(s).map(t=>t.name).join(" ");
+    return (s.name||"").toLowerCase().includes(q) || teamNames.toLowerCase().includes(q) || (s.date||"").includes(q);
+  }).sort((a,b)=> (b.date||"").localeCompare(a.date||""));
+  if(list.length===0){ wrap.innerHTML = '<div class="empty" style="font-size:.85rem;">🔍 No hay sesiones que coincidan.</div>'; return; }
+  const groups = {};
+  list.forEach(s=>{ const k = sessionMonthKey(s); (groups[k] = groups[k] || []).push(s); });
+  wrap.innerHTML = Object.keys(groups).sort((a,b)=>b.localeCompare(a)).map(k=>`
+    <div style="margin-top:6px;">
+      <span class="muted" style="display:block;font-size:.75rem;font-weight:600;padding:2px 0;">🗓️ ${sessionMonthLabel(k)}</span>
+      ${groups[k].map(s=>{
+        const teams = sessionTeams_(s).map(t=>`👕 ${escapeHtml(t.name)}`).join(" · ");
+        const hasSet = sessionAllTaskIds_(s);
+        const complete = addToSessionTaskIds.length>0 && addToSessionTaskIds.every(id=>hasSet.has(id));
+        return `
+        <button type="button" class="btn ghost small" style="display:block;width:100%;text-align:left;margin-top:4px;" ${complete?"disabled":""} onclick="confirmAddToSession_('${s.id}')">
+          <span style="display:block;"><strong>${escapeHtml(s.name)}</strong>${s.date?`<span class="muted" style="font-weight:400;font-size:.78rem;"> · ${escapeHtml(s.date)}</span>`:""}${complete?'<span class="badge outline" style="font-size:.68rem;margin-left:4px;">✔ Ya está</span>':""}</span>
+          <span class="muted" style="display:block;font-size:.75rem;">${teams}</span>
+        </button>`;
+      }).join("")}
+    </div>`).join("");
+}
+window.openAddToSessionModal = (taskIds) => {
+  const ids = (Array.isArray(taskIds) ? taskIds : [taskIds]).filter(id=>tasks.some(t=>t.id===id));
+  if(ids.length===0) return;
+  addToSessionTaskIds = ids;
+  addToSessionAnySuccess = false;
+  document.getElementById("addToSessionBlock").value = sessionBlockForTask_(tasks.find(t=>t.id===ids[0]));
+  document.getElementById("addToSessionNew").textContent =
+    ids.length===1 ? "➕ Crear sesión nueva con esta tarea" : "➕ Crear sesión nueva con estas tareas";
+  document.getElementById("addToSessionSearch").value = "";
+  document.getElementById("addToSessionMsg").innerHTML = "";
+  renderAddToSessionTasks_();
+  renderAddToSessionList_();
+  document.getElementById("addToSessionModal").classList.remove("hidden");
+};
+function closeAddToSessionModal_(){
+  document.getElementById("addToSessionModal").classList.add("hidden");
+  addToSessionTaskIds = [];
+  // Si se añadió algo desde el modo selección, este ya cumplió su función: se deshace.
+  if(addToSessionAnySuccess){
+    addToSessionAnySuccess = false;
+    taskSelectMode = false;
+    taskSelectIds = [];
+    document.getElementById("btnTaskSelectMode").classList.remove("accent");
+    updateTaskSelectBar_();
+    renderTaskList();
+  }
+}
+document.getElementById("btnCloseAddToSession").onclick = closeAddToSessionModal_;
+document.getElementById("addToSessionSearch").oninput = renderAddToSessionList_;
+document.getElementById("addToSessionNew").onclick = () => {
+  const ids = [...addToSessionTaskIds];
+  const block = document.getElementById("addToSessionBlock").value;
+  closeAddToSessionModal_();
+  startNewSessionWithTasks_(ids, block);
+};
+// Añade tareas al bloque indicado de una sesión guardada y deja el documento consistente.
+// Devuelve {added, skipped} para poder avisar de las que ya estaban.
+async function addTasksToSession_(sessionId, taskIds, block){
+  const s = sessions.find(x=>x.id===sessionId);
+  if(!s) throw new Error("No se ha encontrado la sesión.");
+  if(!canEditSession_(s)) throw new Error("No tienes permiso para editar esa sesión.");
+  if(!SESSION_BLOCKS[block]) block = "principal";
+  // Sesiones antiguas sin "blocks": sus tareas estaban todas en "Parte principal" (taskIds).
+  const blocks = s.blocks ? {
+    calentamiento: [...(s.blocks.calentamiento||[])],
+    principal: [...(s.blocks.principal||[])],
+    vuelta: [...(s.blocks.vuelta||[])]
+  } : { calentamiento: [], principal: [...(s.taskIds||[])], vuelta: [] };
+  const already = new Set([...blocks.calentamiento, ...blocks.principal, ...blocks.vuelta]);
+  const toAdd = taskIds.filter(id=> tasks.some(t=>t.id===id) && !already.has(id));
+  const skipped = taskIds.length - toAdd.length;
+  if(toAdd.length===0) return {added:0, skipped};
+  toAdd.forEach(id=> blocks[block].push(id));
+  const flatIds = [...blocks.calentamiento, ...blocks.principal, ...blocks.vuelta];
+  const blocksSnapshot = sessionBlocksSnapshot_(blocks);
+  await db.collection("sessions").doc(sessionId).update({blocks, taskIds: flatIds, blocksSnapshot});
+  // Se refleja ya en la copia local: si se añade otra tarea a la misma sesión antes de que
+  // llegue el snapshot, no se machaca lo que se acaba de escribir.
+  s.blocks = blocks;
+  s.taskIds = flatIds;
+  s.blocksSnapshot = blocksSnapshot;
+  return {added: toAdd.length, skipped};
+}
+window.confirmAddToSession_ = async (sessionId) => {
+  const msg = document.getElementById("addToSessionMsg");
+  const block = document.getElementById("addToSessionBlock").value;
+  const s = sessions.find(x=>x.id===sessionId);
+  msg.innerHTML = "";
+  try{
+    const r = await addTasksToSession_(sessionId, addToSessionTaskIds, block);
+    if(r.added===0){
+      msg.innerHTML = `<p class="error-msg">${addToSessionTaskIds.length===1?"Esa tarea ya estaba":"Esas tareas ya estaban"} en «${escapeHtml(s?s.name:"")}».</p>`;
+    } else {
+      addToSessionAnySuccess = true;
+      msg.innerHTML = `<p class="ok-msg">✔ Añadida${r.added===1?"":"s"} ${r.added} tarea${r.added===1?"":"s"} a «${escapeHtml(s?s.name:"")}» (${escapeHtml(SESSION_BLOCKS[block]||"")})${r.skipped?` · ${r.skipped} ya estaba${r.skipped===1?"":"n"}`:""}.</p>`;
+    }
+    renderAddToSessionList_();
+  }catch(err){
+    msg.innerHTML = `<p class="error-msg">No se ha podido guardar: ${escapeHtml(err.message)}</p>`;
+  }
+};
+// Empezar una sesión nueva con las tareas ya puestas en el bloque elegido: se rellena el
+// editor (sin guardar nada todavía) y se deja ahí para terminar de montarla y guardarla.
+function startNewSessionWithTasks_(taskIds, block){
+  resetSessionForm();
+  document.getElementById("sessionMsg").innerHTML = "";
+  if(!SESSION_BLOCKS[block]) block = "principal";
+  sessionBlocks = { calentamiento: [], principal: [], vuelta: [] };
+  taskIds.forEach(id=>{ if(tasks.some(t=>t.id===id)) sessionBlocks[block].push(id); });
+  renderSessionTaskList();
+  document.querySelector('.tab[data-tab="sessions"]').click();
+  showSessionsView("new");
+  document.getElementById("sessionEditorPanel").scrollIntoView({behavior:"smooth"});
+}
 function renderTaskList(){
   const wrap = document.getElementById("taskList");
+  updateTaskSelectBar_();
   const search = document.getElementById("filterSearch").value.trim().toLowerCase();
   const favOnly = document.getElementById("filterFavOnly").checked;
   const curId = taskCurrentFolder();
@@ -5472,7 +5714,8 @@ function renderTaskList(){
     const catNames = taskCategoryNames(t);
     const frameCount = (t.animation && t.animation.frames) ? t.animation.frames.length : 0;
     return `
-    <div class="task-item">
+    <div class="task-item"${taskSelectMode?` onclick="if(!event.target.closest('button,input,a,label')) toggleTaskSelectFromCard('${t.id}')" style="cursor:pointer;"`:""}>
+      ${taskSelectMode?`<input type="checkbox" class="task-select-cb" data-task-id="${t.id}" ${taskSelectIds.includes(t.id)?"checked":""} onchange="toggleTaskSelect('${t.id}', this.checked)" style="width:auto;flex:0 0 auto;margin-right:2px;" title="Marcar para añadirla a una sesión">`:""}
       <div>
         <h4>${escapeHtml(t.title)}${isItemUnread("tasks",t) ? '<span class="card-dot"></span>' : ""}</h4>
         <div class="task-meta">
@@ -5489,6 +5732,7 @@ function renderTaskList(){
       <div class="task-actions">
         <button type="button" class="star-btn ${isTaskFavorite(t.id)?"active":""}" onclick="toggleFavoriteTask('${t.id}')" title="${isTaskFavorite(t.id)?"Quitar de favoritas":"Añadir a favoritas"}">${isTaskFavorite(t.id)?"★":"☆"}</button>
         <button class="btn small ghost" onclick="viewTask('${t.id}')">Ver</button>
+        <button class="btn small accent" onclick="openAddToSessionModal(['${t.id}'])" title="Añadir esta tarea a una sesión de entrenamiento">➕ Añadir a sesión</button>
         ${canEditContent ? `<button class="btn small ghost" onclick="editTask('${t.id}')">Editar</button>
         <button class="btn small danger" onclick="deleteTask('${t.id}')">Eliminar</button>` : ""}
       </div>
@@ -5534,10 +5778,12 @@ function playSessionHasNoValidFolder_(s){
 }
 
 /* ---------- View task modal ---------- */
+let viewTaskCurrentId = null; // tarea que se está viendo, para poder mandarla a una sesión
 window.viewTask = (id) => {
   closeBoardFullscreen();
   const t = tasks.find(x=>x.id===id);
   if(!t) return;
+  viewTaskCurrentId = id;
   history.replaceState(null, "", location.pathname + location.search + "#task=" + encodeURIComponent(id));
   document.getElementById("viewTaskTitle").textContent = t.title;
   document.getElementById("viewTaskMeta").innerHTML = `
@@ -5601,6 +5847,14 @@ document.getElementById("btnCloseViewModal").onclick = () => {
   closeBoardFullscreen();
   document.getElementById("viewTaskModal").classList.add("hidden");
   history.replaceState(null, "", location.pathname + location.search);
+};
+// "+ Añadir a sesión" desde la ventana de la tarea: se cierra esta y se abre la de elegir
+// sesión con la tarea que estabas viendo.
+document.getElementById("viewTaskAddToSession").onclick = () => {
+  if(!viewTaskCurrentId) return;
+  const id = viewTaskCurrentId;
+  document.getElementById("btnCloseViewModal").onclick();
+  openAddToSessionModal([id]);
 };
 
 /* ============================================================
