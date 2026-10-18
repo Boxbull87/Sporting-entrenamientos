@@ -1,0 +1,12 @@
+# Normalizacion de finales de linea y marcado de binarios.
+#
+# El repositorio guarda siempre LF, y el arbol de trabajo tambien (eol=lf), para que un mismo
+# fichero no cambie de bytes entre Windows y GitHub. Esto manda sobre core.autocrlf.
+* text=auto eol=lf
+
+# Binarios: git no debe convertirlos ni intentar diferenciarlos como texto.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.ico  binary
+*.pdf  binary

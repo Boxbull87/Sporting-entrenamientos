@@ -55,9 +55,25 @@ repo root is the quickest way to serve it for a manual check.)
 - First account ever registered auto-becomes `gestor` (admin) and is auto-activated; every
   later signup gets role `entrenador` and `active:false` until a gestor approves them from the
   "Entrenadores" tab.
-- Git is initialized in this folder. Commit after each confirmed change; only `git push` when the
-  user explicitly asks. Intended remote: `https://github.com/Boxbull87/Sporting-entrenamientos`
-  (add it manually with `git remote add origin ...` if it isn't configured).
+
+## Git
+
+- **Remote**: `origin` = `https://github.com/Boxbull87/Sporting-entrenamientos` (public). Local
+  `main` tracks `origin/main`. GitHub also has a `pruebas` branch (not present locally).
+- **Auth**: HTTPS with Git Credential Manager — credentials are already stored on this machine,
+  so `git push` works without prompting. No SSH keys. If a credential ever expires, git opens a
+  browser sign-in window once. Don't switch to SSH and don't embed tokens in the URL.
+- **History**: the folder's fresh local history was adopted onto GitHub's real history (fetch +
+  `git reset --soft origin/main` + one commit), so `main` sits cleanly on top of it. Never
+  `--force` `main`.
+- **Workflow**: commit after each confirmed change (Spanish commit messages). **Only `git push`
+  when the user explicitly asks** — that's their stated preference; never push on your own.
+- **Line endings**: `.gitattributes` sets `* text=auto eol=lf`, so every text file is stored and
+  checked out with **LF**, even on this Windows machine. Keep it that way; re-introducing CRLF in
+  a text file turns a one-line edit into a whole-file diff.
+- **History caveat**: the user used to publish changes by hand with GitHub's web UI ("Add files
+  via upload"), which creates commits unrelated to this working tree. After any such upload, run
+  `git fetch origin` and compare (`git status -sb`) before assuming the local copy is newer.
 
 ## Roles
 
