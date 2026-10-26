@@ -311,6 +311,12 @@ All inside `index.html` — search for these comment banners to jump around:
   visible in the other matchday sections (timeline, report, PDF…) **after** pressing
   "💾 Guardar convocatoria", which writes `playerStats` + `extraPlayerIds` together — that's the
   same "edit in memory, save explicitly" pattern the attendance modal uses.
+  - **Goles y encajados van separados** (`playerStats[].goals` / `playerStats[].goalsConceded`):
+    `goals` se guarda para **todos** (un portero también marca) y `goalsConceded` solo para el
+    portero (null = no registrado, así no cuenta como portería a cero). La tabla de convocatoria,
+    el resumen de jornada, el resumen de temporada (tabla de porteros), la ficha del jugador, el
+    PDF y el Excel de estadísticas y el "máx. goleador" de Comparar equipos leen esa separación.
+    Antes compartían una sola casilla y un gol del portero se guardaba como encajado.
 - **Control de asistencia** (`renderAttendanceControlView_`/`computeAttendanceSummary_` ~9780):
   cross-session attendance summary, which already included guest players from other categories —
   it's the reference implementation the matchday guest squads were modelled on.
