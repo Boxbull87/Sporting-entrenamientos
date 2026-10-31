@@ -453,6 +453,11 @@ canvas.court{
 }
 .frame-chip .rm:last-child{border-right:none;}
 .frame-chip .rm.danger{color:var(--danger);}
+.frame-chip .frame-caption{
+  font-size:.6rem;line-height:1.15;padding:3px 4px;text-align:center;
+  min-height:1.15em;max-height:2.3em;overflow:hidden;opacity:.92;
+  border-top:1px solid rgba(255,255,255,.15);
+}
 
 /* sessions */
 .session-task{
@@ -935,6 +940,8 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
             <div class="board-toolbar">
               <button type="button" class="btn small ghost" id="toggleArrowMode">➜ Flecha</button>
               <button type="button" class="btn small ghost" id="toggleDottedMode">┄ Línea de puntos</button>
+              <button type="button" class="btn small ghost" id="toggleBlockMode" title="Arrastra para marcar un bloqueo (barra gruesa con topes)">🧱 Bloqueo</button>
+              <button type="button" class="btn small ghost" id="toggleAutoTrace" title="Al mover una ficha se dibuja sola la flecha (jugadores) o la línea de puntos (balón)">➜ Trazo automático: OFF</button>
               <button type="button" class="btn small ghost" id="toggleTextMode">🔤 Texto</button>
               <button type="button" class="btn small ghost shape-btn" id="toggleCircleMode" title="Círculo hueco">○</button>
               <button type="button" class="btn small ghost shape-btn" id="toggleCircleFilledMode" title="Círculo relleno">⬤</button>
@@ -953,6 +960,10 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
               <button type="button" class="btn small danger" id="clearBoard">Vaciar pizarra</button>
             </div>
             <canvas id="courtCanvas" class="court" width="980" height="700"></canvas>
+            <div class="board-toolbar" style="align-items:center;">
+              <label class="muted" for="frameCaptionInput" style="white-space:nowrap;font-weight:600;">📝 Directriz del paso</label>
+              <input type="text" id="frameCaptionInput" maxlength="140" placeholder="Ej.: Desmarques de 2, 3 y 4 · Pase de 4 a 5" style="flex:1;min-width:160px;">
+            </div>
             <div class="board-toolbar">
               <button type="button" class="btn accent small" id="saveFrame">💾 Guardar fotograma</button>
               <button type="button" class="btn ghost small hidden" id="updateFrameBtn">✏️ Actualizar fotograma</button>
@@ -2297,6 +2308,8 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
     <div class="board-toolbar">
       <button type="button" class="btn small ghost" id="fsToggleArrowMode">➜ Flecha</button>
       <button type="button" class="btn small ghost" id="fsToggleDottedMode">┄ Línea de puntos</button>
+      <button type="button" class="btn small ghost" id="fsToggleBlockMode" title="Arrastra para marcar un bloqueo (barra gruesa con topes)">🧱 Bloqueo</button>
+      <button type="button" class="btn small ghost" id="fsToggleAutoTrace" title="Al mover una ficha se dibuja sola la flecha (jugadores) o la línea de puntos (balón)">➜ Trazo automático: OFF</button>
       <button type="button" class="btn small ghost" id="fsToggleTextMode">🔤 Texto</button>
       <button type="button" class="btn small ghost shape-btn" id="fsToggleCircleMode" title="Círculo hueco">○</button>
       <button type="button" class="btn small ghost shape-btn" id="fsToggleCircleFilledMode" title="Círculo relleno">⬤</button>
@@ -2320,6 +2333,10 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
     <button type="button" class="btn small ghost" id="fsViewStopBtn">⏹ Detener</button>
   </div>
   <div id="fsCanvasAnchor"></div>
+  <div id="fsCaptionToolbar" class="fs-toolbar hidden" style="width:100%;max-width:980px;">
+    <label class="muted" for="fsFrameCaptionInput" style="white-space:nowrap;font-weight:600;font-size:.75rem;">📝 Directriz</label>
+    <input type="text" id="fsFrameCaptionInput" maxlength="140" placeholder="Ej.: Desmarques de 2, 3 y 4 · Pase de 4 a 5" style="flex:1;min-width:160px;font-size:.8rem;padding:5px 8px;">
+  </div>
   <div id="fsBottomToolbar" class="fs-toolbar hidden">
     <button type="button" class="btn accent small" id="fsSaveFrame">💾 Guardar fotograma</button>
     <button type="button" class="btn ghost small hidden" id="fsUpdateFrameBtn">✏️ Actualizar fotograma</button>
@@ -4131,7 +4148,9 @@ let tokenSeq = 0, arrowSeq = 0, textSeq = 0, shapeSeq = 0, pathSeq = 0;
 let dragObj = null;     // {kind, id} currently being dragged
 let dragLastPos = null;
 let selected = null;    // {kind, id} currently selected element
-let mode = "select";    // 'select' | 'arrow' | 'dotted' | 'text' | 'circle' | 'pencil'
+let mode = "select";    // 'select' | 'arrow' | 'dotted' | 'block' | 'text' | 'circle' | 'pencil'
+let autoTrace = false;  // al mover una ficha, deja sola su trazo (flecha jugador / puntos balón)
+let dragTokenStart = null; // {x,y,type} de la ficha al empezar a arrastrarla (para el trazo automático)
 let arrowDraft = null;  // {x1,y1,x2,y2} mientras se arrastra una flecha/línea de puntos (se ve en vivo, como shapeDraft)
 let shapeDraft = null;  // {x1,y1,x2,y2} while drawing a circle
 let pencilDraft = null; // array of points while drawing freehand
@@ -4375,6 +4394,22 @@ function drawArrowsOn(cx,cvs,list,alphaFn){
     cx.globalAlpha = alphaFn ? alphaFn(a) : 1;
     const x1=a.x1*cvs.width, y1=a.y1*cvs.height, x2=a.x2*cvs.width, y2=a.y2*cvs.height;
     const w = a.width || 2.5;
+    // Bloqueo: se guarda en la misma lista que las flechas (así ya funciona en fotogramas,
+    // GIF, visor y enlaces públicos) pero se dibuja como barra gruesa con topes en los
+    // extremos, sin punta de flecha. Los trazos antiguos no tienen "block" y se ven igual.
+    if(a.block){
+      const bw = a.width || 7;
+      const angle = Math.atan2(y2-y1, x2-x1);
+      const capLen = Math.max(10, bw*1.7);
+      const sx = Math.sin(angle)*capLen, sy = Math.cos(angle)*capLen;
+      cx.strokeStyle = drawBW ? "#000" : "#ff9f43";
+      cx.lineWidth = bw; cx.lineCap = "round"; cx.setLineDash([]);
+      cx.beginPath(); cx.moveTo(x1,y1); cx.lineTo(x2,y2); cx.stroke();
+      cx.beginPath(); cx.moveTo(x1-sx,y1+sy); cx.lineTo(x1+sx,y1-sy); cx.stroke();
+      cx.beginPath(); cx.moveTo(x2-sx,y2+sy); cx.lineTo(x2+sx,y2-sy); cx.stroke();
+      cx.globalAlpha = 1;
+      return;
+    }
     cx.strokeStyle = drawBW ? "#000" : "#fff176"; cx.lineWidth = w;
     if(a.dashed){
       cx.setLineDash([Math.max(4, w*2.2), Math.max(4, w*1.8)]);
@@ -4407,6 +4442,44 @@ function drawTextsOn(cx,cvs,list,alphaFn){
     cx.fillStyle = drawBW ? "#000" : "#fff"; cx.fillText(t.text, x, y);
     cx.globalAlpha = 1;
   });
+}
+// Directriz de un fotograma ("paso"). Los fotogramas guardados antes de existir esto no
+// tienen el campo y simplemente no muestran nada.
+function frameCaption_(f){
+  return (!Array.isArray(f) && f && typeof f.caption==="string") ? f.caption : "";
+}
+// Barra inferior semitransparente con la directriz del paso, encima de la pista. Se usa al
+// reproducir (editor, visor, pantalla completa y GIF), no mientras se edita.
+function drawCaptionOn(cx,cvs,text){
+  text = String(text||"").trim();
+  if(!text) return;
+  const w = cvs.width, h = cvs.height;
+  const fs = Math.max(13, Math.round(h*0.028));
+  cx.save();
+  cx.font = "600 "+fs+"px sans-serif";
+  const maxW = w*0.86;
+  const words = text.split(/\s+/);
+  const lines = [];
+  let line = "";
+  words.forEach(word=>{
+    const test = line ? line+" "+word : word;
+    if(cx.measureText(test).width > maxW && line){ lines.push(line); line = word; }
+    else line = test;
+  });
+  if(line) lines.push(line);
+  const shown = lines.slice(0,3);
+  if(lines.length>3) shown[2] = shown[2].replace(/\s+\S*$/,"") + "…";
+  const lineH = Math.round(fs*1.28);
+  const padX = Math.round(w*0.035), padY = Math.round(h*0.014);
+  const boxW = w - padX*2;
+  const boxH = shown.length*lineH + padY*2;
+  const boxX = padX, boxY = h - padY - boxH;
+  cx.fillStyle = "rgba(0,0,0,0.62)";
+  cx.fillRect(boxX, boxY, boxW, boxH);
+  cx.fillStyle = "#fff";
+  cx.textAlign = "center"; cx.textBaseline = "middle";
+  shown.forEach((ln,i)=> cx.fillText(ln, w/2, boxY + padY + lineH*(i+0.5)));
+  cx.restore();
 }
 function drawShapesOn(cx,cvs,list,alphaFn){
   (list||[]).forEach(s=>{
@@ -4476,7 +4549,7 @@ function redrawBoard(){
   drawTokensOn(ctx, canvas, tokens);
   drawTextsOn(ctx, canvas, texts);
   if(arrowDraft){
-    drawArrowsOn(ctx, canvas, [{...arrowDraft, dashed: mode==="dotted"}]);
+    drawArrowsOn(ctx, canvas, [{...arrowDraft, dashed: mode==="dotted", block: mode==="block", width: mode==="block" ? 7 : 2.5}]);
   }
   if(shapeDraft){
     const d = shapeDraft;
@@ -4564,7 +4637,7 @@ function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
 function setMode(newMode){
   mode = (mode===newMode) ? "select" : newMode;
   arrowDraft = null; shapeDraft = null; pencilDraft = null; dragObj = null;
-  const map = {arrow:"toggleArrowMode", dotted:"toggleDottedMode", text:"toggleTextMode", circle:"toggleCircleMode", circleFilled:"toggleCircleFilledMode", rect:"toggleRectMode", rectFilled:"toggleRectFilledMode", pencil:"togglePencilMode"};
+  const map = {arrow:"toggleArrowMode", dotted:"toggleDottedMode", block:"toggleBlockMode", text:"toggleTextMode", circle:"toggleCircleMode", circleFilled:"toggleCircleFilledMode", rect:"toggleRectMode", rectFilled:"toggleRectFilledMode", pencil:"togglePencilMode"};
   Object.keys(map).forEach(k=>{
     [document.getElementById(map[k]), document.getElementById("fs"+cap(map[k]))].forEach(el=>{
       if(el) el.classList.toggle("accent", mode===k);
@@ -4573,6 +4646,7 @@ function setMode(newMode){
   const hints = {
     arrow:"Arrastra desde el punto de inicio hasta el punto final de la flecha.",
     dotted:"Arrastra desde el punto de inicio hasta el punto final de la línea de puntos.",
+    block:"Arrastra para marcar un bloqueo (barra gruesa con topes).",
     text:"Toca la pizarra donde quieras escribir el texto.",
     circle:"Arrastra sobre la pizarra para rodear una zona con un círculo hueco.",
     circleFilled:"Arrastra sobre la pizarra para dibujar un círculo relleno.",
@@ -4590,12 +4664,28 @@ function setMode(newMode){
 }
 wire2("toggleArrowMode","fsToggleArrowMode", ()=>setMode("arrow"));
 wire2("toggleDottedMode","fsToggleDottedMode", ()=>setMode("dotted"));
+wire2("toggleBlockMode","fsToggleBlockMode", ()=>setMode("block"));
 wire2("toggleTextMode","fsToggleTextMode", ()=>setMode("text"));
 wire2("toggleCircleMode","fsToggleCircleMode", ()=>setMode("circle"));
 wire2("toggleCircleFilledMode","fsToggleCircleFilledMode", ()=>setMode("circleFilled"));
 wire2("toggleRectMode","fsToggleRectMode", ()=>setMode("rect"));
 wire2("toggleRectFilledMode","fsToggleRectFilledMode", ()=>setMode("rectFilled"));
 wire2("togglePencilMode","fsTogglePencilMode", ()=>setMode("pencil"));
+
+/* ---- Trazo automático: al mover una ficha se deja sola su flecha (jugadores) o su
+   línea de puntos (balón). Es una ayuda opcional: con el botón en OFF la pizarra se
+   comporta exactamente como antes (solo se mueve la ficha). ---- */
+function updateAutoTraceButtons_(){
+  const label = "➜ Trazo automático: " + (autoTrace ? "ON" : "OFF");
+  [document.getElementById("toggleAutoTrace"), document.getElementById("fsToggleAutoTrace")].forEach(btn=>{
+    if(!btn) return;
+    btn.textContent = label;
+    btn.classList.toggle("accent", autoTrace);
+  });
+}
+function toggleAutoTraceFn(){ autoTrace = !autoTrace; updateAutoTraceButtons_(); }
+wire2("toggleAutoTrace","fsToggleAutoTrace", toggleAutoTraceFn);
+updateAutoTraceButtons_();
 
 function finalizeArrow(){
   const d = arrowDraft; arrowDraft = null;
@@ -4605,7 +4695,9 @@ function finalizeArrow(){
   pushUndoSnapshot();
   arrowSeq++;
   const id = "a"+arrowSeq;
-  arrows.push({id, x1:d.x1, y1:d.y1, x2:d.x2, y2:d.y2, width:2.5, dashed: mode==="dotted"});
+  const entry = {id, x1:d.x1, y1:d.y1, x2:d.x2, y2:d.y2, width: mode==="block" ? 7 : 2.5, dashed: mode==="dotted"};
+  if(mode==="block") entry.block = true;
+  arrows.push(entry);
   pushHistory("arrow", id);
   redrawBoard();
 }
@@ -4680,6 +4772,7 @@ function touchToleranceCanvasPx_(){
 let dragIsTouch = false;
 const TOUCH_LIFT = 0.09; // desplaza la ficha hacia arriba mientras se arrastra con el dedo, para que no quede tapada
 function selectAt(p){
+  dragTokenStart = null;
   const px = p.x*canvas.width, py = p.y*canvas.height;
   const tol = touchToleranceCanvasPx_();
   const relTol = tol / canvas.width;
@@ -4698,6 +4791,7 @@ function selectAt(p){
     selected = {kind:"token", id:bestToken.id};
     if(bestToken.type==="goal") lastGoalId = bestToken.id;
     pushUndoSnapshot();
+    dragTokenStart = {x:bestToken.x, y:bestToken.y, type:bestToken.type};
     dragObj = selected; dragLastPos = p;
     redrawBoard(); return;
   }
@@ -4841,22 +4935,51 @@ wire2("deleteSelected","fsDeleteSelected", deleteSelected);
 // siempre — solo cambia qué se guarda al soltar, ver finalizeShape().
 function isShapeMode(m){ return m==="circle" || m==="circleFilled" || m==="rect" || m==="rectFilled"; }
 function boardPointerDown(p){
-  if(mode==="arrow" || mode==="dotted"){ arrowDraft = {x1:p.x, y1:p.y, x2:p.x, y2:p.y}; return; }
+  if(mode==="arrow" || mode==="dotted" || mode==="block"){ dragTokenStart = null; arrowDraft = {x1:p.x, y1:p.y, x2:p.x, y2:p.y}; return; }
   if(mode==="text"){ handleTextClick(p); return; }
   if(isShapeMode(mode)){ shapeDraft = {x1:p.x, y1:p.y, x2:p.x, y2:p.y}; return; }
   if(mode==="pencil"){ pencilDraft = [p]; return; }
   selectAt(p);
 }
 function boardPointerMove(p){
-  if((mode==="arrow"||mode==="dotted") && arrowDraft){ arrowDraft.x2=p.x; arrowDraft.y2=p.y; redrawBoard(); return; }
+  if((mode==="arrow"||mode==="dotted"||mode==="block") && arrowDraft){ arrowDraft.x2=p.x; arrowDraft.y2=p.y; redrawBoard(); return; }
   if(isShapeMode(mode) && shapeDraft){ shapeDraft.x2=p.x; shapeDraft.y2=p.y; redrawBoard(); return; }
   if(mode==="pencil" && pencilDraft){ pencilDraft.push(p); redrawBoard(); return; }
   if(dragObj){ moveDragObj(p); redrawBoard(); }
 }
+// Deja el trazo del movimiento que se acaba de hacer con una ficha: flecha sólida para
+// jugadores/porteros/corredor y línea de puntos para el balón. No hace nada con conos,
+// pesas o porterías, ni si el botón "Trazo automático" está en OFF.
+function autoTraceTokenMove_(){
+  if(!autoTrace || !dragObj || dragObj.kind!=="token" || !dragTokenStart) return;
+  const t = tokens.find(o=>o.id===dragObj.id);
+  if(!t) return;
+  const kind = t.type==="ball" ? "ball"
+    : (["A","B","C","D","GA","GB","GC","GD","runner"].includes(t.type) ? "player" : null);
+  if(!kind) return;
+  const from = dragTokenStart, to = {x:t.x, y:t.y};
+  const dx = to.x-from.x, dy = to.y-from.y;
+  const lenPx = Math.hypot(dx*canvas.width, dy*canvas.height);
+  if(lenPx < 18) return; // un toque sin arrastre no deja trazo
+  // El trazo va del borde de la ficha en su posición inicial al borde en la final, para que
+  // la punta no quede escondida debajo de la propia ficha.
+  const r = tokenRadius(t.type)*(t.scale||1) + 4;
+  const ux = dx*canvas.width/lenPx, uy = dy*canvas.height/lenPx;
+  const ox = ux*r/canvas.width, oy = uy*r/canvas.height;
+  const x1 = from.x+ox, y1 = from.y+oy, x2 = to.x-ox, y2 = to.y-oy;
+  if(Math.hypot((x2-x1)*canvas.width, (y2-y1)*canvas.height) < 10) return;
+  arrowSeq++;
+  // Sin pushUndoSnapshot: ya se guardó al empezar el arrastre, así "Deshacer" devuelve la
+  // ficha a su sitio y quita el trazo de una sola vez.
+  arrows.push({id:"a"+arrowSeq, x1, y1, x2, y2, width:2.5, dashed: kind==="ball"});
+  redrawBoard();
+}
 function boardPointerUp(){
-  if((mode==="arrow"||mode==="dotted") && arrowDraft){ finalizeArrow(); return; }
+  if((mode==="arrow"||mode==="dotted"||mode==="block") && arrowDraft){ finalizeArrow(); return; }
   if(isShapeMode(mode) && shapeDraft){ finalizeShape(); return; }
   if(mode==="pencil" && pencilDraft){ finalizePencil(); return; }
+  autoTraceTokenMove_();
+  dragTokenStart = null;
   dragObj = null;
 }
 canvas.addEventListener("mousedown", e=> boardPointerDown(relPos(e.clientX,e.clientY)));
@@ -4947,20 +5070,65 @@ function updateFrameCount(){
   if(fsCount) fsCount.textContent = frames.length + " fotogramas";
 }
 let activeFrameIndex = null; // qué fotograma está cargado ahora mismo en la pizarra
+// El campo de directriz siempre enseña la del fotograma activo; si no hay ninguno cargado,
+// es la que se guardará en el próximo "Guardar fotograma".
+function syncFrameCaptionInput_(){
+  const val = (activeFrameIndex!=null && frames[activeFrameIndex]) ? frameCaption_(frames[activeFrameIndex]) : "";
+  ["frameCaptionInput","fsFrameCaptionInput"].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.value = val;
+  });
+}
+// Los dos campos (editor normal y pizarra ampliada) escriben la misma directriz.
+function applyCaptionInput_(value){
+  ["frameCaptionInput","fsFrameCaptionInput"].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el && el.value !== value) el.value = value;
+  });
+  if(activeFrameIndex==null || !frames[activeFrameIndex]) return;
+  const txt = value.trim();
+  frames[activeFrameIndex].caption = txt;
+  markBoardDirty();
+  // Mantener el chip del fotograma activo en sintonía mientras se escribe, sin re-renderizar
+  // toda la lista (eso movería el cursor del campo).
+  const chip = document.querySelectorAll("#framesList .frame-chip")[activeFrameIndex];
+  if(chip){
+    let capEl = chip.querySelector(".frame-caption");
+    if(!capEl && txt){
+      capEl = document.createElement("div");
+      capEl.className = "frame-caption";
+      chip.insertBefore(capEl, chip.querySelector(".frame-actions"));
+    }
+    if(capEl && !txt){ capEl.remove(); capEl = null; }
+    if(capEl){ capEl.textContent = txt; capEl.title = txt; }
+  }
+}
 function renderFramesList(){
   updateFrameCount();
   const wrap = document.getElementById("framesList");
-  wrap.innerHTML = frames.map((f,i)=>`
+  wrap.innerHTML = frames.map((f,i)=>{
+    const cap = frameCaption_(f);
+    return `
     <div class="frame-chip ${activeFrameIndex===i ? "active" : ""}">
       <button type="button" class="frame-num" title="Toca para cargar el fotograma ${i+1} en la pizarra" onclick="loadFrame(${i})">${i+1}</button>
+      ${cap ? `<div class="frame-caption" title="${escapeHtml(cap)}">${escapeHtml(cap)}</div>` : ""}
       <div class="frame-actions">
         <button type="button" class="rm" title="Mover a la izquierda" onclick="event.stopPropagation(); moveFrame(${i},-1)">◀</button>
         <button type="button" class="rm" title="Mover a la derecha" onclick="event.stopPropagation(); moveFrame(${i},1)">▶</button>
         <button type="button" class="rm" title="Duplicar fotograma" onclick="event.stopPropagation(); duplicateFrame(${i})">⧉</button>
         <button type="button" class="rm danger" title="Eliminar fotograma" onclick="event.stopPropagation(); removeFrame(${i})">×</button>
       </div>
-    </div>`).join("");
+    </div>`;
+  }).join("");
+  syncFrameCaptionInput_();
 }
+// Escribir la directriz con un fotograma cargado la actualiza en el acto (se guarda con la
+// tarea/jugada aunque no pulses "Actualizar fotograma"). Sin fotograma cargado, se aplicará
+// al próximo que guardes.
+["frameCaptionInput","fsFrameCaptionInput"].forEach(id=>{
+  const el = document.getElementById(id);
+  if(el) el.oninput = (e) => applyCaptionInput_(e.target.value);
+});
 window.loadFrame = (i) => {
   const f = frames[i];
   if(!f) return;
@@ -5041,6 +5209,10 @@ wire2("stopAnim","fsStopAnim", stopAnimFn);
 let fsReturnParent = null, fsReturnNext = null;
 let fsViewFrameList = [];
 
+function currentFrameCaptionInput_(){
+  const el = document.getElementById("frameCaptionInput");
+  return el ? el.value.trim() : "";
+}
 function saveCurrentFrame(){
   if(tokens.length===0){ alert("Añade al menos un jugador antes de guardar un fotograma."); return; }
   frames.push({
@@ -5048,7 +5220,8 @@ function saveCurrentFrame(){
     arrows: JSON.parse(JSON.stringify(arrows)),
     texts: JSON.parse(JSON.stringify(texts)),
     shapes: JSON.parse(JSON.stringify(shapes)),
-    paths: JSON.parse(JSON.stringify(paths))
+    paths: JSON.parse(JSON.stringify(paths)),
+    caption: currentFrameCaptionInput_()
   });
   activeFrameIndex = frames.length - 1;
   markBoardDirty();
@@ -5066,7 +5239,8 @@ function updateCurrentFrame(){
     arrows: JSON.parse(JSON.stringify(arrows)),
     texts: JSON.parse(JSON.stringify(texts)),
     shapes: JSON.parse(JSON.stringify(shapes)),
-    paths: JSON.parse(JSON.stringify(paths))
+    paths: JSON.parse(JSON.stringify(paths)),
+    caption: currentFrameCaptionInput_()
   };
   markBoardDirty();
   renderFramesList();
@@ -5083,10 +5257,12 @@ function openBoardFullscreen(cvs, fsMode, viewFrameList){
   overlay.classList.remove("hidden");
   const isEdit = fsMode !== "view";
   document.getElementById("fsEditToolbar").classList.toggle("hidden", !isEdit);
+  document.getElementById("fsCaptionToolbar").classList.toggle("hidden", !isEdit);
   document.getElementById("fsBottomToolbar").classList.toggle("hidden", !isEdit);
   document.getElementById("fsViewToolbar").classList.toggle("hidden", isEdit);
   if(isEdit){
     updateFrameCount();
+    syncFrameCaptionInput_();
     redrawBoard();
   } else {
     fsViewFrameList = viewFrameList || [];
@@ -5098,6 +5274,7 @@ function openBoardFullscreen(cvs, fsMode, viewFrameList){
       drawArrowsOn(cx,cvs, frameArrows(fsViewFrameList[0]));
       drawTokensOn(cx,cvs, frameTokens(fsViewFrameList[0]));
       drawTextsOn(cx,cvs, frameTexts(fsViewFrameList[0]));
+      drawCaptionOn(cx,cvs, frameCaption_(fsViewFrameList[0]));
     }
   }
 }
@@ -5130,6 +5307,7 @@ document.getElementById("fsViewStopBtn").onclick = () => {
     drawArrowsOn(cxNow,cvsNow, frameArrows(fsViewFrameList[0]));
     drawTokensOn(cxNow,cvsNow, frameTokens(fsViewFrameList[0]));
     drawTextsOn(cxNow,cvsNow, frameTexts(fsViewFrameList[0]));
+    drawCaptionOn(cxNow,cvsNow, frameCaption_(fsViewFrameList[0]));
   }
 };
 
@@ -5146,6 +5324,9 @@ function drawInterpolatedStep_(cx, cvs, frameA, frameB, t){
   drawArrowsOn(cx,cvs, frameArrows(frameA));
   drawTokensOn(cx,cvs, interpTokens);
   drawTextsOn(cx,cvs, frameTexts(frameA));
+  // La directriz que se lee mientras se ejecuta el movimiento es la del fotograma de
+  // DESTINO (el paso que se está completando), igual que en el PDF paso a paso.
+  drawCaptionOn(cx,cvs, frameCaption_(frameB));
 }
 function drawStaticFrame_(cx, cvs, f){
   drawCourtOn(cx,cvs);
@@ -5154,6 +5335,7 @@ function drawStaticFrame_(cx, cvs, f){
   drawArrowsOn(cx,cvs, frameArrows(f));
   drawTokensOn(cx,cvs, frameTokens(f));
   drawTextsOn(cx,cvs, frameTexts(f));
+  drawCaptionOn(cx,cvs, frameCaption_(f));
 }
 function playFrames(frameList, cvs, cx, onDone){
   if(frameList.length===0) return;
@@ -5823,6 +6005,7 @@ window.viewTask = (id) => {
       drawArrowsOn(vx, vc, frameArrows(frameList[0]));
       drawTokensOn(vx, vc, frameTokens(frameList[0]));
       drawTextsOn(vx, vc, frameTexts(frameList[0]));
+      drawCaptionOn(vx, vc, frameCaption_(frameList[0]));
     }
     document.getElementById("viewPlayBtn").onclick = () => playFrames(frameList, document.getElementById("viewCanvas"), document.getElementById("viewCanvas").getContext("2d"), ()=>{});
     document.getElementById("viewStopBtn").onclick = () => {
@@ -5836,6 +6019,7 @@ window.viewTask = (id) => {
         drawArrowsOn(cxNow,cvsNow, frameArrows(frameList[0]));
         drawTokensOn(cxNow,cvsNow, frameTokens(frameList[0]));
         drawTextsOn(cxNow,cvsNow, frameTexts(frameList[0]));
+        drawCaptionOn(cxNow,cvsNow, frameCaption_(frameList[0]));
       }
     };
     document.getElementById("viewExpandBtn").onclick = () => openBoardFullscreen(document.getElementById("viewCanvas"), "view", frameList);
@@ -11845,6 +12029,7 @@ function renderBoardViewer(container, frameList){
       drawArrowsOn(vx, vc, frameArrows(frames_[0]));
       drawTokensOn(vx, vc, frameTokens(frames_[0]));
       drawTextsOn(vx, vc, frameTexts(frames_[0]));
+      drawCaptionOn(vx, vc, frameCaption_(frames_[0]));
     }
   }
   drawStatic();

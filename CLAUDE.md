@@ -201,6 +201,17 @@ All inside `index.html` — search for these comment banners to jump around:
   (`TACTICAL WHITEBOARD` ~4120) — a canvas-based drawing/animation tool (tokens, arrows, shapes,
   multi-frame playback, GIF export) shared by tasks and ABP plays. A reusable read-only viewer
   (`VISOR DE PIZARRA REUTILIZABLE` ~11810) renders a saved board outside the editor.
+  - **Trazo automático** (`autoTrace`, OFF por defecto; botón "➜ Trazo automático"): al activarlo,
+    arrastrar una ficha de jugador/portero/corredor deja una flecha sólida desde el origen; al
+    arrastrar el balón deja una línea de puntos. Conos, pesas y porterías no dejan trazo. Se guarda
+    como una flecha normal en `arrows`, así que deshacer/fotogramas/GIF/visor funcionan sin cambios.
+  - **Bloqueo** (modo `block`): se guarda en `arrows` con `block:true` y `width:7`, y
+    `drawArrowsOn` lo pinta como barra gruesa naranja con topes perpendiculares (sin punta).
+    Al reutilizar `arrows` hereda selección, arrastre, borrado, fotogramas, GIF y visor.
+  - **Directriz por paso** (`caption` en cada fotograma, campo "📝 Directriz del paso"): texto
+    opcional que se guarda con el fotograma y se dibuja con `drawCaptionOn` durante la
+    reproducción (editor, visor, pantalla completa y GIF). Los fotogramas antiguos no tienen
+    `caption` y se ven exactamente igual que antes.
   The bank (`renderTaskList`, ~line 5673) lists each task with ★ / Ver / **➕ Añadir a sesión**
   (see next bullet) / Editar / Eliminar (the last two only for gestor/editor).
 - **Añadir tareas del banco a una sesión** (`BANCO DE TAREAS · AÑADIR TAREAS A UNA SESIÓN`
