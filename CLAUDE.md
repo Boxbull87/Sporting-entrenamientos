@@ -328,6 +328,12 @@ All inside `index.html` — search for these comment banners to jump around:
     el resumen de jornada, el resumen de temporada (tabla de porteros), la ficha del jugador, el
     PDF y el Excel de estadísticas y el "máx. goleador" de Comparar equipos leen esa separación.
     Antes compartían una sola casilla y un gol del portero se guardaba como encajado.
+  - **Goles en propia puerta** (apartado dentro de "⚽ Goles del partido"): los nuestros se
+    guardan en `goalsAgainstEvents` y los del rival en `goalsForEvents`, ambos con
+    `category:"propia_puerta"` + `ownGoal:true` y sin jugador asignado. Así no se confunden con
+    goles tácticos, pero sí suman en los avisos de "etiquetados vs marcador" y en los gráficos
+    por categoría. La categoría especial se filtra del selector normal de añadir gol
+    (`GOAL_CATEGORIES.filter(c=>!c.ownGoal)` en `renderGoalPickerBody_`).
 - **Control de asistencia** (`renderAttendanceControlView_`/`computeAttendanceSummary_` ~9780):
   cross-session attendance summary, which already included guest players from other categories —
   it's the reference implementation the matchday guest squads were modelled on.

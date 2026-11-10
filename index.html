@@ -1820,6 +1820,13 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
                     <button type="button" class="btn ghost small" id="btnAddGoalAgainst">➕ Añadir gol encajado</button>
                   </div>
                 </div>
+                <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px;">
+                  <h4 style="font-size:.85rem;margin:0 0 6px;">🙃 Goles en propia puerta</h4>
+                  <p class="muted" style="margin:0 0 6px;font-size:.78rem;">Los nuestros cuentan como gol en contra; los del rival cuentan como gol a favor. No se asignan a ningún jugador.</p>
+                  <div id="matchdayOwnGoalsList" style="margin-bottom:6px;"></div>
+                  <button type="button" class="btn ghost small" id="btnAddOwnGoalOurs">➕ Nuestro (en contra)</button>
+                  <button type="button" class="btn ghost small" id="btnAddOwnGoalRival">➕ Del rival (a favor)</button>
+                </div>
                 <p id="matchdayGoalsWarning" class="muted" style="font-size:.78rem;margin-top:6px;"></p>
 
                 <h4 style="margin-top:18px;font-size:.85rem;">🕒 Cronología del partido</h4>
@@ -8679,6 +8686,14 @@ const GOAL_CATEGORIES = [
     {id:"transicion_abp", label:"Transición ABP"},
     {id:"contra_contra", label:"Contra de la contra"},
     {id:"robo", label:"Robo"}
+  ]},
+  // Categoría especial: no sale en el selector normal de "Añadir gol marcado/encajado"
+  // (ver ownGoal en renderGoalPickerBody_), solo se añade desde el apartado "Goles en
+  // propia puerta". Así el gol queda en goalsForEvents/goalsAgainstEvents y entra en los
+  // gráficos de categorías, pero no se confunde con un gol táctico normal.
+  {id:"propia_puerta", label:"Gol en propia puerta", ownGoal:true, subs:[
+    {id:"nuestro", label:"Nuestro"},
+    {id:"rival", label:"Del rival"}
   ]}
 ];
 function goalCategoryInfo_(catId){ return GOAL_CATEGORIES.find(c=>c.id===catId) || null; }
@@ -8686,21 +8701,40 @@ function goalSubInfo_(catId, subId){ const c = goalCategoryInfo_(catId); return 
 function goalCategoryLabel_(catId){ const c = goalCategoryInfo_(catId); return c ? c.label : "Sin categoría"; }
 function goalSubLabel_(catId, subId){ const s = goalSubInfo_(catId, subId); return s ? s.label : ""; }
 
+function isOwnGoalEvent_(ev){ return !!(ev && (ev.ownGoal || ev.category==="propia_puerta")); }
 function renderMatchdayGoalEvents_(){
   const m = matchdays.find(x=>x.id===statsMatchdayId);
   const forWrap = document.getElementById("matchdayGoalsForList");
   const againstWrap = document.getElementById("matchdayGoalsAgainstList");
+  const ownWrap = document.getElementById("matchdayOwnGoalsList");
   const warnEl = document.getElementById("matchdayGoalsWarning");
   if(!forWrap || !againstWrap || !warnEl) return;
-  if(!m){ forWrap.innerHTML = ""; againstWrap.innerHTML = ""; warnEl.innerHTML = ""; return; }
+  if(!m){ forWrap.innerHTML = ""; againstWrap.innerHTML = ""; if(ownWrap) ownWrap.innerHTML = ""; warnEl.innerHTML = ""; return; }
   const forEvents = m.goalsForEvents || [];
   const againstEvents = m.goalsAgainstEvents || [];
-  forWrap.innerHTML = goalEventsListHtml_("for", forEvents);
-  againstWrap.innerHTML = goalEventsListHtml_("against", againstEvents);
+  // Los goles en propia puerta viven en las mismas listas (para no duplicar datos y que
+  // entren en los gráficos de categorías), pero se pintan en su propio apartado.
+  forWrap.innerHTML = goalEventsListHtml_("for", forEvents.filter(ev=>!isOwnGoalEvent_(ev)));
+  againstWrap.innerHTML = goalEventsListHtml_("against", againstEvents.filter(ev=>!isOwnGoalEvent_(ev)));
+  const ownEvents = [
+    ...forEvents.filter(isOwnGoalEvent_).map(ev=>({...ev, direction:"for"})),
+    ...againstEvents.filter(isOwnGoalEvent_).map(ev=>({...ev, direction:"against"}))
+  ];
+  if(ownWrap) ownWrap.innerHTML = ownGoalsListHtml_(ownEvents);
   const warnings = [];
-  if(m.goalsFor!=null && forEvents.length!==m.goalsFor) warnings.push(`⚠️ Has etiquetado ${forEvents.length} gol(es) marcado(s), pero el marcador dice ${m.goalsFor}.`);
-  if(m.goalsAgainst!=null && againstEvents.length!==m.goalsAgainst) warnings.push(`⚠️ Has etiquetado ${againstEvents.length} gol(es) encajado(s), pero el marcador dice ${m.goalsAgainst}.`);
+  if(m.goalsFor!=null && forEvents.length!==m.goalsFor) warnings.push(`⚠️ Has etiquetado ${forEvents.length} gol(es) a favor (incluidos los de propia puerta del rival), pero el marcador dice ${m.goalsFor}.`);
+  if(m.goalsAgainst!=null && againstEvents.length!==m.goalsAgainst) warnings.push(`⚠️ Has etiquetado ${againstEvents.length} gol(es) en contra (incluidos los nuestros de propia puerta), pero el marcador dice ${m.goalsAgainst}.`);
   warnEl.innerHTML = warnings.map(w=>`<div>${w}</div>`).join("");
+}
+function ownGoalsListHtml_(events){
+  if(events.length===0) return '<p class="muted" style="margin:0;">Todavía no hay goles en propia puerta.</p>';
+  return events.map(ev=>{
+    const ours = ev.direction==="against";
+    return `<span class="badge" style="display:inline-flex;align-items:center;gap:6px;margin:0 6px 6px 0;">
+      ${ours ? "🙃 Nuestro (en contra)" : "🙃 Del rival (a favor)"}
+      <button type="button" onclick="removeGoalEvent_('${ev.direction}','${ev.id}')" style="background:none;border:none;color:inherit;cursor:pointer;font-size:1em;line-height:1;padding:0;">✕</button>
+    </span>`;
+  }).join("");
 }
 function goalEventsListHtml_(direction, events){
   if(events.length===0) return '<p class="muted" style="margin:0;">Todavía no hay goles etiquetados.</p>';
@@ -8712,6 +8746,23 @@ function goalEventsListHtml_(direction, events){
 }
 document.getElementById("btnAddGoalFor").onclick = () => openGoalPicker_("for");
 document.getElementById("btnAddGoalAgainst").onclick = () => openGoalPicker_("against");
+// Un gol en propia puerta NUESTRO cuenta en contra (goalsAgainstEvents); uno DEL RIVAL
+// cuenta a favor (goalsForEvents). Se guarda con ownGoal:true para pintarlo aparte.
+document.getElementById("btnAddOwnGoalOurs").onclick = () => addOwnGoalEvent_("against");
+document.getElementById("btnAddOwnGoalRival").onclick = () => addOwnGoalEvent_("for");
+async function addOwnGoalEvent_(direction){
+  const m = matchdays.find(x=>x.id===statsMatchdayId);
+  if(!m) return;
+  const field = direction==="for" ? "goalsForEvents" : "goalsAgainstEvents";
+  const events = [...(m[field]||[]), {
+    id: Date.now().toString(36)+Math.random().toString(36).slice(2,7),
+    category: "propia_puerta",
+    subcategory: direction==="for" ? "rival" : "nuestro",
+    ownGoal: true
+  }];
+  try{ await db.collection("matchdays").doc(m.id).update({[field]: events}); }
+  catch(err){ alert("No se ha podido guardar el gol en propia puerta: " + err.message); }
+}
 let goalPickerDirection = null; // "for" | "against"
 let goalPickerCategory = null;  // categoría elegida (null = mostrando la lista de categorías)
 function openGoalPicker_(direction){
@@ -8725,7 +8776,7 @@ function renderGoalPickerBody_(){
   const wrap = document.getElementById("goalPickerBody");
   if(!goalPickerCategory){
     wrap.innerHTML = `<p class="muted" style="margin-top:0;">Elige la categoría:</p>` +
-      GOAL_CATEGORIES.map(c=>`<button type="button" class="btn ghost small" style="width:100%;text-align:left;margin-bottom:4px;" onclick="goalPickerChooseCategory_('${c.id}')">${escapeHtml(c.label)}</button>`).join("");
+      GOAL_CATEGORIES.filter(c=>!c.ownGoal).map(c=>`<button type="button" class="btn ghost small" style="width:100%;text-align:left;margin-bottom:4px;" onclick="goalPickerChooseCategory_('${c.id}')">${escapeHtml(c.label)}</button>`).join("");
     return;
   }
   const cat = goalCategoryInfo_(goalPickerCategory);
@@ -8928,7 +8979,8 @@ const GOAL_CATEGORY_COLORS_ = {
   posicional: "#1e8449",
   superioridad: "#8e44ad",
   inferioridad: "#a3d977",
-  transicion: "#2f80ed"
+  transicion: "#2f80ed",
+  propia_puerta: "#7f8c8d"
 };
 function goalChartTotal_(aggData){ return aggData.reduce((s,c)=>s+c.count, 0); }
 // HTML completo de una "tarjeta" de gráfica (cabecera oscura + donut + leyenda con
