@@ -1836,12 +1836,17 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
             <details class="acc" id="accMatchdayConvocatoria" open>
               <summary>📋 Convocatoria y estadísticas de jugadores</summary>
               <div class="acc-body">
-                <p class="muted" style="margin-top:0;">⚽ Goles: goles marcados (también en la fila del portero). 🙃 PP: goles en propia puerta; se guardan aparte y no suman a los goles marcados. 🥅 Enc.: goles encajados, solo se rellena en la fila del portero. Así un gol marcado por el portero no se confunde con uno encajado.</p>
+                <p class="muted" style="margin-top:0;">⚽ Goles: goles marcados (también en la fila del portero). 🥅 Enc.: goles encajados, solo se rellena en la fila del portero. Así un gol marcado por el portero no se confunde con uno encajado.</p>
                 <div class="row" style="margin-bottom:8px;">
                   <button type="button" class="btn small ghost" id="btnMarkAllStarters">✅ Marcar todos Titular</button>
                   <button type="button" class="btn small ghost" id="btnMarkAllUncalled">🚫 Marcar todos No convocado</button>
                 </div>
                 <div id="matchdayStatsTable" style="overflow-x:auto;"></div>
+                <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px;">
+                  <label style="font-size:.8rem;font-weight:600;">🙃 Goles a favor en propia puerta del rival</label>
+                  <p class="muted" style="margin:4px 0 6px;font-size:.78rem;">Goles que el rival ha marcado en su propia portería y que cuentan para nosotros. No se asignan a ningún jugador; el marcador de la jornada ya debe incluirlos.</p>
+                  <input type="number" min="0" id="mdRivalOwnGoals" style="width:80px;" placeholder="0">
+                </div>
                 <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px;">
                   <label style="font-size:.8rem;font-weight:600;">¿Se ha convocado a algún jugador de otra categoría a este partido?</label>
                   <input type="text" id="mdAddPlayerSearch" placeholder="🔍 Escribe el nombre del jugador..." style="margin-top:6px;">
@@ -8449,6 +8454,8 @@ function renderMatchdayStatsTable(){
   const m = matchdays.find(x=>x.id===statsMatchdayId);
   const wrap = document.getElementById("matchdayStatsTable");
   if(!m){ wrap.innerHTML = ""; document.getElementById("matchdayVideoWrap").innerHTML = ""; return; }
+  const rivalOwnEl = document.getElementById("mdRivalOwnGoals");
+  if(rivalOwnEl) rivalOwnEl.value = m.rivalOwnGoals!=null ? m.rivalOwnGoals : "";
   document.getElementById("matchdayStatsTitle").textContent =
     `Jornada ${m.number} — vs ${m.rival||"?"} (${matchScoreText_(m)})`;
   document.getElementById("matchdayVideoWrap").innerHTML = m.videoUrl ? videoEmbedHtml(m.videoUrl) : "";
@@ -8463,12 +8470,12 @@ function renderMatchdayStatsTable(){
   (m.playerStats||[]).forEach(s=>{ statsMap[s.playerId] = s; });
   wrap.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:.85rem;min-width:560px;">
     <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
-      <th style="padding:4px;">Jugador</th><th style="padding:4px;">Estado</th><th style="padding:4px;">Motivo</th><th style="padding:4px;" title="Goles marcados (porteros incluidos)">⚽ Goles</th><th style="padding:4px;" title="Goles en propia puerta (no suman a los goles marcados)">🙃 PP</th><th style="padding:4px;" title="Goles encajados (solo porteros)">🥅 Enc.</th><th style="padding:4px;">🟨</th><th style="padding:4px;">🟥</th><th style="padding:4px;"></th>
+      <th style="padding:4px;">Jugador</th><th style="padding:4px;">Estado</th><th style="padding:4px;">Motivo</th><th style="padding:4px;" title="Goles marcados (porteros incluidos)">⚽ Goles</th><th style="padding:4px;" title="Goles encajados (solo porteros)">🥅 Enc.</th><th style="padding:4px;">🟨</th><th style="padding:4px;">🟥</th><th style="padding:4px;"></th>
     </tr></thead>
     <tbody>
     ${roster.map(p=>matchdayStatsRowHtml_(p, statsMap[p.id]||{}, false)).join("")}
     ${guests.length ? `
-      <tr><td colspan="9" style="padding:8px 4px 2px;font-size:.8rem;font-weight:600;color:var(--accent);">Convocados de otras categorías</td></tr>
+      <tr><td colspan="8" style="padding:8px 4px 2px;font-size:.8rem;font-weight:600;color:var(--accent);">Convocados de otras categorías</td></tr>
       ${guests.map(p=>matchdayStatsRowHtml_(p, statsMap[p.id]||{}, true)).join("")}` : ""}
     </tbody>
   </table>`;
@@ -8491,7 +8498,6 @@ function matchdayStatsRowHtml_(p, s, isGuest){
     </td>
     <td style="padding:4px;"><input type="text" class="md-reason" value="${escapeHtml(s.reason||"")}" placeholder="Motivo" style="width:110px;"></td>
     <td style="padding:4px;"><input type="number" min="0" class="md-goals" value="${s.goals!=null?s.goals:""}" title="Goles marcados" style="width:60px;"></td>
-    <td style="padding:4px;"><input type="number" min="0" class="md-own-goals" value="${s.ownGoals!=null?s.ownGoals:""}" title="Goles en propia puerta" style="width:60px;"></td>
     <td style="padding:4px;">${isGk
       ? `<input type="number" min="0" class="md-conceded" value="${s.goalsConceded!=null?s.goalsConceded:""}" title="Goles encajados" style="width:60px;">`
       : `<span class="muted" title="Solo se rellena en la fila del portero">—</span>`}</td>
@@ -8519,7 +8525,6 @@ document.getElementById("btnSaveMatchdayStats").onclick = async () => {
     const status = row.querySelector(".md-status").value;
     const reason = row.querySelector(".md-reason").value.trim();
     const goalsVal = row.querySelector(".md-goals").value;
-    const ownGoalsVal = row.querySelector(".md-own-goals").value;
     const concededEl = row.querySelector(".md-conceded");
     const concededVal = concededEl ? concededEl.value : null;
     const yellowVal = row.querySelector(".md-yellow").value;
@@ -8530,9 +8535,7 @@ document.getElementById("btnSaveMatchdayStats").onclick = async () => {
       yellow: yellowVal!=="" ? Number(yellowVal) : 0,
       red: redVal!=="" ? Number(redVal) : 0,
       // Goles marcados: se guardan para TODOS, porteros incluidos (un portero puede marcar).
-      goals: goalsVal!=="" ? Number(goalsVal) : 0,
-      // Goles en propia puerta: estadística aparte, no suman a "goals" ni a "goalsConceded".
-      ownGoals: ownGoalsVal!=="" ? Number(ownGoalsVal) : 0
+      goals: goalsVal!=="" ? Number(goalsVal) : 0
     };
     // Goles encajados: solo el portero. Se deja null si la casilla está vacía para no
     // contar una portería a cero que no se ha registrado (ver computeTeamSummary_).
@@ -8543,8 +8546,10 @@ document.getElementById("btnSaveMatchdayStats").onclick = async () => {
   // matchdayRoster_): la tabla los lee de ahí al repintarse. Se descartan ids de jugadores
   // que ya no existen en la plantilla del club.
   const extraPlayerIds = matchdayExtraIdsEditing.filter(id=>players.some(p=>p.id===id));
+  const rivalOwnGoalsVal = document.getElementById("mdRivalOwnGoals").value;
+  const rivalOwnGoals = rivalOwnGoalsVal!=="" ? Number(rivalOwnGoalsVal) : 0;
   try{
-    await db.collection("matchdays").doc(statsMatchdayId).update({playerStats, extraPlayerIds});
+    await db.collection("matchdays").doc(statsMatchdayId).update({playerStats, extraPlayerIds, rivalOwnGoals});
     matchdayExtraIdsEditing = extraPlayerIds.slice();
     // Los invitados acaban de cambiar: se refrescan las secciones que usan matchdayRoster_
     // para no tener que reabrir la jornada (la tabla se repinta sola con el snapshot).
@@ -9729,7 +9734,7 @@ document.getElementById("btnExportSummaryPDF").onclick = () => {
   doc.setFont("helvetica","bold"); doc.setFontSize(12);
   doc.text(`${team ? team.name : ""} — Temporada ${selectedSeason||"-"}`, margin, y); y += 6;
   doc.setFont("helvetica","normal"); doc.setFontSize(10);
-  doc.text(`Jornadas jugadas: ${sum.played}  ·  Goles a favor: ${sum.goalsFor}  ·  Goles en contra: ${sum.goalsAgainst}`, margin, y); y += 10;
+  doc.text(`Jornadas jugadas: ${sum.played}  ·  Goles a favor: ${sum.goalsFor}  ·  Goles en contra: ${sum.goalsAgainst}  ·  PP del rival: ${sum.rivalOwnGoals}`, margin, y); y += 10;
 
   function drawSimpleTable(headers, rows){
     const colW = (pageW-margin*2)/headers.length;
@@ -9757,15 +9762,15 @@ document.getElementById("btnExportSummaryPDF").onclick = () => {
   doc.setFont("helvetica","bold"); doc.setFontSize(10.5);
   doc.text("Jugadores", margin, y); y += 3;
   drawSimpleTable(
-    ["Jugador","PJ","Titular","Suplente","Convoc.","Goles","PP","Am.","Roj.","Nota"],
-    outfield.map(s=>[`${s.player.dorsal!=null?s.player.dorsal+". ":""}${s.player.name}${s.guest?` (${(teams.find(t=>t.id===s.player.teamId)||{}).name||"otra categoría"})`:""}`, s.played, s.starts, s.subs, s.called, s.goals, s.ownGoals, s.yellow, s.red, s.avgRating!=null?s.avgRating.toFixed(1):"-"])
+    ["Jugador","PJ","Titular","Suplente","Convoc.","Goles","Am.","Roj.","Nota"],
+    outfield.map(s=>[`${s.player.dorsal!=null?s.player.dorsal+". ":""}${s.player.name}${s.guest?` (${(teams.find(t=>t.id===s.player.teamId)||{}).name||"otra categoría"})`:""}`, s.played, s.starts, s.subs, s.called, s.goals, s.yellow, s.red, s.avgRating!=null?s.avgRating.toFixed(1):"-"])
   );
 
   doc.setFont("helvetica","bold"); doc.setFontSize(10.5);
   doc.text("Porteros", margin, y); y += 3;
   drawSimpleTable(
-    ["Portero","PJ","Goles","PP","Encajados","Porterías a 0","Am.","Roj.","Nota"],
-    gks.map(s=>[`${s.player.dorsal!=null?s.player.dorsal+". ":""}${s.player.name}${s.guest?` (${(teams.find(t=>t.id===s.player.teamId)||{}).name||"otra categoría"})`:""}`, s.gkMatches, s.goals, s.ownGoals, s.goalsConceded, s.cleanSheets, s.yellow, s.red, s.avgRating!=null?s.avgRating.toFixed(1):"-"])
+    ["Portero","PJ","Goles","Encajados","Porterías a 0","Am.","Roj.","Nota"],
+    gks.map(s=>[`${s.player.dorsal!=null?s.player.dorsal+". ":""}${s.player.name}${s.guest?` (${(teams.find(t=>t.id===s.player.teamId)||{}).name||"otra categoría"})`:""}`, s.gkMatches, s.goals, s.goalsConceded, s.cleanSheets, s.yellow, s.red, s.avgRating!=null?s.avgRating.toFixed(1):"-"])
   );
 
   doc.save(`Estadisticas_${(team?team.name:"equipo").replace(/[^a-zA-Z0-9]+/g,"_")}.pdf`);
@@ -9779,15 +9784,15 @@ document.getElementById("btnExportSummaryExcel").onclick = () => {
   const outfield = sum.stats.filter(s=>s.player.position!=="Portero").sort((a,b)=> b.goals-a.goals || b.played-a.played);
   const gks = sum.stats.filter(s=>s.player.position==="Portero").sort((a,b)=> b.cleanSheets-a.cleanSheets || a.goalsConceded-b.goalsConceded);
 
-  const outHeader = ["Dorsal","Jugador","PJ","Titular","Suplente","Convocatorias","Goles","PP","Amarillas","Rojas","Nota media"];
-  const outRows = outfield.map(s=>[s.player.dorsal!=null?s.player.dorsal:"", `${s.player.name}${s.guest?` (${(teams.find(t=>t.id===s.player.teamId)||{}).name||"otra categoría"})`:""}`, s.played, s.starts, s.subs, s.called, s.goals, s.ownGoals, s.yellow, s.red, s.avgRating!=null?Number(s.avgRating.toFixed(1)):""]);
+  const outHeader = ["Dorsal","Jugador","PJ","Titular","Suplente","Convocatorias","Goles","Amarillas","Rojas","Nota media"];
+  const outRows = outfield.map(s=>[s.player.dorsal!=null?s.player.dorsal:"", `${s.player.name}${s.guest?` (${(teams.find(t=>t.id===s.player.teamId)||{}).name||"otra categoría"})`:""}`, s.played, s.starts, s.subs, s.called, s.goals, s.yellow, s.red, s.avgRating!=null?Number(s.avgRating.toFixed(1)):""]);
   const wsOut = XLSX.utils.aoa_to_sheet([outHeader, ...outRows]);
-  wsOut["!cols"] = [{wch:8},{wch:26},{wch:6},{wch:8},{wch:9},{wch:12},{wch:8},{wch:8},{wch:10},{wch:8},{wch:10}];
+  wsOut["!cols"] = [{wch:8},{wch:26},{wch:6},{wch:8},{wch:9},{wch:12},{wch:8},{wch:10},{wch:8},{wch:10}];
 
-  const gkHeader = ["Dorsal","Portero","PJ","Goles","PP","Encajados","Porterías a cero","Amarillas","Rojas","Nota media"];
-  const gkRows = gks.map(s=>[s.player.dorsal!=null?s.player.dorsal:"", `${s.player.name}${s.guest?` (${(teams.find(t=>t.id===s.player.teamId)||{}).name||"otra categoría"})`:""}`, s.gkMatches, s.goals, s.ownGoals, s.goalsConceded, s.cleanSheets, s.yellow, s.red, s.avgRating!=null?Number(s.avgRating.toFixed(1)):""]);
+  const gkHeader = ["Dorsal","Portero","PJ","Goles","Encajados","Porterías a cero","Amarillas","Rojas","Nota media"];
+  const gkRows = gks.map(s=>[s.player.dorsal!=null?s.player.dorsal:"", `${s.player.name}${s.guest?` (${(teams.find(t=>t.id===s.player.teamId)||{}).name||"otra categoría"})`:""}`, s.gkMatches, s.goals, s.goalsConceded, s.cleanSheets, s.yellow, s.red, s.avgRating!=null?Number(s.avgRating.toFixed(1)):""]);
   const wsGk = XLSX.utils.aoa_to_sheet([gkHeader, ...gkRows]);
-  wsGk["!cols"] = [{wch:8},{wch:26},{wch:6},{wch:8},{wch:8},{wch:12},{wch:16},{wch:10},{wch:8},{wch:10}];
+  wsGk["!cols"] = [{wch:8},{wch:26},{wch:6},{wch:8},{wch:12},{wch:16},{wch:10},{wch:8},{wch:10}];
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, wsOut, "Jugadores");
@@ -9811,14 +9816,15 @@ function computeTeamSummary_(teamId, season, difficultyFilter, competitionFilter
   roster.forEach(p=>{
     stats[p.id] = {
       player: p, guest: p.teamId!==teamId, played:0, starts:0, subs:0, called:0,
-      goals:0, ownGoals:0, yellow:0, red:0, goalsConceded:0, cleanSheets:0, gkMatches:0,
+      goals:0, yellow:0, red:0, goalsConceded:0, cleanSheets:0, gkMatches:0,
       ratingSum:0, ratingCount:0
     };
   });
-  let goalsFor = 0, goalsAgainst = 0, ownGoals = 0, played = 0;
+  let goalsFor = 0, goalsAgainst = 0, rivalOwnGoals = 0, played = 0;
   teamMds.forEach(m=>{
     if(m.goalsFor!=null) goalsFor += m.goalsFor;
     if(m.goalsAgainst!=null) goalsAgainst += m.goalsAgainst;
+    rivalOwnGoals += m.rivalOwnGoals||0;
     if(Array.isArray(m.playerStats) && m.playerStats.length) played++;
     (m.playerStats||[]).forEach(s=>{
       const st = stats[s.playerId];
@@ -9826,8 +9832,6 @@ function computeTeamSummary_(teamId, season, difficultyFilter, competitionFilter
       if(s.status==="Titular"){ st.starts++; st.played++; st.called++; }
       else if(s.status==="Suplente"){ st.subs++; st.played++; st.called++; }
       st.goals += s.goals||0;
-      st.ownGoals += s.ownGoals||0;
-      ownGoals += s.ownGoals||0;
       st.yellow += s.yellow||0;
       st.red += s.red||0;
       if(st.player.position==="Portero" && (s.status==="Titular"||s.status==="Suplente")){
@@ -9848,7 +9852,7 @@ function computeTeamSummary_(teamId, season, difficultyFilter, competitionFilter
     });
   });
   const statsArr = Object.values(stats).map(st=>({...st, avgRating: st.ratingCount>0 ? (st.ratingSum/st.ratingCount) : null}));
-  return {roster, teamMds, played, goalsFor, goalsAgainst, ownGoals, stats: statsArr};
+  return {roster, teamMds, played, goalsFor, goalsAgainst, rivalOwnGoals, stats: statsArr};
 }
 let summaryMode = "season"; // "season" | "matchday"
 let summarySelectedMatchdayId = null;
@@ -10016,7 +10020,7 @@ function renderSeasonSummary_(wrap){
       <div class="badge outline" style="padding:8px 12px;">🗓️ Jornadas jugadas: ${sum.played}</div>
       <div class="badge outline" style="padding:8px 12px;">⚽ Goles a favor: ${sum.goalsFor}</div>
       <div class="badge outline" style="padding:8px 12px;">🥅 Goles en contra: ${sum.goalsAgainst}</div>
-      <div class="badge outline" style="padding:8px 12px;">🙃 Goles en propia puerta: ${sum.ownGoals}</div>
+      <div class="badge outline" style="padding:8px 12px;">🙃 PP del rival: ${sum.rivalOwnGoals}</div>
     </div>
     <h3 style="font-size:.9rem;">Goles por categoría (temporada)</h3>
     <div class="row" style="align-items:flex-start;margin-bottom:12px;">
@@ -10027,7 +10031,7 @@ function renderSeasonSummary_(wrap){
     <div style="overflow-x:auto;">
     <table style="width:100%;border-collapse:collapse;font-size:.85rem;min-width:480px;">
       <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
-        <th style="padding:5px;">Jugador</th><th style="padding:5px;">PJ</th><th style="padding:5px;">Titular</th><th style="padding:5px;">Suplente</th><th style="padding:5px;">Convoc.</th><th style="padding:5px;">⚽</th><th style="padding:5px;" title="Goles en propia puerta">🙃 PP</th><th style="padding:5px;">🟨</th><th style="padding:5px;">🟥</th><th style="padding:5px;">⭐ Nota media</th>
+        <th style="padding:5px;">Jugador</th><th style="padding:5px;">PJ</th><th style="padding:5px;">Titular</th><th style="padding:5px;">Suplente</th><th style="padding:5px;">Convoc.</th><th style="padding:5px;">⚽</th><th style="padding:5px;">🟨</th><th style="padding:5px;">🟥</th><th style="padding:5px;">⭐ Nota media</th>
       </tr></thead>
       <tbody>
       ${outfield.length ? outfield.map(s=>`
@@ -10038,11 +10042,10 @@ function renderSeasonSummary_(wrap){
           <td style="padding:5px;">${s.subs}</td>
           <td style="padding:5px;">${s.called}</td>
           <td style="padding:5px;">${s.goals}</td>
-          <td style="padding:5px;">${s.ownGoals}</td>
           <td style="padding:5px;">${s.yellow}</td>
           <td style="padding:5px;">${s.red}</td>
           <td style="padding:5px;">${s.avgRating!=null ? s.avgRating.toFixed(1) : "-"}</td>
-        </tr>`).join("") : `<tr><td colspan="10" style="padding:5px;" class="muted">Sin jugadores de campo en la plantilla.</td></tr>`}
+        </tr>`).join("") : `<tr><td colspan="9" style="padding:5px;" class="muted">Sin jugadores de campo en la plantilla.</td></tr>`}
       </tbody>
     </table>
     </div>
@@ -10050,7 +10053,7 @@ function renderSeasonSummary_(wrap){
     <div style="overflow-x:auto;">
     <table style="width:100%;border-collapse:collapse;font-size:.85rem;min-width:420px;">
       <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
-        <th style="padding:5px;">Portero</th><th style="padding:5px;">PJ</th><th style="padding:5px;">⚽ Goles</th><th style="padding:5px;" title="Goles en propia puerta">🙃 PP</th><th style="padding:5px;">🥅 Encajados</th><th style="padding:5px;">Porterías a cero</th><th style="padding:5px;">🟨</th><th style="padding:5px;">🟥</th><th style="padding:5px;">⭐ Nota media</th>
+        <th style="padding:5px;">Portero</th><th style="padding:5px;">PJ</th><th style="padding:5px;">⚽ Goles</th><th style="padding:5px;">🥅 Encajados</th><th style="padding:5px;">Porterías a cero</th><th style="padding:5px;">🟨</th><th style="padding:5px;">🟥</th><th style="padding:5px;">⭐ Nota media</th>
       </tr></thead>
       <tbody>
       ${gks.length ? gks.map(s=>`
@@ -10058,13 +10061,12 @@ function renderSeasonSummary_(wrap){
           <td style="padding:5px;">${jerseyNameHtml_(s.player.position, (s.player.dorsal!=null?escapeHtml(String(s.player.dorsal))+". ":"")+escapeHtml(s.player.name))}${s.guest?` <span class="badge outline" style="font-size:.68rem;">${escapeHtml((teams.find(t=>t.id===s.player.teamId)||{}).name||"otra categoría")}</span>`:""}</td>
           <td style="padding:5px;">${s.gkMatches}</td>
           <td style="padding:5px;">${s.goals}</td>
-          <td style="padding:5px;">${s.ownGoals}</td>
           <td style="padding:5px;">${s.goalsConceded}</td>
           <td style="padding:5px;">${s.cleanSheets}</td>
           <td style="padding:5px;">${s.yellow}</td>
           <td style="padding:5px;">${s.red}</td>
           <td style="padding:5px;">${s.avgRating!=null ? s.avgRating.toFixed(1) : "-"}</td>
-        </tr>`).join("") : `<tr><td colspan="9" style="padding:5px;" class="muted">Sin porteros en la plantilla.</td></tr>`}
+        </tr>`).join("") : `<tr><td colspan="8" style="padding:5px;" class="muted">Sin porteros en la plantilla.</td></tr>`}
       </tbody>
     </table>
     </div>
@@ -10090,14 +10092,14 @@ function renderMatchdaySummary_(wrap){
   const ratings = priv.playerRatings || {};
   const forAgg = aggregateGoalEvents_([m], "goalsForEvents");
   const againstAgg = aggregateGoalEvents_([m], "goalsAgainstEvents");
-  const ownGoalsTotal = (m.playerStats||[]).reduce((a,s)=>a+(s.ownGoals||0),0);
+  const rivalOwnGoals = m.rivalOwnGoals||0;
   wrap.innerHTML = `
     <div class="row" style="margin-bottom:12px;">
       <div class="badge outline" style="padding:8px 12px;">🗓️ Jornada ${m.number}${m.date?` · ${escapeHtml(m.date)}`:""}</div>
       <div class="badge outline" style="padding:8px 12px;">🆚 ${escapeHtml(m.rival||"?")} (${m.homeAway||"-"})</div>
       <div class="badge outline" style="padding:8px 12px;">🏆 ${escapeHtml(m.competition||"-")}</div>
       <div class="badge outline" style="padding:8px 12px;">${m.goalsFor!=null&&m.goalsAgainst!=null ? `⚽ ${matchScoreText_(m)}` : "Sin resultado"}</div>
-      <div class="badge outline" style="padding:8px 12px;">🙃 PP: ${ownGoalsTotal}</div>
+      <div class="badge outline" style="padding:8px 12px;">🙃 PP del rival: ${rivalOwnGoals}</div>
       ${diff ? `<div class="badge outline" title="${diff.label}" style="padding:8px 10px;display:flex;align-items:center;gap:0;"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:${diff.bg};border:1px solid ${diff.border};"></span></div>` : ""}
     </div>
     <button type="button" class="btn ghost small" onclick="goToMatchdayReport('${m.id}')" style="margin-bottom:12px;">📋 Ir al informe del partido</button>
@@ -10121,7 +10123,7 @@ function renderMatchdaySummary_(wrap){
     <div style="overflow-x:auto;">
     <table style="width:100%;border-collapse:collapse;font-size:.85rem;min-width:480px;">
       <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
-        <th style="padding:5px;">Jugador</th><th style="padding:5px;">Estado</th><th style="padding:5px;">Motivo</th><th style="padding:5px;">⚽ Goles</th><th style="padding:5px;" title="Goles en propia puerta">🙃 PP</th><th style="padding:5px;">🥅 Enc.</th><th style="padding:5px;">🟨</th><th style="padding:5px;">🟥</th><th style="padding:5px;">⭐ Nota</th>
+        <th style="padding:5px;">Jugador</th><th style="padding:5px;">Estado</th><th style="padding:5px;">Motivo</th><th style="padding:5px;">⚽ Goles</th><th style="padding:5px;">🥅 Enc.</th><th style="padding:5px;">🟨</th><th style="padding:5px;">🟥</th><th style="padding:5px;">⭐ Nota</th>
       </tr></thead>
       <tbody>
       ${roster.length ? roster.map(p=>{
@@ -10133,13 +10135,12 @@ function renderMatchdaySummary_(wrap){
           <td style="padding:5px;">${escapeHtml(s.status||"No convocado")}</td>
           <td style="padding:5px;">${escapeHtml(s.reason||"")}</td>
           <td style="padding:5px;">${s.goals!=null?s.goals:"-"}</td>
-          <td style="padding:5px;">${s.ownGoals||0}</td>
           <td style="padding:5px;">${isGk ? (s.goalsConceded!=null?s.goalsConceded:"-") : "—"}</td>
           <td style="padding:5px;">${s.yellow||0}</td>
           <td style="padding:5px;">${s.red||0}</td>
           <td style="padding:5px;">${ratings[p.id]!=null?ratings[p.id]:"-"}</td>
         </tr>`;
-      }).join("") : `<tr><td colspan="9" style="padding:5px;" class="muted">Este equipo todavía no tiene jugadores en la plantilla.</td></tr>`}
+      }).join("") : `<tr><td colspan="8" style="padding:5px;" class="muted">Este equipo todavía no tiene jugadores en la plantilla.</td></tr>`}
       </tbody>
     </table>
     </div>
@@ -10176,12 +10177,12 @@ window.openPlayerProfile = (id) => {
   // también esos partidos jugados con otra categoría.
   const teamMds = matchdays.filter(m=> matchdayRosterIds_(m).has(p.id) && matchdaySeason_(m, team)===selectedSeason).sort((a,b)=>(a.number||0)-(b.number||0));
   const isGk = p.position === "Portero";
-  let played=0, starts=0, subs=0, called=0, goals=0, ownGoals=0, yellow=0, red=0, goalsConceded=0, cleanSheets=0, gkMatches=0;
+  let played=0, starts=0, subs=0, called=0, goals=0, yellow=0, red=0, goalsConceded=0, cleanSheets=0, gkMatches=0;
   const rows = teamMds.map(m=>{
     const s = (m.playerStats||[]).find(x=>x.playerId===id) || {status:"No convocado"};
     if(s.status==="Titular"){ starts++; played++; called++; }
     else if(s.status==="Suplente"){ subs++; played++; called++; }
-    goals += s.goals||0; ownGoals += s.ownGoals||0; yellow += s.yellow||0; red += s.red||0;
+    goals += s.goals||0; yellow += s.yellow||0; red += s.red||0;
     if(isGk && (s.status==="Titular"||s.status==="Suplente")){
       gkMatches++;
       goalsConceded += (s.goalsConceded!=null ? s.goalsConceded : 0);
@@ -10198,7 +10199,6 @@ window.openPlayerProfile = (id) => {
       ${isGk
         ? `<div class="badge outline" style="padding:8px 12px;">⚽ Goles: ${goals}</div><div class="badge outline" style="padding:8px 12px;">🥅 Encajados: ${goalsConceded}</div><div class="badge outline" style="padding:8px 12px;">🧤 Porterías a cero: ${cleanSheets}</div>`
         : `<div class="badge outline" style="padding:8px 12px;">⚽ Goles: ${goals}</div>`}
-      <div class="badge outline" style="padding:8px 12px;">🙃 PP: ${ownGoals}</div>
       <div class="badge outline" style="padding:8px 12px;">🟨 ${yellow}</div>
       <div class="badge outline" style="padding:8px 12px;">🟥 ${red}</div>
     </div>
@@ -10206,7 +10206,7 @@ window.openPlayerProfile = (id) => {
     <div style="overflow-x:auto;">
     <table style="width:100%;border-collapse:collapse;font-size:.85rem;min-width:420px;">
       <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
-        <th style="padding:5px;">J.</th><th style="padding:5px;">Rival</th><th style="padding:5px;">Estado</th><th style="padding:5px;">⚽ Goles</th><th style="padding:5px;" title="Goles en propia puerta">🙃 PP</th>${isGk?`<th style="padding:5px;">🥅 Enc.</th>`:""}<th style="padding:5px;">🟨</th><th style="padding:5px;">🟥</th>
+        <th style="padding:5px;">J.</th><th style="padding:5px;">Rival</th><th style="padding:5px;">Estado</th><th style="padding:5px;">⚽ Goles</th>${isGk?`<th style="padding:5px;">🥅 Enc.</th>`:""}<th style="padding:5px;">🟨</th><th style="padding:5px;">🟥</th>
       </tr></thead>
       <tbody>
       ${rows.length ? rows.map(r=>`
@@ -10215,11 +10215,10 @@ window.openPlayerProfile = (id) => {
           <td style="padding:5px;">${escapeHtml(r.m.rival||"-")}${r.m.teamId!==p.teamId?` <span class="badge outline" style="font-size:.68rem;">${escapeHtml((teams.find(t=>t.id===r.m.teamId)||{}).name||"otro equipo")}</span>`:""}</td>
           <td style="padding:5px;">${escapeHtml(r.s.status||"No convocado")}</td>
           <td style="padding:5px;">${r.s.goals||0}</td>
-          <td style="padding:5px;">${r.s.ownGoals||0}</td>
           ${isGk?`<td style="padding:5px;">${r.s.goalsConceded!=null?r.s.goalsConceded:"-"}</td>`:""}
           <td style="padding:5px;">${r.s.yellow||0}</td>
           <td style="padding:5px;">${r.s.red||0}</td>
-        </tr>`).join("") : `<tr><td colspan="${isGk?8:7}" style="padding:5px;" class="muted">Todavía no hay jornadas para este equipo.</td></tr>`}
+        </tr>`).join("") : `<tr><td colspan="${isGk?7:6}" style="padding:5px;" class="muted">Todavía no hay jornadas para este equipo.</td></tr>`}
       </tbody>
     </table>
     </div>`;

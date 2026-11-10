@@ -328,10 +328,11 @@ All inside `index.html` — search for these comment banners to jump around:
     el resumen de jornada, el resumen de temporada (tabla de porteros), la ficha del jugador, el
     PDF y el Excel de estadísticas y el "máx. goleador" de Comparar equipos leen esa separación.
     Antes compartían una sola casilla y un gol del portero se guardaba como encajado.
-  - **Goles en propia puerta por jugador** (`playerStats[].ownGoals`): casilla "🙃 PP" en la
-    convocatoria, separada de `goals` y `goalsConceded`; no suma a los goles marcados ni a los
-    encajados del portero. Se muestra en la convocatoria, resumen de jornada y temporada, ficha
-    del jugador y PDF/Excel de estadísticas. Los datos antiguos sin `ownGoals` se leen como 0.
+  - **Goles a favor en propia puerta del rival** (`matchdays[].rivalOwnGoals`): campo numérico
+    en la convocatoria, separado de los goles por jugador (el rival los marca en su portería y
+    cuentan para nosotros; el marcador de la jornada ya debe incluirlos). Se muestra en el
+    resumen de jornada y temporada y en el PDF de estadísticas. Los datos antiguos sin
+    `rivalOwnGoals` se leen como 0.
 - **Control de asistencia** (`renderAttendanceControlView_`/`computeAttendanceSummary_` ~9780):
   cross-session attendance summary, which already included guest players from other categories —
   it's the reference implementation the matchday guest squads were modelled on.
