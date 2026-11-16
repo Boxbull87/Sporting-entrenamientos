@@ -675,6 +675,69 @@ table.scout-detail th.num,table.scout-detail td.num{text-align:center;}
 table.scout-detail td{padding:5px 7px;border-bottom:1px solid var(--border);font-size:.78rem;}
 table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
 .scout-foot{margin-top:6px;font-family:'Roboto Mono',monospace;font-size:.68rem;}
+
+/* ---------- Estadísticas en partido (directo móvil) ---------- */
+.live-overlay{position:fixed;inset:0;z-index:90;background:var(--paper);overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.live-shell{max-width:560px;margin:0 auto;padding:12px 12px calc(24px + env(safe-area-inset-bottom,0px));}
+.live-header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;}
+.live-header-title{font-family:'Oswald',sans-serif;font-weight:600;font-size:.92rem;text-transform:uppercase;letter-spacing:.04em;text-align:center;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.live-scoreboard{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;background:linear-gradient(160deg,var(--ink),var(--pitch));color:#fff;border-radius:14px;padding:14px 12px;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.18);}
+.live-team{font-family:'Oswald',sans-serif;font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;line-height:1.15;overflow-wrap:break-word;}
+.live-score{font-family:'Oswald',sans-serif;font-size:2.6rem;font-weight:700;line-height:1;white-space:nowrap;padding:0 4px;}
+.live-meta{text-align:center;color:var(--muted);font-size:.72rem;margin:6px 0 10px;font-family:'Roboto Mono',monospace;}
+.live-timer-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:12px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.05);}
+.live-period{font-family:'Roboto Mono',monospace;font-size:.68rem;font-weight:700;letter-spacing:.08em;color:var(--accent);text-transform:uppercase;}
+.live-clock{font-family:'Roboto Mono',monospace;font-size:clamp(2.5rem,13vw,3.6rem);font-weight:700;line-height:1.05;letter-spacing:.02em;margin:2px 0 8px;}
+.live-timer-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;}
+.live-timer-actions .btn{flex:1;min-width:90px;min-height:42px;}
+.live-section-title{display:flex;align-items:center;justify-content:space-between;gap:8px;font-family:'Oswald',sans-serif;font-size:.82rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;}
+.live-onfield-card,.live-feed-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:12px;margin-top:10px;box-shadow:0 1px 3px rgba(0,0,0,.05);}
+.live-onfield{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;}
+.live-player-chip{display:inline-flex;align-items:center;gap:4px;background:#f6f3ee;border:1px solid var(--border);border-radius:999px;padding:5px 9px;font-size:.78rem;font-weight:600;}
+.live-player-chip .gk{font-family:'Roboto Mono',monospace;font-size:.62rem;background:var(--accent);color:#fff;border-radius:4px;padding:1px 4px;}
+.live-player-chip.empty{font-weight:400;color:var(--muted);}
+.live-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
+.live-action-btn{border:none;border-radius:14px;min-height:74px;padding:8px 6px;font-family:'Oswald',sans-serif;font-size:.86rem;font-weight:600;line-height:1.15;text-transform:uppercase;letter-spacing:.02em;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;box-shadow:0 1px 3px rgba(0,0,0,.12);}
+.live-action-btn .ico{font-size:1.55rem;line-height:1;}
+.live-action-btn:active{transform:scale(.97);}
+.live-action-btn.goal{background:linear-gradient(135deg,#1e8449,#27ae60);color:#fff;}
+.live-action-btn.against{background:linear-gradient(135deg,#33455a,#1f2a36);color:#fff;}
+.live-action-btn.pp{background:linear-gradient(135deg,#b9770e,#e0a32e);color:#fff;}
+.live-action-btn.yellow{background:#f1c40f;color:#1a1a1a;}
+.live-action-btn.red{background:linear-gradient(135deg,#c0392b,#9c0f1c);color:#fff;}
+.live-action-btn.neutral{background:#fff;color:var(--ink);border:1px solid var(--border);}
+.live-feed-item{display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);font-size:.82rem;}
+.live-feed-item:last-child{border-bottom:none;}
+.live-feed-main{flex:1;min-width:0;}
+.live-feed-top{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.live-feed-minute{font-family:'Roboto Mono',monospace;font-size:.68rem;color:var(--muted);font-weight:600;}
+.live-feed-score{font-family:'Roboto Mono',monospace;font-size:.72rem;font-weight:700;}
+.live-feed-sub{color:var(--muted);font-size:.72rem;margin-top:2px;}
+.live-feed-undo{background:none;border:none;color:var(--danger);font-size:.9rem;padding:4px 6px;flex:0 0 auto;}
+.live-choice-btn{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:#fff;border:1px solid var(--border);border-radius:10px;padding:11px 12px;margin-bottom:6px;font-family:inherit;font-size:.9rem;font-weight:600;color:var(--ink);}
+.live-choice-btn:hover{background:#faf8f5;}
+.live-choice-btn .meta{margin-left:auto;color:var(--muted);font-size:.72rem;font-weight:400;text-align:right;}
+.live-choice-btn:disabled{opacity:.45;}
+.live-choice-btn.selected{border-color:var(--accent);background:rgba(216,30,44,.06);}
+.live-lineup-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--border);}
+.live-lineup-row:last-child{border-bottom:none;}
+.live-lineup-check{display:flex;align-items:center;gap:8px;flex:1;min-width:0;cursor:pointer;text-transform:none;font-family:inherit;font-weight:400;font-size:.88rem;color:var(--ink);margin:0;}
+.live-lineup-check input{width:auto;flex:0 0 auto;}
+.live-lineup-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.live-lineup-toggle{flex:0 0 auto;border:1px solid var(--border);background:#fff;color:var(--ink);border-radius:999px;padding:6px 10px;font-family:'Roboto Mono',monospace;font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.02em;min-height:34px;}
+.live-lineup-toggle.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+.live-lineup-toggle:disabled{opacity:.4;}
+.live-lineup-summary{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0;}
+.live-badge{display:inline-flex;align-items:center;gap:4px;background:#f6f3ee;border:1px solid var(--border);border-radius:999px;padding:4px 9px;font-family:'Roboto Mono',monospace;font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.02em;color:var(--muted);}
+.live-badge.ok{color:#1e8449;border-color:#a9dfbf;background:#eafaf1;}
+.live-badge.warn{color:#b9770e;border-color:#f5cba7;background:#fef5e7;}
+.live-modal{max-width:520px;}
+.live-modal .live-choice-btn{min-height:48px;}
+@media (max-width:520px){
+  .live-shell{padding:10px 10px calc(20px + env(safe-area-inset-bottom,0px));}
+  .live-score{font-size:2.3rem;}
+  .live-action-btn{min-height:70px;}
+}
 </style>
 </head>
 <body>
@@ -1413,6 +1476,11 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
               <span class="home-card-label">Jornadas</span>
               <span class="home-card-desc">Convocatorias, goles y tarjetas</span>
             </button>
+            <button type="button" class="home-card" id="miEquipoGoLive">
+              <span class="home-card-icon">📱</span>
+              <span class="home-card-label">Estadísticas en partido</span>
+              <span class="home-card-desc">Goles, tarjetas y cronómetro en directo</span>
+            </button>
           </div>
         </div>
       </div>
@@ -1543,6 +1611,72 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
       </div>
     </div>
 
+    <!-- ---------- Estadísticas en partido: modal de acciones (gol, tarjeta, cambios, convocatoria) ---------- -->
+    <div id="liveActionModal" class="modal-bg hidden">
+      <div class="modal live-modal">
+        <h2 style="font-size:1.05rem;" id="liveActionTitle">Acción</h2>
+        <div id="liveActionBody"></div>
+        <button class="btn ghost" id="btnCloseLiveAction" style="width:100%;margin-top:14px;">Cerrar</button>
+      </div>
+    </div>
+
+    <!-- ---------- Estadísticas en partido: directo a pantalla completa (móvil) ---------- -->
+    <div id="liveDashboardOverlay" class="live-overlay hidden">
+      <div class="live-shell">
+        <div class="live-header">
+          <button type="button" class="btn ghost small" id="liveDashboardExit">← Salir</button>
+          <div class="live-header-title" id="liveDashboardTitle">Directo</div>
+          <button type="button" class="btn ghost small" id="liveDashboardChange">Cambiar</button>
+        </div>
+
+        <div class="live-scoreboard">
+          <div class="live-team" id="liveHomeName">Mi equipo</div>
+          <div class="live-score" id="liveScore">0 - 0</div>
+          <div class="live-team" id="liveAwayName">Rival</div>
+        </div>
+        <div class="live-meta" id="liveMatchMeta"></div>
+
+        <div class="live-timer-card">
+          <div class="live-period" id="livePeriod">1ª PARTE</div>
+          <div class="live-clock" id="liveClock">00:00</div>
+          <div class="live-timer-actions">
+            <button type="button" class="btn accent" id="liveTimerToggle">▶️ Iniciar</button>
+            <button type="button" class="btn ghost" id="liveTimerNextPeriod">2ª parte</button>
+            <button type="button" class="btn ghost" id="liveTimerReset">Reiniciar reloj</button>
+          </div>
+        </div>
+
+        <div class="live-onfield-card">
+          <div class="live-section-title">
+            <span>En pista <span id="liveOnFieldCount"></span></span>
+            <button type="button" class="btn ghost small" id="liveChangesBtn">🔄 Cambios</button>
+          </div>
+          <div class="live-onfield" id="liveOnFieldList"></div>
+          <div class="muted" id="liveGoalkeeperNote" style="font-size:.72rem;"></div>
+        </div>
+
+        <div class="live-actions">
+          <button type="button" class="live-action-btn goal" id="liveGoalForBtn"><span class="ico">⚽</span>Gol a favor</button>
+          <button type="button" class="live-action-btn against" id="liveGoalAgainstBtn"><span class="ico">🥅</span>Gol en contra</button>
+          <button type="button" class="live-action-btn pp" id="livePPBtn"><span class="ico">🙃</span>PP del rival</button>
+          <button type="button" class="live-action-btn yellow" id="liveYellowBtn"><span class="ico">🟨</span>Amarilla</button>
+          <button type="button" class="live-action-btn red" id="liveRedBtn"><span class="ico">🟥</span>Roja</button>
+          <button type="button" class="live-action-btn neutral" id="liveConvocatoriaBtn"><span class="ico">📋</span>Convocatoria</button>
+        </div>
+
+        <div class="live-feed-card">
+          <div class="live-section-title"><span>Últimas acciones</span></div>
+          <div id="liveFeed"></div>
+        </div>
+
+        <div id="liveSyncStatus" class="muted" style="text-align:center;font-size:.75rem;margin:10px 0;"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+          <button type="button" class="btn accent" id="liveFinishBtn" style="flex:1;min-width:150px;">✅ Finalizar directo</button>
+          <button type="button" class="btn danger" id="liveResetBtn" style="flex:1;min-width:150px;">♻️ Reiniciar directo</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ---------- Añadir jugada/tarea a una carpeta de equipo (Mi equipo → ABP/Tareas) ---------- -->
     <div id="teamFolderItemPickModal" class="modal-bg hidden">
       <div class="modal">
@@ -1577,6 +1711,11 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
             <span class="home-card-icon">🗓️</span>
             <span class="home-card-label">Jornadas</span>
             <span class="home-card-desc">Convocatorias, goles y tarjetas</span>
+          </button>
+          <button type="button" class="home-card" id="plantillaGoLive">
+            <span class="home-card-icon">📱</span>
+            <span class="home-card-label">Estadísticas en partido</span>
+            <span class="home-card-desc">Goles, tarjetas y cronómetro en directo</span>
           </button>
           <button type="button" class="home-card" id="plantillaGoSummary">
             <span class="home-card-icon">📊</span>
@@ -1677,6 +1816,7 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
           <div id="matchdayStatsView" class="hidden">
             <button type="button" class="btn ghost small" id="btnStatsBack" style="margin-bottom:10px;">← Volver a jornadas</button>
             <h3 id="matchdayStatsTitle" style="font-size:.95rem;"></h3>
+            <div id="matchdayLiveBanner"></div>
             <div id="matchdayVideoWrap" style="margin-bottom:8px;"></div>
 
             <div id="matchdayScoutingWrap" style="margin-bottom:14px;"></div>
@@ -1985,6 +2125,61 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
           </div>
         </div>
 
+      </div>
+
+      <div id="plantillaLiveView" class="hidden">
+        <button type="button" class="btn ghost small" id="plantillaLiveBack" style="margin-bottom:10px;">← Volver</button>
+        <div class="card">
+          <h2 style="font-size:1.05rem;">📱 Estadísticas en partido</h2>
+          <p class="muted" style="margin-top:-6px;">Registra goles, tarjetas y cronómetro en directo. Todo se guarda en la jornada y aparece en Jornadas.</p>
+
+          <div id="liveSetupView">
+            <div class="row">
+              <div>
+                <label>Equipo</label>
+                <select id="liveTeamSelect"></select>
+              </div>
+              <div>
+                <label>Partido</label>
+                <select id="liveMatchdaySelect"></select>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+              <button type="button" class="btn accent" id="liveContinueBtn">Continuar</button>
+              <button type="button" class="btn ghost" id="liveNewMatchBtn">➕ Crear partido</button>
+            </div>
+            <div id="liveNewMatchForm" class="hidden" style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px;">
+              <div class="row">
+                <div><label>Jornada nº</label><input type="number" min="1" id="liveMdNumber"></div>
+                <div><label>Fecha</label><input type="date" id="liveMdDate"></div>
+                <div><label>Rival</label><input type="text" id="liveMdRival"></div>
+              </div>
+              <div class="row" style="margin-top:8px;">
+                <div><label>Competición</label><input type="text" id="liveMdCompetition" list="competitionSuggestions" placeholder="Liga, Copa, Amistoso..."></div>
+                <div><label>Condición</label><select id="liveMdHomeAway"><option value="Local">Local</option><option value="Visitante">Visitante</option></select></div>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+                <button type="button" class="btn accent" id="liveCreateMatchBtn">💾 Crear y preparar</button>
+                <button type="button" class="btn ghost" id="liveCancelNewMatchBtn">Cancelar</button>
+              </div>
+            </div>
+            <div id="liveSetupMsg"></div>
+          </div>
+
+          <div id="liveLineupView" class="hidden">
+            <button type="button" class="btn ghost small" id="liveLineupBack" style="margin-bottom:8px;">← Cambiar partido</button>
+            <h3 id="liveLineupTitle" style="font-size:.95rem;"></h3>
+            <p class="muted" style="margin-top:-4px;">Marca quién va convocado y elige los 5 que están en pista. Los goles y tarjetas se registrarán sobre esta convocatoria.</p>
+            <div class="live-lineup-summary" id="liveLineupSummary"></div>
+            <div id="liveLineupList"></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
+              <button type="button" class="btn ghost small" id="liveLineupAllBtn">✅ Todos convocados</button>
+              <button type="button" class="btn ghost small" id="liveLineupNoneBtn">🚫 Ninguno</button>
+              <button type="button" class="btn accent" id="liveLineupStartBtn">▶️ Empezar directo</button>
+            </div>
+            <div id="liveLineupMsg"></div>
+          </div>
+        </div>
       </div>
 
       <div id="plantillaAttendanceView" class="hidden">
@@ -2788,6 +2983,7 @@ function placeBoardWrapFor(tab){
 }
 document.querySelectorAll(".tab").forEach(btn=>{
   btn.onclick = () => {
+    liveHideDashboardOverlay_();
     document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));
     btn.classList.add("active");
     ["home","tasks","sessions","modelo","abp","miequipo","plantilla","coaches","papelera"].forEach(t=>{
@@ -3556,6 +3752,7 @@ function attachRealtimeListeners(){
     players = snap.docs.map(d=>({id:d.id, ...d.data()}));
     renderPlayersList();
     renderTeamSummary();
+    liveOnPlayersSnapshot_();
   }, err => showSyncError_("plantilla de jugadores", err));
 
   db.collection("sessionSurveys").orderBy("submittedAt","desc").onSnapshot(snap=>{
@@ -3575,6 +3772,7 @@ function attachRealtimeListeners(){
       renderMatchdayTimeline_();
     }
     renderMiEquipoCalendar_();
+    liveOnMatchdaysSnapshot_();
   }, err => showSyncError_("jornadas", err));
 
   // (Las notas de jugadores + informe del partido NO se cargan aquí con un listener: se leen
@@ -6287,6 +6485,7 @@ function showPlantillaView(view){
   document.getElementById("plantillaRosterView").classList.toggle("hidden", view!=="roster");
   document.getElementById("plantillaPlayerView").classList.toggle("hidden", view!=="player");
   document.getElementById("plantillaMatchdaysView").classList.toggle("hidden", view!=="matchdays");
+  document.getElementById("plantillaLiveView").classList.toggle("hidden", view!=="live");
   document.getElementById("plantillaSummaryView").classList.toggle("hidden", view!=="summary");
   document.getElementById("plantillaAttendanceView").classList.toggle("hidden", view!=="attendance");
   document.getElementById("plantillaTeamsView").classList.toggle("hidden", view!=="teams");
@@ -6308,12 +6507,14 @@ function goBackFromPlantillaDetail_(){
 }
 document.getElementById("plantillaGoRoster").onclick = () => { plantillaBackTarget = "plantilla-home"; showPlantillaView("roster"); renderPlayersList(); };
 document.getElementById("plantillaGoMatchdays").onclick = () => { plantillaBackTarget = "plantilla-home"; showPlantillaView("matchdays"); showMatchdaySub("list"); renderMatchdaysList(); };
+document.getElementById("plantillaGoLive").onclick = () => { plantillaBackTarget = "plantilla-home"; showPlantillaView("live"); liveOpen_(); };
 document.getElementById("plantillaGoSummary").onclick = () => { plantillaBackTarget = "plantilla-home"; showPlantillaView("summary"); renderSummaryTeamSelector_(); renderTeamSummary(); };
 document.getElementById("plantillaGoAttendance").onclick = () => { plantillaBackTarget = "plantilla-home"; showPlantillaView("attendance"); renderAttendanceTeamSelector_(); renderAttendanceControlView_(); };
 document.getElementById("plantillaGoTeams").onclick = () => { showPlantillaView("teams"); renderTeamManageList(); };
 document.getElementById("plantillaGoCompare").onclick = () => { showPlantillaView("compare"); renderTeamCompare(); };
 document.getElementById("plantillaRosterBack").onclick = goBackFromPlantillaDetail_;
 document.getElementById("plantillaMatchdaysBack").onclick = goBackFromPlantillaDetail_;
+document.getElementById("plantillaLiveBack").onclick = () => { liveHideDashboardOverlay_(); goBackFromPlantillaDetail_(); };
 document.getElementById("plantillaSummaryBack").onclick = goBackFromPlantillaDetail_;
 document.getElementById("plantillaAttendanceBack").onclick = goBackFromPlantillaDetail_;
 document.getElementById("plantillaTeamsBack").onclick = () => showPlantillaView("home");
@@ -6381,6 +6582,12 @@ document.getElementById("miEquipoGoMatchdays").onclick = () => {
   showPlantillaView("matchdays");
   showMatchdaySub("list");
   renderMatchdaysList();
+};
+document.getElementById("miEquipoGoLive").onclick = () => {
+  plantillaBackTarget = "miequipo";
+  document.querySelector('.tab[data-tab="plantilla"]').click();
+  showPlantillaView("live");
+  liveOpen_();
 };
 document.getElementById("miEquipoGoStats").onclick = () => {
   plantillaBackTarget = "miequipo";
@@ -7384,7 +7591,7 @@ function renderMatchdaysList(){
       <tr style="border-bottom:1px solid var(--border);cursor:pointer;" onclick="openMatchdayStats('${m.id}')">
         <td style="padding:6px;">${diff?`<span title="${diff.label}" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${diff.bg};border:1px solid ${diff.border};margin-right:4px;"></span>`:""}${m.number}</td>
         <td style="padding:6px;">${escapeHtml(m.date||"-")}</td>
-        <td style="padding:6px;">${escapeHtml(m.rival||"-")}${m.homeAway?` (${m.homeAway==="Local"?"L":"V"})`:""}${m.videoUrl?" 🎥":""}</td>
+        <td style="padding:6px;">${escapeHtml(m.rival||"-")}${m.homeAway?` (${m.homeAway==="Local"?"L":"V"})`:""}${m.videoUrl?" 🎥":""}${m.live?' <span class="badge outline" style="font-size:.62rem;">🔴 directo</span>':""}</td>
         <td style="padding:6px;">${escapeHtml(m.competition||"-")}</td>
         <td style="padding:6px;">${m.goalsFor!=null && m.goalsAgainst!=null ? matchScoreText_(m) : "-"}</td>
         <td style="padding:6px;text-align:right;white-space:nowrap;">
@@ -7474,6 +7681,13 @@ document.getElementById("btnSaveMatchday").onclick = async () => {
 
 window.openMatchdayStats = (id) => {
   statsMatchdayId = id;
+  const mdForLiveBanner = matchdays.find(x=>x.id===id);
+  const liveBanner = document.getElementById("matchdayLiveBanner");
+  if(liveBanner){
+    liveBanner.innerHTML = mdForLiveBanner && mdForLiveBanner.live
+      ? '<div class="card" style="border-left:4px solid var(--accent);padding:10px 12px;margin-bottom:12px;background:#fff8f8;"><strong>🔴 Directo activo.</strong> Este partido se está registrando desde <em>Plantilla → Estadísticas en partido</em>. Para goles y tarjetas usa el directo; si editas aquí la convocatoria o el marcador, el directo puede sobrescribirlo al guardar la siguiente acción.</div>'
+      : "";
+  }
   // Copia de trabajo de los invitados de otras categorías (ver matchdayRoster_): se parte de
   // lo que ya haya guardado en la jornada y se descarta el buscador de la anterior.
   matchdayExtraIdsEditing = matchdayExtraIds_(matchdays.find(x=>x.id===id));
@@ -8692,8 +8906,14 @@ const GOAL_CATEGORIES = [
 ];
 function goalCategoryInfo_(catId){ return GOAL_CATEGORIES.find(c=>c.id===catId) || null; }
 function goalSubInfo_(catId, subId){ const c = goalCategoryInfo_(catId); return c ? (c.subs.find(s=>s.id===subId)||null) : null; }
-function goalCategoryLabel_(catId){ const c = goalCategoryInfo_(catId); return c ? c.label : "Sin categoría"; }
-function goalSubLabel_(catId, subId){ const s = goalSubInfo_(catId, subId); return s ? s.label : ""; }
+function goalCategoryLabel_(catId){
+  if(catId==="rival_own_goal") return "PP del rival";
+  const c = goalCategoryInfo_(catId); return c ? c.label : "Sin categoría";
+}
+function goalSubLabel_(catId, subId){
+  if(catId==="rival_own_goal") return "";
+  const s = goalSubInfo_(catId, subId); return s ? s.label : "";
+}
 
 function renderMatchdayGoalEvents_(){
   const m = matchdays.find(x=>x.id===statsMatchdayId);
@@ -8713,11 +8933,18 @@ function renderMatchdayGoalEvents_(){
 }
 function goalEventsListHtml_(direction, events){
   if(events.length===0) return '<p class="muted" style="margin:0;">Todavía no hay goles etiquetados.</p>';
-  return events.map(ev=>`
+  return events.map(ev=>{
+    const scorer = ev.playerId ? players.find(p=>p.id===ev.playerId) : null;
+    const subLabel = ev.subcategory ? ` · ${escapeHtml(goalSubLabel_(ev.category, ev.subcategory))}` : "";
+    const scorerLabel = scorer ? ` · ${escapeHtml(scorer.name)}` : "";
+    const liveBadge = ev.fromLive ? ' <span class="badge outline" style="font-size:.62rem;">directo</span>' : "";
+    const removeBtn = ev.fromLive ? "" : `<button type="button" onclick="removeGoalEvent_('${direction}','${ev.id}')" style="background:none;border:none;color:inherit;cursor:pointer;font-size:1em;line-height:1;padding:0;">✕</button>`;
+    return `
     <span class="badge" style="display:inline-flex;align-items:center;gap:6px;margin:0 6px 6px 0;">
-      ${escapeHtml(goalCategoryLabel_(ev.category))} · ${escapeHtml(goalSubLabel_(ev.category, ev.subcategory))}
-      <button type="button" onclick="removeGoalEvent_('${direction}','${ev.id}')" style="background:none;border:none;color:inherit;cursor:pointer;font-size:1em;line-height:1;padding:0;">✕</button>
-    </span>`).join("");
+      ${escapeHtml(goalCategoryLabel_(ev.category))}${subLabel}${scorerLabel}${liveBadge}
+      ${removeBtn}
+    </span>`;
+  }).join("");
 }
 document.getElementById("btnAddGoalFor").onclick = () => openGoalPicker_("for");
 document.getElementById("btnAddGoalAgainst").onclick = () => openGoalPicker_("against");
@@ -8786,6 +9013,8 @@ function goalPlayerChip_(p, isScorer){
 function matchdayTimelineSorted_(m){
   const timeline = (m && m.timeline) || [];
   return timeline.map((ev,i)=>({ev,i})).sort((a,b)=>{
+    const pa = a.ev.period || 1, pb = b.ev.period || 1;
+    if(pa!==pb) return pa-pb;
     const ma = a.ev.minute, mb = b.ev.minute;
     if(ma==null && mb==null) return a.i-b.i;
     if(ma==null) return 1;
@@ -8802,14 +9031,21 @@ function matchdayTimelineListHtml_(m, editable){
   let goalsFor = 0, goalsAgainst = 0;
   return sorted.map(ev=>{
     if(ev.direction==="for") goalsFor++; else goalsAgainst++;
-    const minuteLabel = ev.minute!=null ? `${ev.minute}'` : "min. ?";
+    const periodLabel = ev.period ? (ev.period===1?"1ª ":"2ª ") : "";
+    const minuteLabel = ev.minute!=null ? `${periodLabel}${ev.minute}'` : "min. ?";
     const onField = (ev.playersOnField||[]).map(pid=>players.find(p=>p.id===pid)).filter(Boolean);
     const scorer = ev.direction==="for" && ev.scorer ? players.find(p=>p.id===ev.scorer) : null;
+    const icon = ev.ownGoalByRival ? "🙃" : (ev.direction==="for"?"⚽":"🥅");
+    const ownGoalLabel = ev.ownGoalByRival ? " · PP del rival" : "";
+    const liveBadge = ev.fromLive ? ' <span class="badge outline" style="font-size:.62rem;">directo</span>' : "";
+    const removeBtn = (editable && !ev.fromLive)
+      ? `<button type="button" onclick="removeTimelineEvent_('${ev.id}')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:1em;line-height:1;padding:0;flex:0 0 auto;">✕</button>`
+      : "";
     return `
     <div style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;margin-bottom:6px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-        <span style="font-size:.85rem;">${ev.direction==="for"?"⚽":"🥅"} <strong>${minuteLabel}</strong> — marcador ${matchScoreText_(m, goalsFor, goalsAgainst)}${scorer?` · Marca: ${escapeHtml(scorer.name)}`:""}</span>
-        ${editable ? `<button type="button" onclick="removeTimelineEvent_('${ev.id}')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:1em;line-height:1;padding:0;flex:0 0 auto;">✕</button>` : ""}
+        <span style="font-size:.85rem;">${icon} <strong>${minuteLabel}</strong> — marcador ${matchScoreText_(m, goalsFor, goalsAgainst)}${scorer?` · Marca: ${escapeHtml(scorer.name)}`:""}${ownGoalLabel}${liveBadge}</span>
+        ${removeBtn}
       </div>
       ${onField.length ? `<div style="margin-top:4px;">${onField.map(p=>goalPlayerChip_(p, p.id===ev.scorer)).join("")}</div>` : '<p class="muted" style="margin:4px 0 0;font-size:.75rem;">Sin jugadores marcados.</p>'}
     </div>`;
@@ -8924,7 +9160,8 @@ function aggregateGoalEvents_(mdList, field){
       byCat[ev.category].subs[ev.subcategory] = (byCat[ev.category].subs[ev.subcategory]||0)+1;
     });
   });
-  return GOAL_CATEGORIES.filter(c=>byCat[c.id]).map(c=>({
+  const allCategories = GOAL_CATEGORIES.concat([{id:"rival_own_goal", label:"PP del rival", subs:[]}]);
+  return allCategories.filter(c=>byCat[c.id]).map(c=>({
     id: c.id, label: c.label, count: byCat[c.id].count,
     subs: c.subs.filter(s=>byCat[c.id].subs[s.id]).map(s=>({label:s.label, count:byCat[c.id].subs[s.id]}))
   }));
@@ -8937,7 +9174,8 @@ const GOAL_CATEGORY_COLORS_ = {
   posicional: "#1e8449",
   superioridad: "#8e44ad",
   inferioridad: "#a3d977",
-  transicion: "#2f80ed"
+  transicion: "#2f80ed",
+  rival_own_goal: "#b9770e"
 };
 function goalChartTotal_(aggData){ return aggData.reduce((s,c)=>s+c.count, 0); }
 // HTML completo de una "tarjeta" de gráfica (cabecera oscura + donut + leyenda con
@@ -13418,6 +13656,1444 @@ document.getElementById("btnRestoreBackup").onclick = async () => {
 function escapeHtml(str){
   return (str||"").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 }
+
+/* ============================================================
+   ESTADÍSTICAS EN PARTIDO (DIRECTO MÓVIL)
+   Vista móvil dentro de Plantilla para registrar goles, tarjetas y
+   cronómetro durante el partido. Los datos se guardan en la propia
+   jornada (matchdays) y se reflejan en Jornadas, Convocatoria,
+   Goles del partido, Cronología y Resumen.
+============================================================ */
+const LIVE_STATE_PREFIX_ = "liveState_";
+const LIVE_PENDING_PREFIX_ = "livePending_";
+const LIVE_LAST_KEY_ = "liveLastMatchdayId";
+
+let liveSelectedMatchdayId = null;
+let liveState = null; // { matchdayId, live, pending }
+let liveLineupInitializedFor = null;
+let liveLineupSelected = new Set();
+let liveLineupOnField = [];
+let liveActionType = null;
+let liveActionStep = null;
+let liveActionPlayerId = null;
+let liveActionCategory = null;
+let liveChangesOnField = [];
+let liveConvSelected = new Set();
+let liveConvOnField = [];
+let liveClockInterval = null;
+let liveDashboardOpen = false;
+let liveLastWrite_ = null;
+
+function liveStateKey_(id){ return LIVE_STATE_PREFIX_ + id; }
+function livePendingKey_(id){ return LIVE_PENDING_PREFIX_ + id; }
+function liveSafeParse_(s){ try{ return JSON.parse(s); }catch(e){ return null; } }
+function liveUid_(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+function liveTodayStr_(){
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+function liveSetLast_(id){
+  try{ localStorage.setItem(LIVE_LAST_KEY_, id); }catch(e){}
+}
+function liveGetLast_(){
+  try{ return localStorage.getItem(LIVE_LAST_KEY_); }catch(e){ return null; }
+}
+function liveTeamName_(teamId){
+  const t = teams.find(x=>x.id===teamId);
+  return t ? t.name : "Mi equipo";
+}
+function livePlayer_(id){ return players.find(p=>p.id===id) || null; }
+function livePlayerName_(id){ const p = livePlayer_(id); return p ? p.name : "Jugador"; }
+function liveMatchday_(){ return matchdays.find(m=>m.id===liveSelectedMatchdayId) || null; }
+
+// Plantilla de la jornada + invitados. Si el directo ya está iniciado, usa la lista de
+// invitados que quedó congelada en live.base.extraPlayerIds para que no cambie a mitad.
+function liveRoster_(m, live){
+  if(!m) return [];
+  const extraIds = (live && live.base && Array.isArray(live.base.extraPlayerIds))
+    ? live.base.extraPlayerIds
+    : matchdayExtraIds_(m);
+  const base = players.filter(p=>p.teamId===m.teamId);
+  const baseIds = new Set(base.map(p=>p.id));
+  const extras = extraIds.map(id=>players.find(p=>p.id===id)).filter(p=>p && !baseIds.has(p.id));
+  return base.concat(extras).sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
+}
+
+// Normaliza playerStats para que todos los jugadores de la plantilla tengan entrada, sin
+// perder goles/tarjetas ya guardados. Los porteros llevan goalsConceded; el resto no.
+function liveNormalizePlayerStats_(m, live){
+  const roster = liveRoster_(m, live);
+  const byId = {};
+  ((live && live.base && live.base.playerStats) || []).forEach(s=>{
+    if(s && s.playerId) byId[s.playerId] = {...s};
+  });
+  const out = roster.map(p=>{
+    const s = byId[p.id] || {};
+    const row = {
+      playerId: p.id,
+      status: s.status || "No convocado",
+      reason: s.reason || "",
+      goals: Number(s.goals||0),
+      yellow: Number(s.yellow||0),
+      red: Number(s.red||0)
+    };
+    if(p.position==="Portero"){
+      row.goalsConceded = (s.goalsConceded!=null ? Number(s.goalsConceded) : null);
+    }
+    return row;
+  });
+  Object.keys(byId).forEach(id=>{
+    if(!out.some(s=>s.playerId===id)) out.push(byId[id]);
+  });
+  return out;
+}
+
+function liveStoreLocal_(state){
+  if(!state || !state.live) return;
+  try{
+    localStorage.setItem(liveStateKey_(state.matchdayId), JSON.stringify({
+      matchdayId: state.matchdayId,
+      live: state.live,
+      pending: !!state.pending,
+      savedAt: Date.now()
+    }));
+  }catch(e){}
+}
+
+function liveLoadStoredState_(m){
+  if(!m) return null;
+  let stored = null;
+  try{ stored = liveSafeParse_(localStorage.getItem(liveStateKey_(m.id))); }catch(e){}
+  const fromDb = m.live ? {matchdayId:m.id, live:m.live, pending:false} : null;
+  if(stored && stored.live && stored.matchdayId===m.id){
+    const storedRev = Number(stored.live.rev||0);
+    const dbRev = fromDb ? Number(fromDb.live.rev||0) : -1;
+    if(stored.pending || storedRev >= dbRev){
+      return {matchdayId:m.id, live:stored.live, pending:!!stored.pending};
+    }
+  }
+  return fromDb;
+}
+
+function liveSetSyncStatus_(text){
+  const el = document.getElementById("liveSyncStatus");
+  if(el) el.textContent = text;
+}
+
+// Portero del equipo en pista; si no hay ninguno, el primer portero convocado que no haya
+// sido expulsado. Se usa para sumar los goles encajados al portero.
+function liveGoalkeeperId_(live, m, expelled){
+  expelled = expelled || new Set();
+  const onField = ((live && live.onField) || []).map(livePlayer_).filter(Boolean);
+  const gk = onField.find(p=>p.position==="Portero");
+  if(gk) return gk.id;
+  const stats = (live && live.base && live.base.playerStats) || [];
+  const convGk = stats.find(s=>{
+    if(expelled.has(s.playerId)) return false;
+    if(Number(s.red||0) > 0) return false;
+    const p = livePlayer_(s.playerId);
+    return p && p.position==="Portero" && s.status!=="No convocado";
+  });
+  return convGk ? convGk.playerId : null;
+}
+
+// Aplica los eventos del directo sobre la foto inicial (live.base) y devuelve el estado
+// derivado que se guarda en los campos normales de la jornada. Así deshacer un evento es
+// simplemente recalcular desde la base, sin arrastrar cuentas intermedias.
+function liveCompute_(m, live){
+  const base = (live && live.base) || {};
+  const playerStats = liveNormalizePlayerStats_(m, live);
+  const statsMap = {};
+  playerStats.forEach(s=>{ statsMap[s.playerId] = s; });
+
+  const goalsForEvents = JSON.parse(JSON.stringify(base.goalsForEvents || []));
+  const goalsAgainstEvents = JSON.parse(JSON.stringify(base.goalsAgainstEvents || []));
+  const timeline = JSON.parse(JSON.stringify(base.timeline || []));
+  let goalsFor = base.goalsFor!=null ? Number(base.goalsFor) : goalsForEvents.length;
+  let goalsAgainst = base.goalsAgainst!=null ? Number(base.goalsAgainst) : goalsAgainstEvents.length;
+  let rivalOwnGoals = Number(base.rivalOwnGoals || 0);
+
+  const events = ((live && live.events) || []).slice().sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+  const expelled = new Set();
+
+  events.forEach(ev=>{
+    const minute = ev.minute!=null ? ev.minute : null;
+    const period = ev.period || 1;
+    const playersOnField = Array.isArray(ev.playersOnField)
+      ? ev.playersOnField.slice()
+      : (((live && live.onField) || []).slice());
+
+    if(ev.type==="goal_for" || ev.type==="rival_own_goal"){
+      goalsFor++;
+      const isOwn = ev.type==="rival_own_goal";
+      goalsForEvents.push({
+        id: ev.id,
+        category: isOwn ? "rival_own_goal" : ev.category,
+        subcategory: isOwn ? null : (ev.subcategory || null),
+        playerId: isOwn ? null : (ev.playerId || null),
+        ownGoalByRival: isOwn,
+        fromLive: true,
+        minute, period
+      });
+      if(isOwn) rivalOwnGoals++;
+      if(!isOwn && ev.playerId && statsMap[ev.playerId]){
+        statsMap[ev.playerId].goals = (statsMap[ev.playerId].goals || 0) + 1;
+      }
+      timeline.push({
+        id: ev.id,
+        direction: "for",
+        minute,
+        period,
+        playersOnField,
+        scorer: isOwn ? null : (ev.playerId || null),
+        ownGoalByRival: isOwn,
+        fromLive: true
+      });
+    } else if(ev.type==="goal_against"){
+      goalsAgainst++;
+      goalsAgainstEvents.push({
+        id: ev.id,
+        category: ev.category,
+        subcategory: ev.subcategory || null,
+        fromLive: true,
+        minute, period
+      });
+      const gkId = ev.goalkeeperId || liveGoalkeeperId_(live, m, expelled);
+      if(gkId && statsMap[gkId]){
+        const current = statsMap[gkId].goalsConceded;
+        statsMap[gkId].goalsConceded = (current!=null ? Number(current) : 0) + 1;
+      }
+      timeline.push({
+        id: ev.id,
+        direction: "against",
+        minute,
+        period,
+        playersOnField,
+        scorer: null,
+        fromLive: true
+      });
+    } else if(ev.type==="yellow"){
+      if(ev.playerId && statsMap[ev.playerId]){
+        statsMap[ev.playerId].yellow = (statsMap[ev.playerId].yellow || 0) + 1;
+      }
+    } else if(ev.type==="red"){
+      if(ev.playerId){
+        expelled.add(ev.playerId);
+        if(statsMap[ev.playerId]) statsMap[ev.playerId].red = (statsMap[ev.playerId].red || 0) + 1;
+      }
+    }
+  });
+
+  return {playerStats, goalsForEvents, goalsAgainstEvents, timeline, goalsFor, goalsAgainst, rivalOwnGoals};
+}
+
+function livePersist_(m, live, opts){
+  opts = opts || {};
+  if(!m || !live) return null;
+  live.rev = Number(live.rev || 0) + 1;
+  live.updatedAt = Date.now();
+  const derived = liveCompute_(m, live);
+  const payload = JSON.parse(JSON.stringify({
+    playerStats: derived.playerStats,
+    extraPlayerIds: (live.base && live.base.extraPlayerIds) || matchdayExtraIds_(m),
+    goalsFor: derived.goalsFor,
+    goalsAgainst: derived.goalsAgainst,
+    goalsForEvents: derived.goalsForEvents,
+    goalsAgainstEvents: derived.goalsAgainstEvents,
+    timeline: derived.timeline,
+    rivalOwnGoals: derived.rivalOwnGoals,
+    live: live
+  }));
+
+  const idx = matchdays.findIndex(x=>x.id===m.id);
+  if(idx>=0) matchdays[idx] = {...matchdays[idx], ...payload};
+  if(liveState && liveState.matchdayId===m.id){
+    liveState.live = live;
+    liveState.pending = true;
+    liveStoreLocal_(liveState);
+  }
+
+  liveSetSyncStatus_("⏳ Guardando…");
+  const revAtWrite = live.rev;
+  let write;
+  try{
+    write = db.collection("matchdays").doc(m.id).update(payload);
+  }catch(err){
+    write = Promise.reject(err);
+  }
+  liveLastWrite_ = write;
+  write.then(()=>{
+    if(liveState && liveState.matchdayId===m.id && Number(liveState.live.rev||0)===revAtWrite){
+      liveState.pending = false;
+      liveStoreLocal_(liveState);
+    }
+    try{
+      const pending = liveSafeParse_(localStorage.getItem(livePendingKey_(m.id)));
+      if(pending && Number(pending.rev||0) <= revAtWrite) localStorage.removeItem(livePendingKey_(m.id));
+    }catch(e){}
+    liveSetSyncStatus_("✅ Guardado");
+  }).catch(err=>{
+    if(liveState && liveState.matchdayId===m.id){
+      liveState.pending = true;
+      liveStoreLocal_(liveState);
+    }
+    try{
+      localStorage.setItem(livePendingKey_(m.id), JSON.stringify({matchdayId:m.id, payload, rev:revAtWrite}));
+    }catch(e){}
+    const offline = err && (err.code==="unavailable" || err.code==="failed-precondition" || !navigator.onLine);
+    const detail = err && (err.message || err.code) ? (err.message || err.code) : String(err);
+    liveSetSyncStatus_(offline ? "📴 Sin conexión: guardado en este dispositivo" : "⚠️ No se ha podido guardar: " + detail);
+  });
+
+  if(opts.render !== false) renderLiveDashboard_();
+  return derived;
+}
+
+function liveFlushPending_(){
+  let keys = [];
+  try{ keys = Object.keys(localStorage).filter(k=>k.startsWith(LIVE_PENDING_PREFIX_)); }catch(e){ return; }
+  keys.forEach(key=>{
+    const raw = localStorage.getItem(key);
+    const item = liveSafeParse_(raw);
+    if(!item || !item.matchdayId || !item.payload) return;
+    let write;
+    try{
+      write = db.collection("matchdays").doc(item.matchdayId).update(item.payload);
+    }catch(err){
+      write = Promise.reject(err);
+    }
+    write.then(()=>{
+      if(localStorage.getItem(key)===raw) localStorage.removeItem(key);
+      const st = liveSafeParse_(localStorage.getItem(liveStateKey_(item.matchdayId)));
+      if(st && st.live && Number(st.live.rev||0) <= Number(item.rev||0)){
+        st.pending = false;
+        try{ localStorage.setItem(liveStateKey_(item.matchdayId), JSON.stringify(st)); }catch(e){}
+      }
+      if(liveState && liveState.matchdayId===item.matchdayId){
+        liveState.pending = false;
+        liveSetSyncStatus_("✅ Sincronizado");
+      }
+    }).catch(()=>{});
+  });
+}
+
+function liveOnMatchdaysSnapshot_(){
+  if(!liveSelectedMatchdayId) return;
+  const m = matchdays.find(x=>x.id===liveSelectedMatchdayId);
+  if(!m) return;
+  if(liveDashboardOpen && liveState && liveState.matchdayId===m.id && !liveState.pending && m.live){
+    const dbRev = Number(m.live.rev || 0);
+    const localRev = Number(liveState.live.rev || 0);
+    if(dbRev > localRev){
+      liveState.live = m.live;
+      liveState.pending = false;
+      liveStoreLocal_(liveState);
+      renderLiveDashboard_();
+    }
+  }
+}
+
+function liveOnPlayersSnapshot_(){
+  if(liveDashboardOpen && liveState) renderLiveDashboard_();
+}
+
+function liveOpen_(){
+  liveHideDashboardOverlay_();
+  liveFlushPending_();
+  const visible = coachVisibleTeams_();
+  if(!selectedTeamId || !visible.some(t=>t.id===selectedTeamId)){
+    if(visible.length){
+      selectedTeamId = visible[0].id;
+      applySelectedTeamChange_();
+    } else {
+      selectedTeamId = null;
+    }
+  }
+  renderSeasonSelector();
+  liveSelectedMatchdayId = null;
+  const lastId = liveGetLast_();
+  if(lastId){
+    const lastM = matchdays.find(x=>x.id===lastId);
+    if(lastM && lastM.teamId===selectedTeamId && matchdaySeason_(lastM)===selectedSeason) liveSelectedMatchdayId = lastM.id;
+  }
+  if(!liveSelectedMatchdayId && selectedTeamId){
+    const active = matchdays
+      .filter(m=>m.teamId===selectedTeamId && m.live && matchdaySeason_(m)===selectedSeason)
+      .sort((a,b)=>Number((b.live.updatedAt||0))-Number((a.live.updatedAt||0)))[0];
+    if(active) liveSelectedMatchdayId = active.id;
+  }
+  showLiveSub_("setup");
+  renderLiveSetup_();
+}
+
+function showLiveSub_(view){
+  document.getElementById("liveSetupView").classList.toggle("hidden", view!=="setup");
+  document.getElementById("liveLineupView").classList.toggle("hidden", view!=="lineup");
+}
+
+function renderLiveSetup_(){
+  const teamSel = document.getElementById("liveTeamSelect");
+  const matchSel = document.getElementById("liveMatchdaySelect");
+  const msg = document.getElementById("liveSetupMsg");
+  if(!teamSel || !matchSel) return;
+  if(msg) msg.innerHTML = "";
+  const visible = coachVisibleTeams_();
+  if(!visible.length){
+    teamSel.innerHTML = '<option value="">Sin equipos</option>';
+    teamSel.disabled = true;
+    matchSel.innerHTML = '<option value="">—</option>';
+    matchSel.disabled = true;
+    document.getElementById("liveContinueBtn").disabled = true;
+    document.getElementById("liveNewMatchBtn").disabled = true;
+    document.getElementById("liveNewMatchForm").classList.add("hidden");
+    if(msg) msg.innerHTML = '<p class="error-msg">No tienes equipos asignados. Pídele a un gestor que te asigne uno.</p>';
+    return;
+  }
+  teamSel.disabled = false;
+  matchSel.disabled = false;
+  teamSel.innerHTML = visible.map(t=>`<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("");
+  if(!selectedTeamId || !visible.some(t=>t.id===selectedTeamId)) selectedTeamId = visible[0].id;
+  teamSel.value = selectedTeamId;
+
+  const list = matchdays
+    .filter(m=>m.teamId===selectedTeamId && matchdaySeason_(m)===selectedSeason)
+    .sort((a,b)=>{
+      const da = a.date || "", db = b.date || "";
+      if(da!==db) return db.localeCompare(da);
+      return (Number(b.number)||0)-(Number(a.number)||0);
+    });
+  let options = '<option value="">— Elige un partido —</option>';
+  list.forEach(m=>{
+    const label = `Jornada ${m.number||"?"} · ${m.rival||"Rival"}${m.date?` · ${m.date}`:""}${m.live?" · 🔴 Directo":""}`;
+    options += `<option value="${m.id}">${escapeHtml(label)}</option>`;
+  });
+  options += '<option value="__new__">➕ Crear nuevo partido</option>';
+  matchSel.innerHTML = options;
+  if(liveSelectedMatchdayId && list.some(m=>m.id===liveSelectedMatchdayId)) matchSel.value = liveSelectedMatchdayId;
+  else if(!list.length) matchSel.value = "__new__";
+  else matchSel.value = "";
+  document.getElementById("liveContinueBtn").disabled = false;
+  document.getElementById("liveNewMatchBtn").disabled = false;
+  liveUpdateSetupSelection_();
+}
+
+function liveUpdateSetupSelection_(){
+  const sel = document.getElementById("liveMatchdaySelect");
+  const form = document.getElementById("liveNewMatchForm");
+  const btn = document.getElementById("liveContinueBtn");
+  if(!sel || !form || !btn) return;
+  const val = sel.value;
+  const msg = document.getElementById("liveSetupMsg");
+  if(msg) msg.innerHTML = "";
+  if(val === "__new__"){
+    liveSelectedMatchdayId = null;
+    form.classList.remove("hidden");
+    livePrefillNewMatchForm_();
+    btn.disabled = true;
+    btn.textContent = "Preparar directo";
+    return;
+  }
+  form.classList.add("hidden");
+  if(!val){
+    liveSelectedMatchdayId = null;
+    btn.disabled = true;
+    btn.textContent = "Preparar directo";
+    return;
+  }
+  liveSelectedMatchdayId = val;
+  liveSetLast_(val);
+  const m = matchdays.find(x=>x.id===val);
+  btn.disabled = false;
+  btn.textContent = m && m.live ? "▶️ Continuar directo" : "Preparar directo";
+}
+
+function livePrefillNewMatchForm_(){
+  const teamMds = matchdays.filter(m=>m.teamId===selectedTeamId);
+  const nextNum = teamMds.length ? Math.max(...teamMds.map(m=>Number(m.number)||0))+1 : 1;
+  const numEl = document.getElementById("liveMdNumber");
+  if(numEl) numEl.value = nextNum;
+  const dateEl = document.getElementById("liveMdDate");
+  if(dateEl) dateEl.value = liveTodayStr_();
+  const rivalEl = document.getElementById("liveMdRival");
+  if(rivalEl) rivalEl.value = "";
+  const compEl = document.getElementById("liveMdCompetition");
+  if(compEl) compEl.value = "Liga";
+  const haEl = document.getElementById("liveMdHomeAway");
+  if(haEl) haEl.value = "Local";
+}
+
+async function liveCreateMatch_(){
+  const msg = document.getElementById("liveSetupMsg");
+  if(msg) msg.innerHTML = "";
+  if(!selectedTeamId){
+    if(msg) msg.innerHTML = '<p class="error-msg">Elige primero un equipo.</p>';
+    return;
+  }
+  const number = parseInt(document.getElementById("liveMdNumber").value, 10);
+  if(!number || number < 1){
+    if(msg) msg.innerHTML = '<p class="error-msg">Pon un número de jornada válido.</p>';
+    return;
+  }
+  const team = teams.find(t=>t.id===selectedTeamId);
+  const payload = {
+    teamId: selectedTeamId,
+    number,
+    date: document.getElementById("liveMdDate").value || null,
+    rival: document.getElementById("liveMdRival").value.trim(),
+    competition: document.getElementById("liveMdCompetition").value.trim() || "Liga",
+    homeAway: document.getElementById("liveMdHomeAway").value || "Local",
+    season: selectedSeason || (team && team.currentSeason) || defaultSeasonLabel_(),
+    playerStats: [],
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    createdBy: currentUser ? currentUser.uid : null
+  };
+  try{
+    const ref = await db.collection("matchdays").add(payload);
+    const localM = {...payload, id: ref.id};
+    delete localM.createdAt;
+    if(!matchdays.some(x=>x.id===ref.id)) matchdays.push(localM);
+    liveSelectedMatchdayId = ref.id;
+    liveSetLast_(ref.id);
+    liveLineupInitializedFor = null;
+    liveState = null;
+    showLiveSub_("lineup");
+    renderLiveLineup_();
+  }catch(err){
+    if(msg) msg.innerHTML = `<p class="error-msg">No se ha podido crear el partido: ${escapeHtml(err.message||String(err))}</p>`;
+  }
+}
+
+function liveContinue_(){
+  const m = liveMatchday_();
+  if(!m){ alert("Elige un partido o crea uno nuevo."); return; }
+  liveSetLast_(m.id);
+  const state = liveLoadStoredState_(m);
+  if(state){
+    liveState = state;
+    liveSelectedMatchdayId = m.id;
+    if(state.pending){
+      let hasPendingKey = false;
+      try{ hasPendingKey = !!localStorage.getItem(livePendingKey_(m.id)); }catch(e){}
+      if(!hasPendingKey) livePersist_(m, state.live, {render:false});
+    }
+    showLiveSub_("lineup");
+    openLiveDashboard_();
+    return;
+  }
+  liveLineupInitializedFor = null;
+  showLiveSub_("lineup");
+  renderLiveLineup_();
+}
+
+function renderLiveLineup_(){
+  const m = liveMatchday_();
+  if(!m){ showLiveSub_("setup"); renderLiveSetup_(); return; }
+  if(m.live){
+    const state = liveLoadStoredState_(m);
+    if(state){ liveState = state; openLiveDashboard_(); return; }
+  }
+
+  const title = document.getElementById("liveLineupTitle");
+  const summary = document.getElementById("liveLineupSummary");
+  const listEl = document.getElementById("liveLineupList");
+  const msg = document.getElementById("liveLineupMsg");
+  if(msg) msg.innerHTML = "";
+
+  const roster = liveRoster_(m, null);
+  if(liveLineupInitializedFor !== m.id){
+    const existing = m.playerStats || [];
+    const hasStatuses = existing.some(s=>s && s.status);
+    if(hasStatuses){
+      liveLineupSelected = new Set(existing.filter(s=>s.status && s.status!=="No convocado").map(s=>s.playerId));
+      liveLineupOnField = existing
+        .filter(s=>s.status==="Titular" && Number(s.red||0)===0)
+        .map(s=>s.playerId)
+        .slice(0,5);
+    } else {
+      liveLineupSelected = new Set(roster.map(p=>p.id));
+      liveLineupOnField = [];
+    }
+    liveLineupInitializedFor = m.id;
+  }
+
+  const rosterIds = new Set(roster.map(p=>p.id));
+  liveLineupSelected = new Set(Array.from(liveLineupSelected).filter(id=>rosterIds.has(id)));
+  liveLineupOnField = liveLineupOnField.filter(id=>rosterIds.has(id)).slice(0,5);
+
+  if(title) title.textContent = `Jornada ${m.number||"?"} · ${m.rival||"Rival"}`;
+  if(!roster.length){
+    if(summary) summary.innerHTML = "";
+    if(listEl) listEl.innerHTML = '<p class="muted">No hay jugadores en la plantilla de este equipo. Añádelos primero en Plantilla de jugadores.</p>';
+    const startEmpty = document.getElementById("liveLineupStartBtn");
+    if(startEmpty) startEmpty.disabled = true;
+    return;
+  }
+
+  const gkOnField = liveLineupOnField.map(livePlayer_).find(p=>p && p.position==="Portero");
+  const gkInSquad = roster.find(p=>p.position==="Portero" && liveLineupSelected.has(p.id));
+  if(summary) summary.innerHTML = `
+    <span class="live-badge ${liveLineupSelected.size?"ok":""}">Convocados: ${liveLineupSelected.size}</span>
+    <span class="live-badge ${liveLineupOnField.length===5?"ok":"warn"}">En pista: ${liveLineupOnField.length}/5</span>
+    ${gkOnField?`<span class="live-badge ok">Portero: ${escapeHtml(gkOnField.name)}</span>`:(gkInSquad?`<span class="live-badge warn">Portero en banquillo</span>`:`<span class="live-badge warn">Sin portero</span>`)}
+  `;
+
+  if(listEl) listEl.innerHTML = roster.map(p=>{
+    const selected = liveLineupSelected.has(p.id);
+    const onField = liveLineupOnField.includes(p.id);
+    const existingStat = (m.playerStats || []).find(s=>s.playerId===p.id);
+    const isRed = existingStat && Number(existingStat.red||0) > 0;
+    return `<div class="live-lineup-row">
+      <label class="live-lineup-check">
+        <input type="checkbox" ${selected?"checked":""} onchange="liveLineupToggleSelected_('${p.id}')">
+        ${jerseyIconHtml_(p.position)}
+        <span class="live-lineup-name"><strong>${p.dorsal!=null?p.dorsal:"-"}</strong> ${escapeHtml(p.name)}${matchdayGuestBadgeHtml_(m,p)}${isRed?' <span class="live-badge warn">Expulsado</span>':""}</span>
+      </label>
+      <button type="button" class="live-lineup-toggle ${onField?"active":""}" ${(!selected||isRed)?"disabled":""} onclick="liveLineupToggleOnField_('${p.id}')">${onField?"En pista":"Pista"}</button>
+    </div>`;
+  }).join("");
+
+  const start = document.getElementById("liveLineupStartBtn");
+  if(start){
+    start.disabled = liveLineupSelected.size===0;
+    start.textContent = "▶️ Empezar directo";
+  }
+}
+
+function liveLineupToggleSelected_(id){
+  if(liveLineupSelected.has(id)){
+    liveLineupSelected.delete(id);
+    liveLineupOnField = liveLineupOnField.filter(x=>x!==id);
+  } else {
+    liveLineupSelected.add(id);
+  }
+  renderLiveLineup_();
+}
+
+function liveLineupToggleOnField_(id){
+  if(!liveLineupSelected.has(id)) return;
+  const m = liveMatchday_();
+  const existingStat = m && (m.playerStats || []).find(s=>s.playerId===id);
+  if(existingStat && Number(existingStat.red||0) > 0){
+    alert("Ese jugador ya tiene una roja y no puede estar en pista.");
+    return;
+  }
+  if(liveLineupOnField.includes(id)){
+    liveLineupOnField = liveLineupOnField.filter(x=>x!==id);
+  } else if(liveLineupOnField.length>=5){
+    alert("Ya hay 5 jugadores en pista. Quita a uno primero.");
+    return;
+  } else {
+    liveLineupOnField.push(id);
+  }
+  renderLiveLineup_();
+}
+
+function liveLineupStart_(){
+  const m = liveMatchday_();
+  if(!m) return;
+  if(m.live){
+    const state = liveLoadStoredState_(m);
+    if(state){ liveState = state; openLiveDashboard_(); return; }
+  }
+  const msg = document.getElementById("liveLineupMsg");
+  if(msg) msg.innerHTML = "";
+  if(liveLineupSelected.size===0){
+    if(msg) msg.innerHTML = '<p class="error-msg">Marca al menos un jugador convocado.</p>';
+    return;
+  }
+  if(liveLineupOnField.length===0){
+    if(msg) msg.innerHTML = '<p class="error-msg">Elige al menos un jugador en pista.</p>';
+    return;
+  }
+  if(liveLineupOnField.length>5){
+    if(msg) msg.innerHTML = '<p class="error-msg">No puede haber más de 5 jugadores en pista.</p>';
+    return;
+  }
+
+  const roster = liveRoster_(m, null);
+  const existing = m.playerStats || [];
+  const basePlayerStats = roster.map(p=>{
+    const s = existing.find(x=>x.playerId===p.id) || {};
+    const status = liveLineupOnField.includes(p.id)
+      ? "Titular"
+      : (liveLineupSelected.has(p.id) ? "Suplente" : "No convocado");
+    const row = {
+      playerId: p.id,
+      status,
+      reason: s.reason || "",
+      goals: Number(s.goals||0),
+      yellow: Number(s.yellow||0),
+      red: Number(s.red||0)
+    };
+    if(p.position==="Portero"){
+      row.goalsConceded = (s.goalsConceded!=null ? Number(s.goalsConceded) : null);
+    }
+    return row;
+  });
+
+  const base = {
+    playerStats: basePlayerStats,
+    extraPlayerIds: matchdayExtraIds_(m),
+    goalsForEvents: JSON.parse(JSON.stringify(m.goalsForEvents || [])),
+    goalsAgainstEvents: JSON.parse(JSON.stringify(m.goalsAgainstEvents || [])),
+    timeline: JSON.parse(JSON.stringify(m.timeline || [])),
+    goalsFor: m.goalsFor!=null ? Number(m.goalsFor) : (m.goalsForEvents || []).length,
+    goalsAgainst: m.goalsAgainst!=null ? Number(m.goalsAgainst) : (m.goalsAgainstEvents || []).length,
+    rivalOwnGoals: Number(m.rivalOwnGoals || 0)
+  };
+  const live = {
+    version: 1,
+    rev: 1,
+    startedAt: Date.now(),
+    base,
+    onField: liveLineupOnField.slice(0,5),
+    events: [],
+    timer: {period:1, running:false, startedAt:null, elapsed:0}
+  };
+
+  liveState = {matchdayId:m.id, live, pending:false};
+  liveSelectedMatchdayId = m.id;
+  liveSetLast_(m.id);
+  liveStoreLocal_(liveState);
+  livePersist_(m, live, {render:false});
+  openLiveDashboard_();
+}
+
+function openLiveDashboard_(){
+  if(!liveState){ alert("No hay directo iniciado."); return; }
+  const m = matchdays.find(x=>x.id===liveState.matchdayId);
+  if(!m){ alert("La jornada ya no existe."); return; }
+  liveDashboardOpen = true;
+  liveSetSyncStatus_(liveState.pending ? "⏳ Cambios pendientes de sincronizar" : "✅ Guardado");
+  const overlay = document.getElementById("liveDashboardOverlay");
+  if(overlay) overlay.classList.remove("hidden");
+  document.body.style.overflow = "hidden";
+  renderLiveDashboard_();
+  if(overlay) overlay.scrollTop = 0;
+}
+
+function liveHideDashboardOverlay_(){
+  const overlay = document.getElementById("liveDashboardOverlay");
+  if(overlay) overlay.classList.add("hidden");
+  document.body.style.overflow = "";
+  liveDashboardOpen = false;
+  if(liveClockInterval){ clearInterval(liveClockInterval); liveClockInterval = null; }
+}
+
+function renderLiveDashboard_(){
+  if(!liveState) return;
+  const m = matchdays.find(x=>x.id===liveState.matchdayId);
+  if(!m){ liveHideDashboardOverlay_(); return; }
+  const live = liveState.live;
+  const derived = liveCompute_(m, live);
+  const timer = live.timer || {period:1, running:false, startedAt:null, elapsed:0};
+
+  const title = document.getElementById("liveDashboardTitle");
+  if(title) title.textContent = `Jornada ${m.number||"?"} · ${m.rival||"Rival"}`;
+  const teamName = liveTeamName_(m.teamId);
+  const rivalName = m.rival || "Rival";
+  const isAway = m.homeAway === "Visitante";
+  const home = document.getElementById("liveHomeName");
+  if(home) home.textContent = isAway ? rivalName : teamName;
+  const away = document.getElementById("liveAwayName");
+  if(away) away.textContent = isAway ? teamName : rivalName;
+  const score = document.getElementById("liveScore");
+  if(score) score.textContent = matchScoreText_(m, derived.goalsFor, derived.goalsAgainst);
+  const meta = document.getElementById("liveMatchMeta");
+  if(meta) meta.textContent = [m.competition||"Partido", m.date||"", m.homeAway||""].filter(Boolean).join(" · ");
+
+  const period = document.getElementById("livePeriod");
+  if(period) period.textContent = timer.period===2 ? "2ª PARTE" : "1ª PARTE";
+  const clock = document.getElementById("liveClock");
+  if(clock) clock.textContent = liveClockText_(timer);
+  const toggle = document.getElementById("liveTimerToggle");
+  if(toggle) toggle.textContent = timer.running ? "⏸️ Pausar" : "▶️ Iniciar";
+  const next = document.getElementById("liveTimerNextPeriod");
+  if(next) next.textContent = timer.period===2 ? "Finalizar" : "2ª parte";
+
+  const onField = ((live.onField) || []).map(livePlayer_).filter(Boolean);
+  const onFieldWrap = document.getElementById("liveOnFieldList");
+  if(onFieldWrap){
+    onFieldWrap.innerHTML = onField.length
+      ? onField.map(p=>`<span class="live-player-chip">${p.dorsal!=null?`<strong>${p.dorsal}</strong>`:""} ${escapeHtml(p.name)}${p.position==="Portero"?' <span class="gk">P</span>':""}</span>`).join("")
+      : '<span class="live-player-chip empty">Sin jugadores en pista</span>';
+  }
+  const count = document.getElementById("liveOnFieldCount");
+  if(count) count.textContent = `(${onField.length}/5)`;
+  const gk = onField.find(p=>p.position==="Portero");
+  const gkFallback = liveGoalkeeperId_(live, m);
+  const gkNote = document.getElementById("liveGoalkeeperNote");
+  if(gkNote) gkNote.textContent = gk
+    ? `Portero: ${gk.name}`
+    : (gkFallback
+        ? `No hay portero en pista: los goles encajados se sumarán a ${livePlayerName_(gkFallback)}.`
+        : "No hay portero en pista ni convocado: los goles encajados no se sumarán a ningún portero.");
+
+  const feed = document.getElementById("liveFeed");
+  if(feed) feed.innerHTML = renderLiveFeedHtml_(m, live, derived);
+  const syncEl = document.getElementById("liveSyncStatus");
+  if(syncEl && !syncEl.textContent){
+    syncEl.textContent = liveState.pending ? "⏳ Cambios pendientes de sincronizar" : "✅ Guardado";
+  }
+
+  if(liveClockInterval){ clearInterval(liveClockInterval); liveClockInterval = null; }
+  if(liveDashboardOpen && timer.running){
+    liveClockInterval = setInterval(updateLiveClock_, 500);
+  }
+  updateLiveClock_();
+}
+
+function renderLiveFeedHtml_(m, live, derived){
+  const events = ((live && live.events) || []).slice().sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  if(!events.length) return '<p class="muted" style="margin:0;">Todavía no hay acciones.</p>';
+
+  let sf = live.base && live.base.goalsFor!=null ? Number(live.base.goalsFor) : (((live.base && live.base.goalsForEvents) || []).length);
+  let sa = live.base && live.base.goalsAgainst!=null ? Number(live.base.goalsAgainst) : (((live.base && live.base.goalsAgainstEvents) || []).length);
+  const chronological = ((live.events) || []).slice().sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)).map(ev=>{
+    if(ev.type==="goal_for" || ev.type==="rival_own_goal") sf++;
+    if(ev.type==="goal_against") sa++;
+    return {ev, scoreFor:sf, scoreAgainst:sa};
+  });
+  const scoreById = {};
+  chronological.forEach(x=>{ scoreById[x.ev.id] = x; });
+
+  return events.map(ev=>{
+    const x = scoreById[ev.id] || {scoreFor:null, scoreAgainst:null};
+    const minute = ev.minute!=null
+      ? `${ev.period===2?"2ª ":ev.period===1?"1ª ":""}${ev.minute}'`
+      : "min. ?";
+    let icon = "•", main = "Acción", sub = "";
+    if(ev.type==="goal_for"){
+      icon = "⚽";
+      main = `Gol · ${escapeHtml(livePlayerName_(ev.playerId))}`;
+      const cat = ev.category ? goalCategoryLabel_(ev.category) : "";
+      const subLabel = ev.subcategory ? goalSubLabel_(ev.category, ev.subcategory) : "";
+      sub = [cat, subLabel].filter(Boolean).join(" · ");
+    } else if(ev.type==="rival_own_goal"){
+      icon = "🙃";
+      main = "PP del rival";
+      sub = "Gol a favor";
+    } else if(ev.type==="goal_against"){
+      icon = "🥅";
+      main = "Gol en contra";
+      const cat = ev.category ? goalCategoryLabel_(ev.category) : "";
+      const subLabel = ev.subcategory ? goalSubLabel_(ev.category, ev.subcategory) : "";
+      sub = [cat, subLabel].filter(Boolean).join(" · ");
+    } else if(ev.type==="yellow"){
+      icon = "🟨";
+      main = `Amarilla · ${escapeHtml(livePlayerName_(ev.playerId))}`;
+    } else if(ev.type==="red"){
+      icon = "🟥";
+      main = `Roja · ${escapeHtml(livePlayerName_(ev.playerId))}`;
+    }
+    const scoreLabel = (ev.type==="goal_for" || ev.type==="rival_own_goal" || ev.type==="goal_against") && x.scoreFor!=null
+      ? `<span class="live-feed-score">${matchScoreText_(m, x.scoreFor, x.scoreAgainst)}</span>`
+      : "";
+    return `<div class="live-feed-item">
+      <div class="live-feed-main">
+        <div class="live-feed-top"><span>${icon}</span><strong>${main}</strong>${scoreLabel}<span class="live-feed-minute">${minute}</span></div>
+        ${sub?`<div class="live-feed-sub">${escapeHtml(sub)}</div>`:""}
+      </div>
+      <button type="button" class="live-feed-undo" onclick="liveUndoEvent_('${ev.id}')" title="Deshacer">✕</button>
+    </div>`;
+  }).join("");
+}
+
+function liveElapsedSeconds_(timer){
+  if(!timer) return 0;
+  let s = Number(timer.elapsed || 0);
+  if(timer.running && timer.startedAt){
+    s += Math.floor((Date.now() - Number(timer.startedAt)) / 1000);
+  }
+  return Math.max(0, s);
+}
+
+function liveClockText_(timer){
+  const s = Math.min(liveElapsedSeconds_(timer), 20*60);
+  return `${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
+}
+
+function updateLiveClock_(){
+  if(!liveState || !liveState.live) return;
+  const timer = liveState.live.timer || {period:1, running:false, startedAt:null, elapsed:0};
+  const clock = document.getElementById("liveClock");
+  if(clock) clock.textContent = liveClockText_(timer);
+  const period = document.getElementById("livePeriod");
+  if(period) period.textContent = timer.period===2 ? "2ª PARTE" : "1ª PARTE";
+  const toggle = document.getElementById("liveTimerToggle");
+  if(toggle) toggle.textContent = timer.running ? "⏸️ Pausar" : "▶️ Iniciar";
+  const next = document.getElementById("liveTimerNextPeriod");
+  if(next) next.textContent = timer.period===2 ? "Finalizar" : "2ª parte";
+
+  if(timer.running && liveElapsedSeconds_(timer) >= 20*60){
+    timer.elapsed = 20*60;
+    timer.running = false;
+    timer.startedAt = null;
+    const m = matchdays.find(x=>x.id===liveState.matchdayId);
+    if(m) livePersist_(m, liveState.live, {render:false});
+    if(liveClockInterval){ clearInterval(liveClockInterval); liveClockInterval = null; }
+    if(clock) clock.textContent = liveClockText_(timer);
+    if(toggle) toggle.textContent = "▶️ Iniciar";
+  }
+}
+
+function liveTimerToggle_(){
+  if(!liveState || !liveState.live) return;
+  const m = matchdays.find(x=>x.id===liveState.matchdayId);
+  if(!m) return;
+  const t = liveState.live.timer || (liveState.live.timer = {period:1, running:false, startedAt:null, elapsed:0});
+  if(t.running){
+    t.elapsed = Math.min(liveElapsedSeconds_(t), 20*60);
+    t.running = false;
+    t.startedAt = null;
+  } else {
+    if(liveElapsedSeconds_(t) >= 20*60){
+      alert("La parte ha llegado a 20:00. Pulsa '2ª parte' o 'Finalizar'.");
+      return;
+    }
+    t.startedAt = Date.now();
+    t.running = true;
+  }
+  livePersist_(m, liveState.live);
+}
+
+function liveTimerNextPeriod_(){
+  if(!liveState || !liveState.live) return;
+  const m = matchdays.find(x=>x.id===liveState.matchdayId);
+  if(!m) return;
+  const t = liveState.live.timer || (liveState.live.timer = {period:1, running:false, startedAt:null, elapsed:0});
+  if((t.period || 1) === 1){
+    if(!confirm("¿Empezar la 2ª parte? El cronómetro volverá a 00:00.")) return;
+    t.period = 2;
+    t.elapsed = 0;
+    t.running = false;
+    t.startedAt = null;
+  } else {
+    if(!confirm("¿Finalizar el partido? Se parará el cronómetro.")) return;
+    t.elapsed = Math.min(liveElapsedSeconds_(t), 20*60);
+    t.running = false;
+    t.startedAt = null;
+  }
+  livePersist_(m, liveState.live);
+}
+
+function liveTimerReset_(){
+  if(!liveState || !liveState.live) return;
+  if(!confirm("¿Reiniciar el cronómetro a 00:00 y la 1ª parte? No se borran los goles ni las tarjetas.")) return;
+  const m = matchdays.find(x=>x.id===liveState.matchdayId);
+  if(!m) return;
+  liveState.live.timer = {period:1, running:false, startedAt:null, elapsed:0};
+  livePersist_(m, liveState.live);
+}
+
+function liveMinute_(live){
+  const elapsed = liveElapsedSeconds_(live && live.timer);
+  return Math.max(1, Math.min(20, Math.ceil(elapsed/60)));
+}
+
+function liveAddEvent_(ev){
+  if(!liveState || !liveState.live) return;
+  const m = matchdays.find(x=>x.id===liveState.matchdayId);
+  if(!m) return;
+  const live = liveState.live;
+  if(!live.timer) live.timer = {period:1, running:false, startedAt:null, elapsed:0};
+  if(live.timer.running && liveElapsedSeconds_(live.timer) >= 20*60){
+    live.timer.elapsed = 20*60;
+    live.timer.running = false;
+    live.timer.startedAt = null;
+  }
+  ev.id = liveUid_();
+  ev.createdAt = Date.now();
+  ev.minute = liveMinute_(live);
+  ev.period = live.timer.period || 1;
+  ev.playersOnField = (live.onField || []).slice();
+  if(ev.type==="goal_against") ev.goalkeeperId = liveGoalkeeperId_(live, m);
+  if(ev.type==="red" && ev.playerId){
+    ev.wasOnField = (live.onField || []).includes(ev.playerId);
+    if(ev.wasOnField) live.onField = live.onField.filter(id=>id!==ev.playerId);
+  }
+  live.events = live.events || [];
+  live.events.push(ev);
+  livePersist_(m, live);
+}
+
+function liveUndoEvent_(eventId){
+  if(!liveState || !liveState.live) return;
+  const m = matchdays.find(x=>x.id===liveState.matchdayId);
+  if(!m) return;
+  const live = liveState.live;
+  const ev = (live.events || []).find(x=>x.id===eventId);
+  if(!ev) return;
+  if(!confirm("¿Deshacer esta acción? Se actualizarán el marcador y las estadísticas.")) return;
+  live.events = (live.events || []).filter(x=>x.id!==eventId);
+  if(ev.type==="red" && ev.wasOnField && ev.playerId
+     && !(live.onField || []).includes(ev.playerId)
+     && (live.onField || []).length < 5){
+    live.onField = (live.onField || []).concat([ev.playerId]);
+  }
+  livePersist_(m, live);
+}
+
+function liveResetDirect_(){
+  if(!liveState || !liveState.live) return;
+  if(!confirm("¿Reiniciar el directo? Se borrarán los goles y tarjetas registrados en esta sesión y se volverá a la convocatoria inicial. No se borra la jornada.")) return;
+  const m = matchdays.find(x=>x.id===liveState.matchdayId);
+  if(!m) return;
+  const live = liveState.live;
+  live.events = [];
+  live.timer = {period:1, running:false, startedAt:null, elapsed:0};
+  live.onField = ((live.base && live.base.playerStats) || [])
+    .filter(s=>s.status==="Titular" && Number(s.red||0)===0)
+    .map(s=>s.playerId)
+    .slice(0,5);
+  livePersist_(m, live);
+}
+
+async function liveFinishDirect_(){
+  if(!liveState || !liveState.live) return;
+  const m = matchdays.find(x=>x.id===liveState.matchdayId);
+  if(!m) return;
+  if(!confirm("¿Finalizar el directo? Se cerrará la sesión y la jornada quedará con las estadísticas actuales. No se borran goles ni tarjetas.")) return;
+  // Espera a la última escritura en curso para que no pueda volver a añadir "live" después
+  // de cerrar la sesión. Si falló, el update final de abajo ya guarda el estado actual.
+  try{ if(liveLastWrite_) await liveLastWrite_; }catch(e){}
+  const derived = liveCompute_(m, liveState.live);
+  const payload = {
+    playerStats: derived.playerStats,
+    extraPlayerIds: (liveState.live.base && liveState.live.base.extraPlayerIds) || matchdayExtraIds_(m),
+    goalsFor: derived.goalsFor,
+    goalsAgainst: derived.goalsAgainst,
+    goalsForEvents: derived.goalsForEvents,
+    goalsAgainstEvents: derived.goalsAgainstEvents,
+    timeline: derived.timeline,
+    rivalOwnGoals: derived.rivalOwnGoals,
+    live: firebase.firestore.FieldValue.delete()
+  };
+  try{
+    await db.collection("matchdays").doc(m.id).update(payload);
+    const idx = matchdays.findIndex(x=>x.id===m.id);
+    if(idx>=0){
+      const copy = {...matchdays[idx], ...payload};
+      delete copy.live;
+      matchdays[idx] = copy;
+    }
+    try{
+      localStorage.removeItem(liveStateKey_(m.id));
+      localStorage.removeItem(livePendingKey_(m.id));
+    }catch(e){}
+    liveState = null;
+    liveSelectedMatchdayId = m.id;
+    liveHideDashboardOverlay_();
+    showLiveSub_("setup");
+    renderLiveSetup_();
+    alert("Directo finalizado. Las estadísticas quedan guardadas en la jornada.");
+  }catch(err){
+    alert("No se ha podido finalizar el directo: " + (err.message || err));
+  }
+}
+
+function liveOpenChanges_(){
+  if(!liveState || !liveState.live) return;
+  const m = matchdays.find(x=>x.id===liveState.matchdayId);
+  if(!m) return;
+  const derived = liveCompute_(m, liveState.live);
+  const redIds = new Set(derived.playerStats.filter(s=>Number(s.red||0)>0).map(s=>s.playerId));
+  liveChangesOnField = (liveState.live.onField || []).filter(id=>!redIds.has(id)).slice(0,5);
+  renderLiveChangesModal_();
+  document.getElementById("liveActionModal").classList.remove("hidden");
+}
+
+function renderLiveChangesModal_(){
+  if(!liveState || !liveState.live) return;
+  const m = matchdays.find(x=>x.id===liveState.matchdayId);
+  if(!m) return;
+  const live = liveState.live;
+  const derived = liveCompute_(m, live);
+  const statsMap = {};
+  derived.playerStats.forEach(s=>{ statsMap[s.playerId] = s; });
+  const roster = liveRoster_(m, live);
+  const conv = roster.filter(p=>{
+    const s = statsMap[p.id];
+    return s && s.status!=="No convocado";
+  });
+  const onFieldSet = new Set(liveChangesOnField);
+  const rows = conv.map(p=>{
+    const s = statsMap[p.id] || {};
+    const isRed = Number(s.red||0) > 0;
+    const inField = onFieldSet.has(p.id);
+    return `<div class="live-lineup-row">
+      <div class="live-lineup-check" style="cursor:default;">
+        ${jerseyIconHtml_(p.position)}
+        <span class="live-lineup-name"><strong>${p.dorsal!=null?p.dorsal:"-"}</strong> ${escapeHtml(p.name)}${isRed?' <span class="live-badge warn">Expulsado</span>':""}</span>
+      </div>
+      <button type="button" class="live-lineup-toggle ${inField?"active":""}" ${isRed?"disabled":""} onclick="liveToggleChangePlayer_('${p.id}')">${inField?"Quitar":"Poner"}</button>
+    </div>`;
+  }).join("");
+  document.getElementById("liveActionTitle").textContent = "🔄 Cambios";
+  document.getElementById("liveActionBody").innerHTML = `
+    <p class="muted" style="margin-top:0;">Elige quién está en pista (${liveChangesOnField.length}/5).</p>
+    <div style="max-height:52vh;overflow-y:auto;">${rows || '<p class="muted">No hay jugadores convocados.</p>'}</div>
+    <button type="button" class="btn accent" style="width:100%;margin-top:10px;" onclick="liveSaveChanges_()">💾 Guardar cambios</button>`;
+}
+
+function liveToggleChangePlayer_(id){
+  if(liveChangesOnField.includes(id)){
+    liveChangesOnField = liveChangesOnField.filter(x=>x!==id);
+  } else if(liveChangesOnField.length>=5){
+    alert("Ya hay 5 jugadores en pista.");
+    return;
+  } else {
+    liveChangesOnField.push(id);
+  }
+  renderLiveChangesModal_();
+}
+
+function liveSaveChanges_(){
+  if(!liveState || !liveState.live) return;
+  const m = matchdays.find(x=>x.id===liveState.matchdayId);
+  if(!m) return;
+  const derived = liveCompute_(m, liveState.live);
+  const redIds = new Set(derived.playerStats.filter(s=>Number(s.red||0)>0).map(s=>s.playerId));
+  liveState.live.onField = liveChangesOnField.filter(id=>!redIds.has(id)).slice(0,5);
+  livePersist_(m, liveState.live);
+  document.getElementById("liveActionModal").classList.add("hidden");
+}
+
+function liveOpenConvocatoria_(){
+  if(!liveState || !liveState.live) return;
+  const m = matchdays.find(x=>x.id===liveState.matchdayId);
+  if(!m) return;
+  liveState.live.base.playerStats = liveNormalizePlayerStats_(m, liveState.live);
+  liveConvSelected = new Set(
+    (liveState.live.base.playerStats || [])
+      .filter(s=>s.status && s.status!=="No convocado")
+      .map(s=>s.playerId)
+  );
+  const derived = liveCompute_(m, liveState.live);
+  const redIds = new Set(derived.playerStats.filter(s=>Number(s.red||0)>0).map(s=>s.playerId));
+  liveConvOnField = (liveState.live.onField || []).filter(id=>!redIds.has(id)).slice(0,5);
+  renderLiveConvocatoriaModal_();
+  document.getElementById("liveActionModal").classList.remove("hidden");
+}
+
+function renderLiveConvocatoriaModal_(){
+  if(!liveState || !liveState.live) return;
+  const m = matchdays.find(x=>x.id===liveState.matchdayId);
+  if(!m) return;
+  const live = liveState.live;
+  const derived = liveCompute_(m, live);
+  const statsMap = {};
+  derived.playerStats.forEach(s=>{ statsMap[s.playerId] = s; });
+  const roster = liveRoster_(m, live);
+  const rows = roster.map(p=>{
+    const selected = liveConvSelected.has(p.id);
+    const onField = liveConvOnField.includes(p.id);
+    const s = statsMap[p.id] || {};
+    const isRed = Number(s.red||0) > 0;
+    return `<div class="live-lineup-row">
+      <label class="live-lineup-check">
+        <input type="checkbox" ${selected?"checked":""} onchange="liveConvToggleSelected_('${p.id}')">
+        ${jerseyIconHtml_(p.position)}
+        <span class="live-lineup-name"><strong>${p.dorsal!=null?p.dorsal:"-"}</strong> ${escapeHtml(p.name)}${isRed?' <span class="live-badge warn">Expulsado</span>':""}</span>
+      </label>
+      <button type="button" class="live-lineup-toggle ${onField?"active":""}" ${(!selected||isRed)?"disabled":""} onclick="liveConvToggleOnField_('${p.id}')">${onField?"En pista":"Pista"}</button>
+    </div>`;
+  }).join("");
+  document.getElementById("liveActionTitle").textContent = "📋 Convocatoria";
+  document.getElementById("liveActionBody").innerHTML = `
+    <p class="muted" style="margin-top:0;">Marca quién va convocado y elige los 5 en pista (${liveConvOnField.length}/5). Los goles y tarjetas ya registrados se conservan.</p>
+    <div style="max-height:52vh;overflow-y:auto;">${rows || '<p class="muted">No hay jugadores en la plantilla.</p>'}</div>
+    <button type="button" class="btn accent" style="width:100%;margin-top:10px;" onclick="liveSaveConvocatoria_()">💾 Guardar convocatoria</button>`;
+}
+
+function liveConvToggleSelected_(id){
+  if(liveConvSelected.has(id)){
+    liveConvSelected.delete(id);
+    liveConvOnField = liveConvOnField.filter(x=>x!==id);
+  } else {
+    liveConvSelected.add(id);
+  }
+  renderLiveConvocatoriaModal_();
+}
+
+function liveConvToggleOnField_(id){
+  if(!liveConvSelected.has(id)) return;
+  const m = matchdays.find(x=>x.id===liveState.matchdayId);
+  if(!m) return;
+  const derived = liveCompute_(m, liveState.live);
+  const st = derived.playerStats.find(s=>s.playerId===id);
+  if(st && Number(st.red||0) > 0){
+    alert("Ese jugador está expulsado y no puede volver a la pista.");
+    return;
+  }
+  if(liveConvOnField.includes(id)){
+    liveConvOnField = liveConvOnField.filter(x=>x!==id);
+  } else if(liveConvOnField.length>=5){
+    alert("Ya hay 5 jugadores en pista. Quita a uno primero.");
+    return;
+  } else {
+    liveConvOnField.push(id);
+  }
+  renderLiveConvocatoriaModal_();
+}
+
+function liveSaveConvocatoria_(){
+  if(!liveState || !liveState.live) return;
+  const m = matchdays.find(x=>x.id===liveState.matchdayId);
+  if(!m) return;
+  const live = liveState.live;
+  const stats = liveNormalizePlayerStats_(m, live);
+  live.base.playerStats = stats.map(s=>{
+    const selected = liveConvSelected.has(s.playerId);
+    const onField = liveConvOnField.includes(s.playerId);
+    return {...s, status: onField ? "Titular" : selected ? "Suplente" : "No convocado"};
+  });
+  const derived = liveCompute_(m, live);
+  const redIds = new Set(derived.playerStats.filter(s=>Number(s.red||0)>0).map(s=>s.playerId));
+  live.onField = liveConvOnField.filter(id=>liveConvSelected.has(id) && !redIds.has(id)).slice(0,5);
+  livePersist_(m, live);
+  document.getElementById("liveActionModal").classList.add("hidden");
+}
+
+function liveOpenAction_(type){
+  if(!liveState || !liveState.live) return;
+  liveActionType = type;
+  liveActionPlayerId = null;
+  liveActionCategory = null;
+  liveActionStep = (type==="goal_for" || type==="yellow" || type==="red")
+    ? "player"
+    : (type==="goal_against" ? "category" : "confirm");
+  renderLiveActionModal_();
+  document.getElementById("liveActionModal").classList.remove("hidden");
+}
+
+function renderLiveActionModal_(){
+  if(!liveState || !liveState.live) return;
+  const m = matchdays.find(x=>x.id===liveState.matchdayId);
+  if(!m) return;
+  const live = liveState.live;
+  const derived = liveCompute_(m, live);
+  const title = document.getElementById("liveActionTitle");
+  const body = document.getElementById("liveActionBody");
+  if(!title || !body) return;
+
+  if(liveActionType==="goal_for"){
+    title.textContent = "⚽ Gol a favor";
+    if(liveActionStep==="player"){ body.innerHTML = livePlayerChoiceHtml_(m, live, derived, "Elige quién ha marcado:"); return; }
+    if(liveActionStep==="category"){ body.innerHTML = liveCategoryChoiceHtml_(); return; }
+    if(liveActionStep==="subcategory"){ body.innerHTML = liveSubcategoryChoiceHtml_(); return; }
+  }
+  if(liveActionType==="goal_against"){
+    title.textContent = "🥅 Gol en contra";
+    if(liveActionStep==="category"){ body.innerHTML = liveCategoryChoiceHtml_(); return; }
+    if(liveActionStep==="subcategory"){ body.innerHTML = liveSubcategoryChoiceHtml_(); return; }
+  }
+  if(liveActionType==="rival_own_goal"){
+    title.textContent = "🙃 PP del rival";
+    body.innerHTML = livePPConfirmHtml_(m, live, derived);
+    return;
+  }
+  if(liveActionType==="yellow" || liveActionType==="red"){
+    title.textContent = liveActionType==="yellow" ? "🟨 Amarilla" : "🟥 Roja";
+    body.innerHTML = livePlayerChoiceHtml_(m, live, derived,
+      liveActionType==="yellow" ? "¿A quién le muestras la amarilla?" : "¿A quién expulsas?")
+      + (liveActionType==="yellow" ? '<p class="muted" style="font-size:.75rem;">Si es la segunda amarilla, registra también la roja.</p>' : "");
+    return;
+  }
+}
+
+function livePlayerChoiceHtml_(m, live, derived, prompt){
+  const statsMap = {};
+  derived.playerStats.forEach(s=>{ statsMap[s.playerId] = s; });
+  const onFieldOrder = new Map(((live.onField) || []).map((id,i)=>[id,i]));
+  const list = liveRoster_(m, live)
+    .filter(p=>{
+      const s = statsMap[p.id];
+      return s && s.status!=="No convocado" && Number(s.red||0)===0;
+    })
+    .sort((a,b)=>{
+      const oa = onFieldOrder.has(a.id) ? onFieldOrder.get(a.id) : 999;
+      const ob = onFieldOrder.has(b.id) ? onFieldOrder.get(b.id) : 999;
+      return oa-ob || (a.dorsal||0)-(b.dorsal||0);
+    });
+  if(!list.length){
+    return '<p class="muted" style="margin-top:0;">No hay jugadores convocados disponibles. Abre "📋 Convocatoria" para convocar a alguien.</p>';
+  }
+  return `<p class="muted" style="margin-top:0;">${prompt}</p>` + list.map(p=>{
+    const s = statsMap[p.id] || {};
+    const onField = onFieldOrder.has(p.id);
+    const cards = `${s.yellow?`🟨${s.yellow}`:""}${s.red?`🟥${s.red}`:""}`;
+    const meta = [p.position==="Portero"?"Portero":"", cards].filter(Boolean).join(" ");
+    return `<button type="button" class="live-choice-btn" onclick="liveActionChoosePlayer_('${p.id}')">
+      ${jerseyIconHtml_(p.position)}
+      <span>${p.dorsal!=null?`<strong>${p.dorsal}</strong> `:""}${escapeHtml(p.name)}${onField?' <span class="live-badge ok">Pista</span>':""}</span>
+      <span class="meta">${escapeHtml(meta)}</span>
+    </button>`;
+  }).join("");
+}
+
+function liveCategoryChoiceHtml_(){
+  return `<p class="muted" style="margin-top:0;">Elige la categoría:</p>` +
+    GOAL_CATEGORIES.map(c=>`<button type="button" class="live-choice-btn" onclick="liveActionChooseCategory_('${c.id}')">${escapeHtml(c.label)}</button>`).join("") +
+    `<button type="button" class="btn ghost small" style="width:100%;margin-top:6px;" onclick="liveActionBack_()">← Volver</button>`;
+}
+
+function liveSubcategoryChoiceHtml_(){
+  const cat = goalCategoryInfo_(liveActionCategory);
+  if(!cat) return "";
+  return `<button type="button" class="btn ghost small" style="margin-bottom:8px;" onclick="liveActionBack_()">← ${escapeHtml(cat.label)}</button>
+    <p class="muted" style="margin-top:0;">Elige la subcategoría:</p>` +
+    cat.subs.map(s=>`<button type="button" class="live-choice-btn" onclick="liveActionChooseSub_('${s.id}')">${escapeHtml(s.label)}</button>`).join("");
+}
+
+function livePPConfirmHtml_(m, live, derived){
+  const minute = liveMinute_(live);
+  const period = live.timer && live.timer.period===2 ? "2ª" : "1ª";
+  return `<p style="margin-top:0;">Se sumará <strong>1 gol a favor</strong> y <strong>1 PP del rival</strong> en el minuto <strong>${period} ${minute}'</strong>.</p>
+    <p class="muted">Marcador actual: <strong>${matchScoreText_(m, derived.goalsFor, derived.goalsAgainst)}</strong></p>
+    <button type="button" class="btn accent" style="width:100%;margin-top:8px;" onclick="liveActionSavePP_()">✅ Registrar PP del rival</button>`;
+}
+
+function liveActionChoosePlayer_(id){
+  if(liveActionType==="goal_for"){
+    liveActionPlayerId = id;
+    liveActionStep = "category";
+    renderLiveActionModal_();
+    return;
+  }
+  if(liveActionType==="yellow" || liveActionType==="red"){
+    const name = livePlayerName_(id);
+    if(liveActionType==="red" && !confirm(`¿Registrar roja para ${name}?`)) return;
+    liveAddEvent_({type:liveActionType, playerId:id});
+    document.getElementById("liveActionModal").classList.add("hidden");
+  }
+}
+
+function liveActionChooseCategory_(catId){
+  liveActionCategory = catId;
+  liveActionStep = "subcategory";
+  renderLiveActionModal_();
+}
+
+function liveActionChooseSub_(subId){
+  const ev = {type:liveActionType, category:liveActionCategory, subcategory:subId};
+  if(liveActionType==="goal_for") ev.playerId = liveActionPlayerId;
+  liveAddEvent_(ev);
+  document.getElementById("liveActionModal").classList.add("hidden");
+}
+
+function liveActionSavePP_(){
+  liveAddEvent_({type:"rival_own_goal"});
+  document.getElementById("liveActionModal").classList.add("hidden");
+}
+
+function liveActionBack_(){
+  if(liveActionStep==="subcategory"){
+    liveActionStep = "category";
+    renderLiveActionModal_();
+    return;
+  }
+  if(liveActionStep==="category" && liveActionType==="goal_for"){
+    liveActionStep = "player";
+    renderLiveActionModal_();
+    return;
+  }
+  document.getElementById("liveActionModal").classList.add("hidden");
+}
+
+/* ---------- Listeners de Estadísticas en partido ---------- */
+function liveBind_(id, event, handler){
+  const el = document.getElementById(id);
+  if(el) el[event] = handler;
+}
+
+liveBind_("liveTeamSelect", "onchange", (e)=>{
+  const teamId = e.target.value || null;
+  if(!teamId) return;
+  selectedTeamId = teamId;
+  plantillaBackTarget = "plantilla-home";
+  applySelectedTeamChange_();
+  liveSelectedMatchdayId = null;
+  liveState = null;
+  liveLineupInitializedFor = null;
+  showLiveSub_("setup");
+  renderLiveSetup_();
+});
+
+liveBind_("liveMatchdaySelect", "onchange", liveUpdateSetupSelection_);
+liveBind_("liveContinueBtn", "onclick", liveContinue_);
+liveBind_("liveNewMatchBtn", "onclick", ()=>{
+  const sel = document.getElementById("liveMatchdaySelect");
+  if(!sel) return;
+  sel.value = "__new__";
+  liveUpdateSetupSelection_();
+  const rival = document.getElementById("liveMdRival");
+  if(rival) rival.focus();
+});
+liveBind_("liveCancelNewMatchBtn", "onclick", ()=>{
+  const sel = document.getElementById("liveMatchdaySelect");
+  if(!sel) return;
+  const first = matchdays
+    .filter(m=>m.teamId===selectedTeamId && matchdaySeason_(m)===selectedSeason)
+    .sort((a,b)=>{
+      const da = a.date || "", db = b.date || "";
+      if(da!==db) return db.localeCompare(da);
+      return (Number(b.number)||0)-(Number(a.number)||0);
+    })[0];
+  sel.value = first ? first.id : "";
+  liveUpdateSetupSelection_();
+});
+liveBind_("liveCreateMatchBtn", "onclick", liveCreateMatch_);
+
+liveBind_("liveLineupBack", "onclick", ()=>{
+  showLiveSub_("setup");
+  renderLiveSetup_();
+});
+liveBind_("liveLineupAllBtn", "onclick", ()=>{
+  const m = liveMatchday_();
+  if(!m) return;
+  liveLineupSelected = new Set(liveRoster_(m, null).map(p=>p.id));
+  renderLiveLineup_();
+});
+liveBind_("liveLineupNoneBtn", "onclick", ()=>{
+  liveLineupSelected = new Set();
+  liveLineupOnField = [];
+  renderLiveLineup_();
+});
+liveBind_("liveLineupStartBtn", "onclick", liveLineupStart_);
+
+liveBind_("liveDashboardExit", "onclick", ()=>{
+  liveHideDashboardOverlay_();
+  goBackFromPlantillaDetail_();
+});
+liveBind_("liveDashboardChange", "onclick", ()=>{
+  liveHideDashboardOverlay_();
+  showLiveSub_("setup");
+  renderLiveSetup_();
+});
+liveBind_("liveTimerToggle", "onclick", liveTimerToggle_);
+liveBind_("liveTimerNextPeriod", "onclick", liveTimerNextPeriod_);
+liveBind_("liveTimerReset", "onclick", liveTimerReset_);
+liveBind_("liveChangesBtn", "onclick", liveOpenChanges_);
+liveBind_("liveConvocatoriaBtn", "onclick", liveOpenConvocatoria_);
+liveBind_("liveGoalForBtn", "onclick", ()=>liveOpenAction_("goal_for"));
+liveBind_("liveGoalAgainstBtn", "onclick", ()=>liveOpenAction_("goal_against"));
+liveBind_("livePPBtn", "onclick", ()=>liveOpenAction_("rival_own_goal"));
+liveBind_("liveYellowBtn", "onclick", ()=>liveOpenAction_("yellow"));
+liveBind_("liveRedBtn", "onclick", ()=>liveOpenAction_("red"));
+liveBind_("liveResetBtn", "onclick", liveResetDirect_);
+liveBind_("liveFinishBtn", "onclick", liveFinishDirect_);
+liveBind_("btnCloseLiveAction", "onclick", ()=>{
+  document.getElementById("liveActionModal").classList.add("hidden");
+});
+
+window.addEventListener("online", ()=>{
+  liveSetSyncStatus_("🔄 Conexión recuperada: sincronizando…");
+  liveFlushPending_();
+});
+window.addEventListener("offline", ()=>{
+  liveSetSyncStatus_("📴 Sin conexión: los cambios se guardan en este dispositivo");
+});
 </script>
 
 <!--

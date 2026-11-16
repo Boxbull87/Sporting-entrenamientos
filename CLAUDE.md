@@ -11,7 +11,7 @@ code comments are in Spanish.
 
 ## Architecture
 
-- **Everything lives in one file: `index.html`** (1,06 MB, **~13.380 lines**) — HTML, inline CSS
+- **Everything lives in one file: `index.html`** (1,18 MB, **~15.200 lines**) — HTML, inline CSS
   and all JavaScript. No build step, no bundler, no `package.json`, no local dependencies.
   Because it's one huge file, keep edits surgical and search for the section banners below to
   jump around.
@@ -289,7 +289,7 @@ All inside `index.html` — search for these comment banners to jump around:
   `openFavFolderPick`, `openFavFolderActions`.
 - **Mi equipo** (`MI EQUIPO` ~6133, its own tab): a personal, team-scoped lens on the app for a
   coach with one or more assigned teams. Pick a team → menu with:
-  - **Plantilla** → nested submenu (Plantilla de jugadores / Jornadas / Estadísticas / Resumen)
+  - **Plantilla** → nested submenu (Plantilla de jugadores / Jornadas / Estadísticas en partido / Estadísticas / Resumen)
     that jumps into the *same* views as the main Plantilla tab, pre-locked to that team
     (`plantillaBackTarget` makes "← Volver" return here instead of Plantilla's own home).
   - **ABP** / **Tareas** → *not* the ★ favorites — a separate, per-team folder tree the coach
@@ -308,10 +308,10 @@ All inside `index.html` — search for these comment banners to jump around:
   - **Calendario** (bottom of the menu screen): `renderMiEquipoCalendar_` — month grid of that
     team's sessions/matchdays, click a day to create one.
 - **Plantilla** (`EQUIPOS Y PLANTILLA DE JUGADORES` ~5934): teams, players, matchdays (jornadas)
-  and per-match player stats; also a team-comparison view ("Comparar equipos"), the
-  "Estadísticas" submenu (see Panel de Estadísticas above) and the individual player card
-  (`openPlayerProfile`), which lists the player's matchdays **including ones played as a guest
-  for another team**.
+  and per-match player stats; también la vista móvil **Estadísticas en partido** (ver abajo),
+  una vista de comparación de equipos ("Comparar equipos"), el submenú "Estadísticas" (ver Panel
+  de Estadísticas arriba) y la ficha individual del jugador (`openPlayerProfile`), que lista sus
+  jornadas **incluidas las jugadas como invitado con otro equipo**.
 - **Jornadas** (`JORNADAS — CRONOLOGÍA DEL PARTIDO` ~8567): one matchday's detail — goal events
   timeline, per-player stats, `rivalReport` (opponent scouting), convocatoria PDF, rival-report
   PDF, season summary PDF/Excel, and the embedded Scouting FS panel. The
@@ -333,6 +333,36 @@ All inside `index.html` — search for these comment banners to jump around:
     cuentan para nosotros; el marcador de la jornada ya debe incluirlos). Se muestra en el
     resumen de jornada y temporada y en el PDF de estadísticas. Los datos antiguos sin
     `rivalOwnGoals` se leen como 0.
+- **Estadísticas en partido (directo móvil)** (`ESTADÍSTICAS EN PARTIDO (DIRECTO MÓVIL)` ~13657):
+  vista móvil dentro de Plantilla (y acceso desde Mi equipo → Plantilla) para registrar un
+  partido en vivo: elegir equipo → partido existente o crear uno → convocatoria/quinteto →
+  dashboard a pantalla completa. El cronómetro tiene dos partes de 20:00, se puede pausar,
+  reanudar y reiniciar; corre con reloj real (`startedAt` + `elapsed`) y se autopausa al llegar
+  a 20:00.
+  - **Estado en `matchdays[].live`**: `{version, rev, startedAt, base, onField, events, timer,
+    updatedAt}`. `base` es la foto previa de la jornada (`playerStats`, `extraPlayerIds`,
+    `goalsForEvents`, `goalsAgainstEvents`, `timeline`, `goalsFor`, `goalsAgainst`,
+    `rivalOwnGoals`); `events` son las acciones del directo. `liveCompute_` recalcula desde
+    `base + events` los campos normales de la jornada, así deshacer una acción es solo
+    recalcular. Los eventos generados en directo llevan `fromLive: true`: Jornadas los muestra
+    con la etiqueta "directo" y sin botón de borrar (se deshacen desde el dashboard).
+  - **Acciones**: gol a favor (jugador + categoría/subcategoría de `GOAL_CATEGORIES`), gol en
+    contra (categoría/subcategoría), **PP del rival** (categoría especial `rival_own_goal`, suma
+    1 gol a favor y 1 a `rivalOwnGoals`), amarilla y roja. La roja saca al jugador de `onField`;
+    deshacerla lo devuelve si hay hueco. Los goles encajados se suman al portero en pista o, si
+    no hay, al portero convocado (`liveGoalkeeperId_`).
+  - **Cerrar la sesión**: "✅ Finalizar directo" guarda el estado actual y borra `live` de la
+    jornada (los goles/tarjetas se quedan en los campos normales). "♻️ Reiniciar directo" en
+    cambio vacía `events`/cronómetro y vuelve a la convocatoria inicial sin borrar la jornada.
+  - **Guardado local-first**: `livePersist_` actualiza `matchdays` de forma optimista, guarda
+    `liveState_<id>` en `localStorage` y escribe en Firestore. Si falla, guarda el payload en
+    `livePending_<id>` y `liveFlushPending_` reintenta al volver online (evento `online`). No se
+    activa la persistencia offline global de Firestore.
+  - **Crear partido**: la vista de configuración filtra por la temporada seleccionada en
+    Plantilla; el partido creado desde aquí se guarda con `season` = temporada seleccionada y
+    aparece en Jornadas. `openMatchdayStats` muestra un aviso si la jornada tiene un directo
+    activo: editar allí la convocatoria/marcador puede quedar sobrescrito por la siguiente
+    acción del directo.
 - **Control de asistencia** (`renderAttendanceControlView_`/`computeAttendanceSummary_` ~9780):
   cross-session attendance summary, which already included guest players from other categories —
   it's the reference implementation the matchday guest squads were modelled on.
