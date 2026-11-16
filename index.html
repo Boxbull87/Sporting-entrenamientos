@@ -696,6 +696,10 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
 .live-player-chip{display:inline-flex;align-items:center;gap:4px;background:#f6f3ee;border:1px solid var(--border);border-radius:999px;padding:5px 9px;font-size:.78rem;font-weight:600;}
 .live-player-chip .gk{font-family:'Roboto Mono',monospace;font-size:.62rem;background:var(--accent);color:#fff;border-radius:4px;padding:1px 4px;}
 .live-player-chip.empty{font-weight:400;color:var(--muted);}
+.live-player-chip .mins{font-family:'Roboto Mono',monospace;font-size:.63rem;color:var(--muted);font-weight:700;margin-left:2px;}
+.live-clock-note{font-family:'Roboto Mono',monospace;font-size:.68rem;color:var(--muted);min-height:1em;margin:-4px 0 8px;}
+.live-clock-note.warn{color:#b9770e;font-weight:700;}
+.live-lineup-mins{font-family:'Roboto Mono',monospace;font-size:.66rem;color:var(--muted);font-weight:700;flex:0 0 auto;margin-right:2px;}
 .live-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
 .live-action-btn{border:none;border-radius:14px;min-height:74px;padding:8px 6px;font-family:'Oswald',sans-serif;font-size:.86rem;font-weight:600;line-height:1.15;text-transform:uppercase;letter-spacing:.02em;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;box-shadow:0 1px 3px rgba(0,0,0,.12);}
 .live-action-btn .ico{font-size:1.55rem;line-height:1;}
@@ -1620,6 +1624,32 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
       </div>
     </div>
 
+    <!-- ---------- Formato de partido por defecto del equipo ---------- -->
+    <div id="teamFormatModal" class="modal-bg hidden">
+      <div class="modal live-modal">
+        <h2 style="font-size:1.05rem;">⏱️ Formato de partido</h2>
+        <p class="muted" id="teamFormatTeamName" style="margin-top:-6px;"></p>
+        <div class="row">
+          <div>
+            <label>Minutos por parte</label>
+            <input type="number" min="1" max="90" step="1" id="teamFormatMinutes" list="matchMinutesOptions" placeholder="25">
+          </div>
+          <div>
+            <label>Reloj</label>
+            <select id="teamFormatClock">
+              <option value="parado">Parado (se para con el árbitro)</option>
+              <option value="corrido">Corrido (tiempo real)</option>
+            </select>
+          </div>
+        </div>
+        <p class="muted" style="font-size:.76rem;margin-top:8px;">Se usa por defecto en las jornadas de este equipo. El tope de seguridad es de 5 minutos añadidos por parte. En cada partido puedes cambiarlo desde “Estadísticas en partido”.</p>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <button class="btn accent" id="teamFormatSave" style="flex:1;">💾 Guardar</button>
+          <button class="btn ghost" id="teamFormatCancel" style="flex:1;">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ---------- Estadísticas en partido: directo a pantalla completa (móvil) ---------- -->
     <div id="liveDashboardOverlay" class="live-overlay hidden">
       <div class="live-shell">
@@ -1639,6 +1669,7 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
         <div class="live-timer-card">
           <div class="live-period" id="livePeriod">1ª PARTE</div>
           <div class="live-clock" id="liveClock">00:00</div>
+          <div class="live-clock-note" id="liveClockNote"></div>
           <div class="live-timer-actions">
             <button type="button" class="btn accent" id="liveTimerToggle">▶️ Iniciar</button>
             <button type="button" class="btn ghost" id="liveTimerNextPeriod">2ª parte</button>
@@ -2143,6 +2174,30 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
                 <label>Partido</label>
                 <select id="liveMatchdaySelect"></select>
               </div>
+            </div>
+            <div id="liveFormatBox" style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
+              <label style="font-weight:600;">⏱️ Formato del partido</label>
+              <div class="row" style="margin-top:6px;">
+                <div>
+                  <label>Minutos por parte</label>
+                  <input type="number" min="1" max="90" step="1" id="liveFormatMinutes" list="matchMinutesOptions" placeholder="25">
+                  <datalist id="matchMinutesOptions">
+                    <option value="20"></option><option value="25"></option><option value="30"></option><option value="35"></option><option value="40"></option>
+                  </datalist>
+                </div>
+                <div>
+                  <label>Reloj</label>
+                  <select id="liveFormatClock">
+                    <option value="parado">Parado (se para con el árbitro)</option>
+                    <option value="corrido">Corrido (tiempo real)</option>
+                  </select>
+                </div>
+              </div>
+              <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-weight:400;">
+                <input type="checkbox" id="liveFormatTrack" checked style="width:auto;">
+                Contar minutos de juego en este partido
+              </label>
+              <p class="muted" id="liveFormatHint" style="font-size:.74rem;margin-top:4px;"></p>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
               <button type="button" class="btn accent" id="liveContinueBtn">Continuar</button>
@@ -7293,15 +7348,61 @@ function renderTeamManageList(){
   const wrap = document.getElementById("teamManageList");
   if(!wrap) return;
   if(teams.length===0){ wrap.innerHTML = '<p class="muted">Todavía no hay equipos creados.</p>'; return; }
-  wrap.innerHTML = teams.map(t=>`
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);">
-      <span>${escapeHtml(t.name)}</span>
-      <div style="display:flex;gap:6px;">
+  wrap.innerHTML = teams.map(t=>{
+    const f = teamMatchFormat_(t.id);
+    return `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;">
+      <span>${escapeHtml(t.name)} <span class="muted" style="font-size:.76rem;">· ${matchFormatLabel_(f)}</span></span>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="btn ghost small" onclick="openTeamFormat('${t.id}')">⏱️ Formato</button>
         <button class="btn ghost small" onclick="renameTeam('${t.id}')">✏️ Renombrar</button>
         <button class="btn danger small" onclick="deleteTeam('${t.id}')">🗑️ Eliminar</button>
       </div>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 }
+let teamFormatEditingId = null;
+window.openTeamFormat = (id) => {
+  const t = teams.find(x=>x.id===id);
+  if(!t) return;
+  teamFormatEditingId = id;
+  const f = teamMatchFormat_(id);
+  const nameEl = document.getElementById("teamFormatTeamName");
+  if(nameEl) nameEl.textContent = t.name;
+  const minEl = document.getElementById("teamFormatMinutes");
+  if(minEl) minEl.value = f.minutes;
+  const clockEl = document.getElementById("teamFormatClock");
+  if(clockEl) clockEl.value = f.clock;
+  const modal = document.getElementById("teamFormatModal");
+  if(modal) modal.classList.remove("hidden");
+};
+document.getElementById("teamFormatCancel").onclick = () => {
+  const modal = document.getElementById("teamFormatModal");
+  if(modal) modal.classList.add("hidden");
+  teamFormatEditingId = null;
+};
+document.getElementById("teamFormatSave").onclick = async () => {
+  if(!teamFormatEditingId) return;
+  const f = normalizeMatchFormat_({
+    minutes: Number(document.getElementById("teamFormatMinutes").value),
+    clock: document.getElementById("teamFormatClock").value,
+    maxAdded: LIVE_DEFAULT_FORMAT_.maxAdded,
+    trackMinutes: true
+  });
+  const id = teamFormatEditingId;
+  try{
+    await db.collection("teams").doc(id).update({matchFormat: f});
+    const t = teams.find(x=>x.id===id);
+    if(t) t.matchFormat = f;
+    const modal = document.getElementById("teamFormatModal");
+    if(modal) modal.classList.add("hidden");
+    teamFormatEditingId = null;
+    renderTeamManageList();
+    if(liveSelectedMatchdayId === null) liveRenderSetupFormat_();
+  }catch(err){
+    alert("No se ha podido guardar el formato: " + (err.message || err));
+  }
+};
 document.getElementById("btnNewTeam").onclick = async () => {
   const input = document.getElementById("newTeamName");
   const name = input.value.trim();
@@ -8670,8 +8771,11 @@ function renderMatchdayStatsTable(){
   if(!m){ wrap.innerHTML = ""; document.getElementById("matchdayVideoWrap").innerHTML = ""; return; }
   const rivalOwnEl = document.getElementById("mdRivalOwnGoals");
   if(rivalOwnEl) rivalOwnEl.value = m.rivalOwnGoals!=null ? m.rivalOwnGoals : "";
+  const liveStarted = !!m.live;
+  const matchFormat = matchdayMatchFormat_(m);
+  const trackMinutes = matchFormat.trackMinutes !== false;
   document.getElementById("matchdayStatsTitle").textContent =
-    `Jornada ${m.number} — vs ${m.rival||"?"} (${matchScoreText_(m)})`;
+    `Jornada ${m.number} — vs ${m.rival||"?"} (${matchScoreText_(m)}) · ${matchFormatLabel_(matchFormat)}`;
   document.getElementById("matchdayVideoWrap").innerHTML = m.videoUrl ? videoEmbedHtml(m.videoUrl) : "";
   const roster = players.filter(p=>p.teamId===m.teamId).sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
   const guests = matchdayExtraPlayersEditing_();
@@ -8682,26 +8786,33 @@ function renderMatchdayStatsTable(){
   }
   const statsMap = {};
   (m.playerStats||[]).forEach(s=>{ statsMap[s.playerId] = s; });
-  wrap.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:.85rem;min-width:560px;">
+  const rowOpts = {live: liveStarted, track: trackMinutes};
+  wrap.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:.85rem;min-width:620px;">
     <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
-      <th style="padding:4px;">Jugador</th><th style="padding:4px;">Estado</th><th style="padding:4px;">Motivo</th><th style="padding:4px;" title="Goles marcados (porteros incluidos)">⚽ Goles</th><th style="padding:4px;" title="Goles encajados (solo porteros)">🥅 Enc.</th><th style="padding:4px;">🟨</th><th style="padding:4px;">🟥</th><th style="padding:4px;"></th>
+      <th style="padding:4px;">Jugador</th><th style="padding:4px;">Estado</th><th style="padding:4px;">Motivo</th><th style="padding:4px;" title="Minutos jugados">⏱ Min</th><th style="padding:4px;" title="Goles marcados (porteros incluidos)">⚽ Goles</th><th style="padding:4px;" title="Goles encajados (solo porteros)">🥅 Enc.</th><th style="padding:4px;">🟨</th><th style="padding:4px;">🟥</th><th style="padding:4px;"></th>
     </tr></thead>
     <tbody>
-    ${roster.map(p=>matchdayStatsRowHtml_(p, statsMap[p.id]||{}, false)).join("")}
+    ${roster.map(p=>matchdayStatsRowHtml_(p, statsMap[p.id]||{}, false, rowOpts)).join("")}
     ${guests.length ? `
-      <tr><td colspan="8" style="padding:8px 4px 2px;font-size:.8rem;font-weight:600;color:var(--accent);">Convocados de otras categorías</td></tr>
-      ${guests.map(p=>matchdayStatsRowHtml_(p, statsMap[p.id]||{}, true)).join("")}` : ""}
+      <tr><td colspan="9" style="padding:8px 4px 2px;font-size:.8rem;font-weight:600;color:var(--accent);">Convocados de otras categorías</td></tr>
+      ${guests.map(p=>matchdayStatsRowHtml_(p, statsMap[p.id]||{}, true, rowOpts)).join("")}` : ""}
     </tbody>
   </table>`;
   renderMatchdayAddResults_();
 }
-function matchdayStatsRowHtml_(p, s, isGuest){
+function matchdayStatsRowHtml_(p, s, isGuest, opts){
+  opts = opts || {};
   const isGk = p.position === "Portero";
+  const minsCell = opts.live
+    ? `<span class="muted" title="Se calcula en directo">${formatSeconds_(s.seconds)}</span>`
+    : (opts.track
+        ? `<input type="number" min="0" max="200" class="md-minutes" value="${s.seconds!=null?Math.round(Number(s.seconds)/60):""}" title="Minutos jugados" style="width:56px;">`
+        : `<span class="muted" title="Minutos desactivados en este partido">—</span>`);
   // Goles marcados y goles encajados son campos SEPARADOS (s.goals / s.goalsConceded):
   // un portero puede marcar, y antes compartían la misma casilla, así que un gol suyo se
   // guardaba como "encajado". Los jugadores de campo no tienen casilla de encajados.
   return `
-  <tr data-player-id="${p.id}" data-is-gk="${isGk?"1":"0"}" data-guest="${isGuest?"1":"0"}" style="border-bottom:1px solid var(--border);">
+  <tr data-player-id="${p.id}" data-is-gk="${isGk?"1":"0"}" data-guest="${isGuest?"1":"0"}" data-seconds="${s.seconds!=null?s.seconds:""}" style="border-bottom:1px solid var(--border);">
     <td style="padding:4px;">${jerseyNameHtml_(p.position, (p.dorsal!=null?escapeHtml(String(p.dorsal))+". ":"")+escapeHtml(p.name))}${isGuest?` <span class="badge outline" style="font-size:.68rem;">${escapeHtml((teams.find(t=>t.id===p.teamId)||{}).name||"otra categoría")}</span>`:""}</td>
     <td style="padding:4px;">
       <select class="md-status">
@@ -8711,6 +8822,7 @@ function matchdayStatsRowHtml_(p, s, isGuest){
       </select>
     </td>
     <td style="padding:4px;"><input type="text" class="md-reason" value="${escapeHtml(s.reason||"")}" placeholder="Motivo" style="width:110px;"></td>
+    <td style="padding:4px;">${minsCell}</td>
     <td style="padding:4px;"><input type="number" min="0" class="md-goals" value="${s.goals!=null?s.goals:""}" title="Goles marcados" style="width:60px;"></td>
     <td style="padding:4px;">${isGk
       ? `<input type="number" min="0" class="md-conceded" value="${s.goalsConceded!=null?s.goalsConceded:""}" title="Goles encajados" style="width:60px;">`
@@ -8731,6 +8843,8 @@ document.getElementById("btnMarkAllUncalled").onclick = () => {
 document.getElementById("btnSaveMatchdayStats").onclick = async () => {
   const msgEl = document.getElementById("matchdayStatsMsg");
   if(!statsMatchdayId) return;
+  const mdForFormat = matchdays.find(x=>x.id===statsMatchdayId);
+  const trackMinutes = mdForFormat ? matchdayMatchFormat_(mdForFormat).trackMinutes !== false : true;
   const rows = document.querySelectorAll("#matchdayStatsTable tr[data-player-id]");
   const playerStats = [];
   rows.forEach(row=>{
@@ -8743,6 +8857,9 @@ document.getElementById("btnSaveMatchdayStats").onclick = async () => {
     const concededVal = concededEl ? concededEl.value : null;
     const yellowVal = row.querySelector(".md-yellow").value;
     const redVal = row.querySelector(".md-red").value;
+    const minutesEl = row.querySelector(".md-minutes");
+    const minutesVal = minutesEl ? minutesEl.value : null;
+    const existingSeconds = row.dataset.seconds !== "" ? Number(row.dataset.seconds) : null;
     const entry = {
       playerId, status,
       reason: status==="No convocado" ? reason : "",
@@ -8751,6 +8868,16 @@ document.getElementById("btnSaveMatchdayStats").onclick = async () => {
       // Goles marcados: se guardan para TODOS, porteros incluidos (un portero puede marcar).
       goals: goalsVal!=="" ? Number(goalsVal) : 0
     };
+    // Minutos: si la celda es editable se guarda lo escrito; si el partido está en directo
+    // (sin celda) se conserva lo que ya hubiera calculado el directo. Si el partido tiene
+    // los minutos desactivados, se guarda null para que no cuenten.
+    if(!trackMinutes){
+      entry.seconds = null;
+    } else if(minutesVal!=null){
+      entry.seconds = minutesVal!=="" ? Math.max(0, Number(minutesVal))*60 : null;
+    } else if(existingSeconds!=null){
+      entry.seconds = existingSeconds;
+    }
     // Goles encajados: solo el portero. Se deja null si la casilla está vacía para no
     // contar una portería a cero que no se ha registrado (ver computeTeamSummary_).
     if(isGk) entry.goalsConceded = (concededVal!=null && concededVal!=="") ? Number(concededVal) : null;
@@ -10000,15 +10127,15 @@ document.getElementById("btnExportSummaryPDF").onclick = () => {
   doc.setFont("helvetica","bold"); doc.setFontSize(10.5);
   doc.text("Jugadores", margin, y); y += 3;
   drawSimpleTable(
-    ["Jugador","PJ","Titular","Suplente","Convoc.","Goles","Am.","Roj.","Nota"],
-    outfield.map(s=>[`${s.player.dorsal!=null?s.player.dorsal+". ":""}${s.player.name}${s.guest?` (${(teams.find(t=>t.id===s.player.teamId)||{}).name||"otra categoría"})`:""}`, s.played, s.starts, s.subs, s.called, s.goals, s.yellow, s.red, s.avgRating!=null?s.avgRating.toFixed(1):"-"])
+    ["Jugador","PJ","Titular","Suplente","Convoc.","Min","Goles","Am.","Roj.","Nota"],
+    outfield.map(s=>[`${s.player.dorsal!=null?s.player.dorsal+". ":""}${s.player.name}${s.guest?` (${(teams.find(t=>t.id===s.player.teamId)||{}).name||"otra categoría"})`:""}`, s.played, s.starts, s.subs, s.called, formatMinutesShort_(s.seconds), s.goals, s.yellow, s.red, s.avgRating!=null?s.avgRating.toFixed(1):"-"])
   );
 
   doc.setFont("helvetica","bold"); doc.setFontSize(10.5);
   doc.text("Porteros", margin, y); y += 3;
   drawSimpleTable(
-    ["Portero","PJ","Goles","Encajados","Porterías a 0","Am.","Roj.","Nota"],
-    gks.map(s=>[`${s.player.dorsal!=null?s.player.dorsal+". ":""}${s.player.name}${s.guest?` (${(teams.find(t=>t.id===s.player.teamId)||{}).name||"otra categoría"})`:""}`, s.gkMatches, s.goals, s.goalsConceded, s.cleanSheets, s.yellow, s.red, s.avgRating!=null?s.avgRating.toFixed(1):"-"])
+    ["Portero","PJ","Min","Goles","Encajados","Porterías a 0","Am.","Roj.","Nota"],
+    gks.map(s=>[`${s.player.dorsal!=null?s.player.dorsal+". ":""}${s.player.name}${s.guest?` (${(teams.find(t=>t.id===s.player.teamId)||{}).name||"otra categoría"})`:""}`, s.gkMatches, formatMinutesShort_(s.seconds), s.goals, s.goalsConceded, s.cleanSheets, s.yellow, s.red, s.avgRating!=null?s.avgRating.toFixed(1):"-"])
   );
 
   doc.save(`Estadisticas_${(team?team.name:"equipo").replace(/[^a-zA-Z0-9]+/g,"_")}.pdf`);
@@ -10022,15 +10149,15 @@ document.getElementById("btnExportSummaryExcel").onclick = () => {
   const outfield = sum.stats.filter(s=>s.player.position!=="Portero").sort((a,b)=> b.goals-a.goals || b.played-a.played);
   const gks = sum.stats.filter(s=>s.player.position==="Portero").sort((a,b)=> b.cleanSheets-a.cleanSheets || a.goalsConceded-b.goalsConceded);
 
-  const outHeader = ["Dorsal","Jugador","PJ","Titular","Suplente","Convocatorias","Goles","Amarillas","Rojas","Nota media"];
-  const outRows = outfield.map(s=>[s.player.dorsal!=null?s.player.dorsal:"", `${s.player.name}${s.guest?` (${(teams.find(t=>t.id===s.player.teamId)||{}).name||"otra categoría"})`:""}`, s.played, s.starts, s.subs, s.called, s.goals, s.yellow, s.red, s.avgRating!=null?Number(s.avgRating.toFixed(1)):""]);
+  const outHeader = ["Dorsal","Jugador","PJ","Titular","Suplente","Convocatorias","Minutos","Goles","Amarillas","Rojas","Nota media"];
+  const outRows = outfield.map(s=>[s.player.dorsal!=null?s.player.dorsal:"", `${s.player.name}${s.guest?` (${(teams.find(t=>t.id===s.player.teamId)||{}).name||"otra categoría"})`:""}`, s.played, s.starts, s.subs, s.called, Math.round((Number(s.seconds)||0)/60), s.goals, s.yellow, s.red, s.avgRating!=null?Number(s.avgRating.toFixed(1)):""]);
   const wsOut = XLSX.utils.aoa_to_sheet([outHeader, ...outRows]);
-  wsOut["!cols"] = [{wch:8},{wch:26},{wch:6},{wch:8},{wch:9},{wch:12},{wch:8},{wch:10},{wch:8},{wch:10}];
+  wsOut["!cols"] = [{wch:8},{wch:26},{wch:6},{wch:8},{wch:9},{wch:12},{wch:8},{wch:8},{wch:10},{wch:8},{wch:10}];
 
-  const gkHeader = ["Dorsal","Portero","PJ","Goles","Encajados","Porterías a cero","Amarillas","Rojas","Nota media"];
-  const gkRows = gks.map(s=>[s.player.dorsal!=null?s.player.dorsal:"", `${s.player.name}${s.guest?` (${(teams.find(t=>t.id===s.player.teamId)||{}).name||"otra categoría"})`:""}`, s.gkMatches, s.goals, s.goalsConceded, s.cleanSheets, s.yellow, s.red, s.avgRating!=null?Number(s.avgRating.toFixed(1)):""]);
+  const gkHeader = ["Dorsal","Portero","PJ","Minutos","Goles","Encajados","Porterías a cero","Amarillas","Rojas","Nota media"];
+  const gkRows = gks.map(s=>[s.player.dorsal!=null?s.player.dorsal:"", `${s.player.name}${s.guest?` (${(teams.find(t=>t.id===s.player.teamId)||{}).name||"otra categoría"})`:""}`, s.gkMatches, Math.round((Number(s.seconds)||0)/60), s.goals, s.goalsConceded, s.cleanSheets, s.yellow, s.red, s.avgRating!=null?Number(s.avgRating.toFixed(1)):""]);
   const wsGk = XLSX.utils.aoa_to_sheet([gkHeader, ...gkRows]);
-  wsGk["!cols"] = [{wch:8},{wch:26},{wch:6},{wch:8},{wch:12},{wch:16},{wch:10},{wch:8},{wch:10}];
+  wsGk["!cols"] = [{wch:8},{wch:26},{wch:6},{wch:8},{wch:8},{wch:12},{wch:16},{wch:10},{wch:8},{wch:10}];
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, wsOut, "Jugadores");
@@ -10055,7 +10182,7 @@ function computeTeamSummary_(teamId, season, difficultyFilter, competitionFilter
     stats[p.id] = {
       player: p, guest: p.teamId!==teamId, played:0, starts:0, subs:0, called:0,
       goals:0, yellow:0, red:0, goalsConceded:0, cleanSheets:0, gkMatches:0,
-      ratingSum:0, ratingCount:0
+      seconds:0, ratingSum:0, ratingCount:0
     };
   });
   let goalsFor = 0, goalsAgainst = 0, rivalOwnGoals = 0, played = 0;
@@ -10072,6 +10199,7 @@ function computeTeamSummary_(teamId, season, difficultyFilter, competitionFilter
       st.goals += s.goals||0;
       st.yellow += s.yellow||0;
       st.red += s.red||0;
+      st.seconds += s.seconds||0;
       if(st.player.position==="Portero" && (s.status==="Titular"||s.status==="Suplente")){
         st.gkMatches++;
         st.goalsConceded += (s.goalsConceded!=null ? s.goalsConceded : 0);
@@ -10250,6 +10378,7 @@ function renderSeasonSummary_(wrap){
   const sum = computeTeamSummary_(selectedTeamId, selectedSeason, summaryDifficultyFilter, summaryCompetitionFilter);
   const outfield = sum.stats.filter(s=>s.player.position!=="Portero").sort((a,b)=> b.goals-a.goals || b.played-a.played);
   const gks = sum.stats.filter(s=>s.player.position==="Portero").sort((a,b)=> b.cleanSheets-a.cleanSheets || a.goalsConceded-b.goalsConceded);
+  const totalSeconds = sum.stats.reduce((acc,s)=> acc + (Number(s.seconds)||0), 0);
   const forAgg = aggregateGoalEvents_(sum.teamMds, "goalsForEvents");
   const againstAgg = aggregateGoalEvents_(sum.teamMds, "goalsAgainstEvents");
   wrap.innerHTML = `
@@ -10259,6 +10388,7 @@ function renderSeasonSummary_(wrap){
       <div class="badge outline" style="padding:8px 12px;">⚽ Goles a favor: ${sum.goalsFor}</div>
       <div class="badge outline" style="padding:8px 12px;">🥅 Goles en contra: ${sum.goalsAgainst}</div>
       <div class="badge outline" style="padding:8px 12px;">🙃 PP del rival: ${sum.rivalOwnGoals}</div>
+      <div class="badge outline" style="padding:8px 12px;">⏱️ Minutos acumulados: ${Math.round(totalSeconds/60)}'</div>
     </div>
     <h3 style="font-size:.9rem;">Goles por categoría (temporada)</h3>
     <div class="row" style="align-items:flex-start;margin-bottom:12px;">
@@ -10269,7 +10399,7 @@ function renderSeasonSummary_(wrap){
     <div style="overflow-x:auto;">
     <table style="width:100%;border-collapse:collapse;font-size:.85rem;min-width:480px;">
       <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
-        <th style="padding:5px;">Jugador</th><th style="padding:5px;">PJ</th><th style="padding:5px;">Titular</th><th style="padding:5px;">Suplente</th><th style="padding:5px;">Convoc.</th><th style="padding:5px;">⚽</th><th style="padding:5px;">🟨</th><th style="padding:5px;">🟥</th><th style="padding:5px;">⭐ Nota media</th>
+        <th style="padding:5px;">Jugador</th><th style="padding:5px;">PJ</th><th style="padding:5px;">Titular</th><th style="padding:5px;">Suplente</th><th style="padding:5px;">Convoc.</th><th style="padding:5px;">⏱ Min</th><th style="padding:5px;">⚽</th><th style="padding:5px;">🟨</th><th style="padding:5px;">🟥</th><th style="padding:5px;">⭐ Nota media</th>
       </tr></thead>
       <tbody>
       ${outfield.length ? outfield.map(s=>`
@@ -10279,11 +10409,12 @@ function renderSeasonSummary_(wrap){
           <td style="padding:5px;">${s.starts}</td>
           <td style="padding:5px;">${s.subs}</td>
           <td style="padding:5px;">${s.called}</td>
+          <td style="padding:5px;">${formatMinutesShort_(s.seconds)}</td>
           <td style="padding:5px;">${s.goals}</td>
           <td style="padding:5px;">${s.yellow}</td>
           <td style="padding:5px;">${s.red}</td>
           <td style="padding:5px;">${s.avgRating!=null ? s.avgRating.toFixed(1) : "-"}</td>
-        </tr>`).join("") : `<tr><td colspan="9" style="padding:5px;" class="muted">Sin jugadores de campo en la plantilla.</td></tr>`}
+        </tr>`).join("") : `<tr><td colspan="10" style="padding:5px;" class="muted">Sin jugadores de campo en la plantilla.</td></tr>`}
       </tbody>
     </table>
     </div>
@@ -10291,20 +10422,21 @@ function renderSeasonSummary_(wrap){
     <div style="overflow-x:auto;">
     <table style="width:100%;border-collapse:collapse;font-size:.85rem;min-width:420px;">
       <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
-        <th style="padding:5px;">Portero</th><th style="padding:5px;">PJ</th><th style="padding:5px;">⚽ Goles</th><th style="padding:5px;">🥅 Encajados</th><th style="padding:5px;">Porterías a cero</th><th style="padding:5px;">🟨</th><th style="padding:5px;">🟥</th><th style="padding:5px;">⭐ Nota media</th>
+        <th style="padding:5px;">Portero</th><th style="padding:5px;">PJ</th><th style="padding:5px;">⏱ Min</th><th style="padding:5px;">⚽ Goles</th><th style="padding:5px;">🥅 Encajados</th><th style="padding:5px;">Porterías a cero</th><th style="padding:5px;">🟨</th><th style="padding:5px;">🟥</th><th style="padding:5px;">⭐ Nota media</th>
       </tr></thead>
       <tbody>
       ${gks.length ? gks.map(s=>`
         <tr style="border-bottom:1px solid var(--border);">
           <td style="padding:5px;">${jerseyNameHtml_(s.player.position, (s.player.dorsal!=null?escapeHtml(String(s.player.dorsal))+". ":"")+escapeHtml(s.player.name))}${s.guest?` <span class="badge outline" style="font-size:.68rem;">${escapeHtml((teams.find(t=>t.id===s.player.teamId)||{}).name||"otra categoría")}</span>`:""}</td>
           <td style="padding:5px;">${s.gkMatches}</td>
+          <td style="padding:5px;">${formatMinutesShort_(s.seconds)}</td>
           <td style="padding:5px;">${s.goals}</td>
           <td style="padding:5px;">${s.goalsConceded}</td>
           <td style="padding:5px;">${s.cleanSheets}</td>
           <td style="padding:5px;">${s.yellow}</td>
           <td style="padding:5px;">${s.red}</td>
           <td style="padding:5px;">${s.avgRating!=null ? s.avgRating.toFixed(1) : "-"}</td>
-        </tr>`).join("") : `<tr><td colspan="8" style="padding:5px;" class="muted">Sin porteros en la plantilla.</td></tr>`}
+        </tr>`).join("") : `<tr><td colspan="9" style="padding:5px;" class="muted">Sin porteros en la plantilla.</td></tr>`}
       </tbody>
     </table>
     </div>
@@ -10338,6 +10470,7 @@ function renderMatchdaySummary_(wrap){
       <div class="badge outline" style="padding:8px 12px;">🏆 ${escapeHtml(m.competition||"-")}</div>
       <div class="badge outline" style="padding:8px 12px;">${m.goalsFor!=null&&m.goalsAgainst!=null ? `⚽ ${matchScoreText_(m)}` : "Sin resultado"}</div>
       <div class="badge outline" style="padding:8px 12px;">🙃 PP del rival: ${rivalOwnGoals}</div>
+      <div class="badge outline" style="padding:8px 12px;">⏱️ ${matchFormatLabel_(matchdayMatchFormat_(m))}</div>
       ${diff ? `<div class="badge outline" title="${diff.label}" style="padding:8px 10px;display:flex;align-items:center;gap:0;"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:${diff.bg};border:1px solid ${diff.border};"></span></div>` : ""}
     </div>
     <button type="button" class="btn ghost small" onclick="goToMatchdayReport('${m.id}')" style="margin-bottom:12px;">📋 Ir al informe del partido</button>
@@ -10361,7 +10494,7 @@ function renderMatchdaySummary_(wrap){
     <div style="overflow-x:auto;">
     <table style="width:100%;border-collapse:collapse;font-size:.85rem;min-width:480px;">
       <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
-        <th style="padding:5px;">Jugador</th><th style="padding:5px;">Estado</th><th style="padding:5px;">Motivo</th><th style="padding:5px;">⚽ Goles</th><th style="padding:5px;">🥅 Enc.</th><th style="padding:5px;">🟨</th><th style="padding:5px;">🟥</th><th style="padding:5px;">⭐ Nota</th>
+        <th style="padding:5px;">Jugador</th><th style="padding:5px;">Estado</th><th style="padding:5px;">Motivo</th><th style="padding:5px;">⏱ Min</th><th style="padding:5px;">⚽ Goles</th><th style="padding:5px;">🥅 Enc.</th><th style="padding:5px;">🟨</th><th style="padding:5px;">🟥</th><th style="padding:5px;">⭐ Nota</th>
       </tr></thead>
       <tbody>
       ${roster.length ? roster.map(p=>{
@@ -10372,13 +10505,14 @@ function renderMatchdaySummary_(wrap){
           <td style="padding:5px;">${jerseyNameHtml_(p.position, (p.dorsal!=null?escapeHtml(String(p.dorsal))+". ":"")+escapeHtml(p.name))}${matchdayGuestBadgeHtml_(m,p)}</td>
           <td style="padding:5px;">${escapeHtml(s.status||"No convocado")}</td>
           <td style="padding:5px;">${escapeHtml(s.reason||"")}</td>
+          <td style="padding:5px;">${formatSeconds_(s.seconds)}</td>
           <td style="padding:5px;">${s.goals!=null?s.goals:"-"}</td>
           <td style="padding:5px;">${isGk ? (s.goalsConceded!=null?s.goalsConceded:"-") : "—"}</td>
           <td style="padding:5px;">${s.yellow||0}</td>
           <td style="padding:5px;">${s.red||0}</td>
           <td style="padding:5px;">${ratings[p.id]!=null?ratings[p.id]:"-"}</td>
         </tr>`;
-      }).join("") : `<tr><td colspan="8" style="padding:5px;" class="muted">Este equipo todavía no tiene jugadores en la plantilla.</td></tr>`}
+      }).join("") : `<tr><td colspan="9" style="padding:5px;" class="muted">Este equipo todavía no tiene jugadores en la plantilla.</td></tr>`}
       </tbody>
     </table>
     </div>
@@ -10415,12 +10549,13 @@ window.openPlayerProfile = (id) => {
   // también esos partidos jugados con otra categoría.
   const teamMds = matchdays.filter(m=> matchdayRosterIds_(m).has(p.id) && matchdaySeason_(m, team)===selectedSeason).sort((a,b)=>(a.number||0)-(b.number||0));
   const isGk = p.position === "Portero";
-  let played=0, starts=0, subs=0, called=0, goals=0, yellow=0, red=0, goalsConceded=0, cleanSheets=0, gkMatches=0;
+  let played=0, starts=0, subs=0, called=0, goals=0, yellow=0, red=0, goalsConceded=0, cleanSheets=0, gkMatches=0, seconds=0;
   const rows = teamMds.map(m=>{
     const s = (m.playerStats||[]).find(x=>x.playerId===id) || {status:"No convocado"};
     if(s.status==="Titular"){ starts++; played++; called++; }
     else if(s.status==="Suplente"){ subs++; played++; called++; }
     goals += s.goals||0; yellow += s.yellow||0; red += s.red||0;
+    seconds += s.seconds||0;
     if(isGk && (s.status==="Titular"||s.status==="Suplente")){
       gkMatches++;
       goalsConceded += (s.goalsConceded!=null ? s.goalsConceded : 0);
@@ -10434,6 +10569,7 @@ window.openPlayerProfile = (id) => {
       <div class="badge outline" style="padding:8px 12px;">🗓️ Partidos jugados: ${played}</div>
       <div class="badge outline" style="padding:8px 12px;">🟢 Titular: ${starts}</div>
       <div class="badge outline" style="padding:8px 12px;">🔵 Suplente: ${subs}</div>
+      <div class="badge outline" style="padding:8px 12px;">⏱️ Minutos: ${Math.round(seconds/60)}'</div>
       ${isGk
         ? `<div class="badge outline" style="padding:8px 12px;">⚽ Goles: ${goals}</div><div class="badge outline" style="padding:8px 12px;">🥅 Encajados: ${goalsConceded}</div><div class="badge outline" style="padding:8px 12px;">🧤 Porterías a cero: ${cleanSheets}</div>`
         : `<div class="badge outline" style="padding:8px 12px;">⚽ Goles: ${goals}</div>`}
@@ -10442,9 +10578,9 @@ window.openPlayerProfile = (id) => {
     </div>
     <h3 style="font-size:.9rem;">Jornada a jornada</h3>
     <div style="overflow-x:auto;">
-    <table style="width:100%;border-collapse:collapse;font-size:.85rem;min-width:420px;">
+    <table style="width:100%;border-collapse:collapse;font-size:.85rem;min-width:460px;">
       <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
-        <th style="padding:5px;">J.</th><th style="padding:5px;">Rival</th><th style="padding:5px;">Estado</th><th style="padding:5px;">⚽ Goles</th>${isGk?`<th style="padding:5px;">🥅 Enc.</th>`:""}<th style="padding:5px;">🟨</th><th style="padding:5px;">🟥</th>
+        <th style="padding:5px;">J.</th><th style="padding:5px;">Rival</th><th style="padding:5px;">Estado</th><th style="padding:5px;">⏱ Min</th><th style="padding:5px;">⚽ Goles</th>${isGk?`<th style="padding:5px;">🥅 Enc.</th>`:""}<th style="padding:5px;">🟨</th><th style="padding:5px;">🟥</th>
       </tr></thead>
       <tbody>
       ${rows.length ? rows.map(r=>`
@@ -10452,6 +10588,7 @@ window.openPlayerProfile = (id) => {
           <td style="padding:5px;">${r.m.number}</td>
           <td style="padding:5px;">${escapeHtml(r.m.rival||"-")}${r.m.teamId!==p.teamId?` <span class="badge outline" style="font-size:.68rem;">${escapeHtml((teams.find(t=>t.id===r.m.teamId)||{}).name||"otro equipo")}</span>`:""}</td>
           <td style="padding:5px;">${escapeHtml(r.s.status||"No convocado")}</td>
+          <td style="padding:5px;">${formatSeconds_(r.s.seconds)}</td>
           <td style="padding:5px;">${r.s.goals||0}</td>
           ${isGk?`<td style="padding:5px;">${r.s.goalsConceded!=null?r.s.goalsConceded:"-"}</td>`:""}
           <td style="padding:5px;">${r.s.yellow||0}</td>
@@ -13706,6 +13843,51 @@ function livePlayer_(id){ return players.find(p=>p.id===id) || null; }
 function livePlayerName_(id){ const p = livePlayer_(id); return p ? p.name : "Jugador"; }
 function liveMatchday_(){ return matchdays.find(m=>m.id===liveSelectedMatchdayId) || null; }
 
+/* ---------- Formato de partido: minutos por parte, tipo de reloj y tope de añadido ---------- */
+// Cada equipo puede tener su formato (2×20 parado, 2×25 corrido, 2×30 corrido...). La jornada
+// puede sobrescribirlo para un partido concreto. Si no hay nada guardado se usa 2×20 parado,
+// que es el comportamiento anterior, para no romper datos antiguos.
+const LIVE_DEFAULT_FORMAT_ = { minutes: 20, clock: "parado", maxAdded: 5, trackMinutes: true };
+function normalizeMatchFormat_(f){
+  const src = f || {};
+  let minutes = Number(src.minutes);
+  if(!(minutes >= 1 && minutes <= 90)) minutes = LIVE_DEFAULT_FORMAT_.minutes;
+  let maxAdded = Number(src.maxAdded);
+  if(!(maxAdded >= 0 && maxAdded <= 30)) maxAdded = LIVE_DEFAULT_FORMAT_.maxAdded;
+  return {
+    minutes,
+    clock: src.clock === "corrido" ? "corrido" : "parado",
+    maxAdded,
+    trackMinutes: src.trackMinutes !== false
+  };
+}
+function teamMatchFormat_(teamId){
+  const t = teams.find(x=>x.id===teamId);
+  return normalizeMatchFormat_(t && t.matchFormat);
+}
+function matchdayMatchFormat_(m){
+  if(!m) return normalizeMatchFormat_(null);
+  // Si el directo ya está iniciado manda el formato congelado en live.format.
+  if(m.live && m.live.format) return normalizeMatchFormat_(m.live.format);
+  return normalizeMatchFormat_(m.matchFormat || teamMatchFormat_(m.teamId));
+}
+function matchFormatLabel_(f){
+  f = normalizeMatchFormat_(f);
+  return `2×${f.minutes}' ${f.clock === "corrido" ? "reloj corrido" : "reloj parado"}`;
+}
+function matchFormatPeriodSeconds_(f){ return normalizeMatchFormat_(f).minutes * 60; }
+function matchFormatMaxSeconds_(f){ const x = normalizeMatchFormat_(f); return (x.minutes + x.maxAdded) * 60; }
+// Minutos en mm:ss (para el directo) y en minutos enteros (para tablas y PDF).
+function formatSeconds_(seconds){
+  if(seconds == null || isNaN(Number(seconds))) return "—";
+  const s = Math.max(0, Math.round(Number(seconds)));
+  return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
+}
+function formatMinutesShort_(seconds){
+  if(seconds == null || isNaN(Number(seconds))) return "—";
+  return `${Math.round(Number(seconds)/60)}'`;
+}
+
 // Plantilla de la jornada + invitados. Si el directo ya está iniciado, usa la lista de
 // invitados que quedó congelada en live.base.extraPlayerIds para que no cambie a mitad.
 function liveRoster_(m, live){
@@ -13740,6 +13922,7 @@ function liveNormalizePlayerStats_(m, live){
     if(p.position==="Portero"){
       row.goalsConceded = (s.goalsConceded!=null ? Number(s.goalsConceded) : null);
     }
+    if(s.seconds!=null && !isNaN(Number(s.seconds))) row.seconds = Number(s.seconds);
     return row;
   });
   Object.keys(byId).forEach(id=>{
@@ -13760,6 +13943,16 @@ function liveStoreLocal_(state){
   }catch(e){}
 }
 
+function liveNormalizeLoadedLive_(live, m){
+  if(!live) return live;
+  live.format = normalizeMatchFormat_(live.format || matchdayMatchFormat_(m));
+  if(!Array.isArray(live.presence)) live.presence = [];
+  if(live.timer && live.timer.base==null) live.timer.base = 0;
+  // Sesión antigua sin quinteto inicial: no inventamos minutos hacia atrás.
+  if(!Array.isArray(live.startOnField)) live.startOnField = null;
+  return live;
+}
+
 function liveLoadStoredState_(m){
   if(!m) return null;
   let stored = null;
@@ -13769,9 +13962,10 @@ function liveLoadStoredState_(m){
     const storedRev = Number(stored.live.rev||0);
     const dbRev = fromDb ? Number(fromDb.live.rev||0) : -1;
     if(stored.pending || storedRev >= dbRev){
-      return {matchdayId:m.id, live:stored.live, pending:!!stored.pending};
+      return {matchdayId:m.id, live: liveNormalizeLoadedLive_(stored.live, m), pending:!!stored.pending};
     }
   }
+  if(fromDb) fromDb.live = liveNormalizeLoadedLive_(fromDb.live, m);
   return fromDb;
 }
 
@@ -13795,6 +13989,63 @@ function liveGoalkeeperId_(live, m, expelled){
     return p && p.position==="Portero" && s.status!=="No convocado";
   });
   return convGk ? convGk.playerId : null;
+}
+
+// Segundo absoluto de un evento dentro del partido. Los eventos nuevos ya guardan `clock`;
+// los antiguos (sin `clock`) se reconstruyen con su parte y su minuto.
+function liveEventClock_(ev, format){
+  if(ev && ev.clock != null && !isNaN(Number(ev.clock))) return Math.max(0, Number(ev.clock));
+  const f = normalizeMatchFormat_(format);
+  const period = Number(ev && ev.period || 1);
+  const minute = Number(ev && ev.minute || 1);
+  return (period-1)*f.minutes*60 + Math.max(0, minute-1)*60;
+}
+
+// Registra un cambio de quinteto (cambios/convocatoria) con el reloj del partido. Las rojas
+// NO se registran aquí: se deducen del propio evento de roja, para que deshacerla devuelva
+// automáticamente los minutos del tramo.
+function liveRecordPresence_(live, ids){
+  if(!live) return;
+  const clock = liveAbsoluteSeconds_(live);
+  const next = (ids || []).slice();
+  live.presence = live.presence || [];
+  const last = live.presence[live.presence.length-1];
+  if(last && JSON.stringify((last.onField||[]).slice().sort()) === JSON.stringify(next.slice().sort())) return;
+  live.presence.push({ clock, onField: next, createdAt: Date.now() });
+}
+
+// Minutos jugados por jugador: integral de "quién está en pista" entre 0 y el reloj actual.
+// Se recalcula desde live.startOnField + live.presence + rojas, igual que el resto del directo.
+function liveComputeSeconds_(live){
+  const f = liveFormat_(live);
+  if(f.trackMinutes === false) return null;
+  const start = (live && live.startOnField) || null;
+  if(!Array.isArray(start)) return null; // sesión antigua sin datos de presencia
+  const now = liveAbsoluteSeconds_(live);
+  const secs = {};
+  let field = new Set(start);
+  let last = 0;
+  const addUntil = (until)=>{
+    const to = Math.max(last, Math.min(Number(until)||0, now));
+    const delta = to - last;
+    if(delta > 0) field.forEach(id=>{ secs[id] = (secs[id]||0) + delta; });
+    last = to;
+  };
+  const timeline = [];
+  (live.presence || []).forEach(p=>{
+    timeline.push({ clock: Number(p.clock)||0, kind: "presence", onField: p.onField || [] });
+  });
+  (live.events || []).forEach(ev=>{
+    if(ev.type === "red" && ev.playerId) timeline.push({ clock: liveEventClock_(ev, f), kind: "red", playerId: ev.playerId });
+  });
+  timeline.sort((a,b)=> (a.clock - b.clock) || (a.kind === "presence" ? -1 : 1));
+  timeline.forEach(item=>{
+    addUntil(item.clock);
+    if(item.kind === "presence") field = new Set(item.onField);
+    else if(item.kind === "red") field.delete(item.playerId);
+  });
+  addUntil(now);
+  return secs;
 }
 
 // Aplica los eventos del directo sobre la foto inicial (live.base) y devuelve el estado
@@ -13881,6 +14132,19 @@ function liveCompute_(m, live){
         expelled.add(ev.playerId);
         if(statsMap[ev.playerId]) statsMap[ev.playerId].red = (statsMap[ev.playerId].red || 0) + 1;
       }
+    }
+  });
+
+  // Minutos jugados: se calculan al final, desde la presencia en pista y el reloj. Si el
+  // partido tiene los minutos desactivados, se guarda null para que no cuenten.
+  const secondsMap = liveComputeSeconds_(live);
+  Object.keys(statsMap).forEach(id=>{
+    const st = statsMap[id];
+    if(!st) return;
+    if(liveFormat_(live).trackMinutes === false){
+      st.seconds = null;
+    } else if(secondsMap){
+      st.seconds = (st.status && st.status !== "No convocado") ? Math.round(secondsMap[id] || 0) : null;
     }
   });
 
@@ -14091,6 +14355,7 @@ function liveUpdateSetupSelection_(){
     livePrefillNewMatchForm_();
     btn.disabled = true;
     btn.textContent = "Preparar directo";
+    liveRenderSetupFormat_();
     return;
   }
   form.classList.add("hidden");
@@ -14098,6 +14363,7 @@ function liveUpdateSetupSelection_(){
     liveSelectedMatchdayId = null;
     btn.disabled = true;
     btn.textContent = "Preparar directo";
+    liveRenderSetupFormat_();
     return;
   }
   liveSelectedMatchdayId = val;
@@ -14105,6 +14371,52 @@ function liveUpdateSetupSelection_(){
   const m = matchdays.find(x=>x.id===val);
   btn.disabled = false;
   btn.textContent = m && m.live ? "▶️ Continuar directo" : "Preparar directo";
+  liveRenderSetupFormat_();
+}
+
+function liveSetupFormat_(){
+  const minutesEl = document.getElementById("liveFormatMinutes");
+  const clockEl = document.getElementById("liveFormatClock");
+  const trackEl = document.getElementById("liveFormatTrack");
+  return normalizeMatchFormat_({
+    minutes: minutesEl ? Number(minutesEl.value) : LIVE_DEFAULT_FORMAT_.minutes,
+    clock: clockEl ? clockEl.value : LIVE_DEFAULT_FORMAT_.clock,
+    maxAdded: LIVE_DEFAULT_FORMAT_.maxAdded,
+    trackMinutes: trackEl ? !!trackEl.checked : true
+  });
+}
+
+function liveRenderSetupFormat_(){
+  const minutesEl = document.getElementById("liveFormatMinutes");
+  const clockEl = document.getElementById("liveFormatClock");
+  const trackEl = document.getElementById("liveFormatTrack");
+  const hintEl = document.getElementById("liveFormatHint");
+  if(!minutesEl || !clockEl || !trackEl) return;
+  const m = liveMatchday_();
+  const liveStarted = !!(m && m.live);
+  const f = liveStarted ? liveFormat_(m.live) : (m ? matchdayMatchFormat_(m) : teamMatchFormat_(selectedTeamId));
+  minutesEl.value = f.minutes;
+  clockEl.value = f.clock;
+  trackEl.checked = f.trackMinutes !== false;
+  minutesEl.disabled = liveStarted;
+  clockEl.disabled = liveStarted;
+  trackEl.disabled = liveStarted;
+  if(hintEl){
+    hintEl.textContent = liveStarted
+      ? "El directo ya está iniciado: el formato queda fijado para este partido."
+      : `Tope de seguridad: ${f.minutes + f.maxAdded} min por parte (${f.minutes} + ${f.maxAdded} de añadido).${f.trackMinutes === false ? " Los minutos no se contarán en este partido." : ""}`;
+  }
+}
+
+// Guarda el formato elegido como sobrescritura SOLO de este partido (la jornada). El valor
+// por defecto del equipo se cambia desde "Equipos del club".
+function liveSaveSetupFormat_(){
+  const m = liveMatchday_();
+  if(!m || m.live) return;
+  const f = liveSetupFormat_();
+  m.matchFormat = f;
+  try{ db.collection("matchdays").doc(m.id).update({matchFormat:f}).catch(()=>{}); }catch(e){}
+  liveRenderSetupFormat_();
 }
 
 function livePrefillNewMatchForm_(){
@@ -14143,6 +14455,7 @@ async function liveCreateMatch_(){
     competition: document.getElementById("liveMdCompetition").value.trim() || "Liga",
     homeAway: document.getElementById("liveMdHomeAway").value || "Local",
     season: selectedSeason || (team && team.currentSeason) || defaultSeasonLabel_(),
+    matchFormat: liveSetupFormat_(),
     playerStats: [],
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     createdBy: currentUser ? currentUser.uid : null
@@ -14345,10 +14658,13 @@ function liveLineupStart_(){
     version: 1,
     rev: 1,
     startedAt: Date.now(),
+    format: matchdayMatchFormat_(m),
     base,
     onField: liveLineupOnField.slice(0,5),
+    startOnField: liveLineupOnField.slice(0,5),
+    presence: [],
     events: [],
-    timer: {period:1, running:false, startedAt:null, elapsed:0}
+    timer: {period:1, running:false, startedAt:null, elapsed:0, base:0}
   };
 
   liveState = {matchdayId:m.id, live, pending:false};
@@ -14380,13 +14696,29 @@ function liveHideDashboardOverlay_(){
   if(liveClockInterval){ clearInterval(liveClockInterval); liveClockInterval = null; }
 }
 
+function renderLiveOnFieldChips_(m, live, derived){
+  live = live || (liveState && liveState.live);
+  if(!live) return;
+  const wrap = document.getElementById("liveOnFieldList");
+  if(!wrap) return;
+  const onField = ((live.onField) || []).map(livePlayer_).filter(Boolean);
+  const secondsMap = liveComputeSeconds_(live) || {};
+  const showMins = liveFormat_(live).trackMinutes !== false && Array.isArray(live.startOnField);
+  wrap.innerHTML = onField.length
+    ? onField.map(p=>{
+        const mins = showMins ? formatMinutesShort_(secondsMap[p.id] || 0) : "";
+        return `<span class="live-player-chip">${p.dorsal!=null?`<strong>${p.dorsal}</strong>`:""} ${escapeHtml(p.name)}${p.position==="Portero"?' <span class="gk">P</span>':""}${mins?`<span class="mins">⏱ ${mins}</span>`:""}</span>`;
+      }).join("")
+    : '<span class="live-player-chip empty">Sin jugadores en pista</span>';
+}
+
 function renderLiveDashboard_(){
   if(!liveState) return;
   const m = matchdays.find(x=>x.id===liveState.matchdayId);
   if(!m){ liveHideDashboardOverlay_(); return; }
   const live = liveState.live;
   const derived = liveCompute_(m, live);
-  const timer = live.timer || {period:1, running:false, startedAt:null, elapsed:0};
+  const timer = liveTimerObj_(live);
 
   const title = document.getElementById("liveDashboardTitle");
   if(title) title.textContent = `Jornada ${m.number||"?"} · ${m.rival||"Rival"}`;
@@ -14402,23 +14734,11 @@ function renderLiveDashboard_(){
   const meta = document.getElementById("liveMatchMeta");
   if(meta) meta.textContent = [m.competition||"Partido", m.date||"", m.homeAway||""].filter(Boolean).join(" · ");
 
-  const period = document.getElementById("livePeriod");
-  if(period) period.textContent = timer.period===2 ? "2ª PARTE" : "1ª PARTE";
-  const clock = document.getElementById("liveClock");
-  if(clock) clock.textContent = liveClockText_(timer);
-  const toggle = document.getElementById("liveTimerToggle");
-  if(toggle) toggle.textContent = timer.running ? "⏸️ Pausar" : "▶️ Iniciar";
-  const next = document.getElementById("liveTimerNextPeriod");
-  if(next) next.textContent = timer.period===2 ? "Finalizar" : "2ª parte";
+  liveRenderClock_(live, timer);
 
-  const onField = ((live.onField) || []).map(livePlayer_).filter(Boolean);
-  const onFieldWrap = document.getElementById("liveOnFieldList");
-  if(onFieldWrap){
-    onFieldWrap.innerHTML = onField.length
-      ? onField.map(p=>`<span class="live-player-chip">${p.dorsal!=null?`<strong>${p.dorsal}</strong>`:""} ${escapeHtml(p.name)}${p.position==="Portero"?' <span class="gk">P</span>':""}</span>`).join("")
-      : '<span class="live-player-chip empty">Sin jugadores en pista</span>';
-  }
+  renderLiveOnFieldChips_(m, live, derived);
   const count = document.getElementById("liveOnFieldCount");
+  const onField = ((live.onField) || []).map(livePlayer_).filter(Boolean);
   if(count) count.textContent = `(${onField.length}/5)`;
   const gk = onField.find(p=>p.position==="Portero");
   const gkFallback = liveGoalkeeperId_(live, m);
@@ -14508,32 +14828,74 @@ function liveElapsedSeconds_(timer){
   return Math.max(0, s);
 }
 
-function liveClockText_(timer){
-  const s = Math.min(liveElapsedSeconds_(timer), 20*60);
+function liveFormat_(live){ return normalizeMatchFormat_(live && live.format); }
+
+function liveTimerObj_(live){
+  if(!live.timer) live.timer = {period:1, running:false, startedAt:null, elapsed:0, base:0};
+  if(live.timer.base==null) live.timer.base = 0;
+  return live.timer;
+}
+
+// Reloj absoluto del partido: lo que duraron las partes ya cerradas (con su añadido) más lo
+// que lleva la parte actual. Se usa para los minutos jugados y para situar cada acción.
+function liveAbsoluteSeconds_(live){
+  const t = live.timer || {};
+  const max = matchFormatMaxSeconds_(liveFormat_(live));
+  return Math.max(0, Number(t.base||0) + Math.min(liveElapsedSeconds_(t), max));
+}
+
+function livePeriodText_(timer, format){
+  const f = normalizeMatchFormat_(format);
+  return `${(timer && timer.period===2) ? "2ª" : "1ª"} PARTE · ${f.minutes} min`;
+}
+
+function liveClockText_(timer, format){
+  const s = Math.min(liveElapsedSeconds_(timer), matchFormatMaxSeconds_(format));
   return `${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
 }
 
-function updateLiveClock_(){
-  if(!liveState || !liveState.live) return;
-  const timer = liveState.live.timer || {period:1, running:false, startedAt:null, elapsed:0};
+// Texto bajo el reloj: añadido sobre el tiempo reglamentario o aviso del tope de seguridad.
+function liveClockNoteText_(timer, format){
+  const f = normalizeMatchFormat_(format);
+  const nominal = matchFormatPeriodSeconds_(f);
+  const max = matchFormatMaxSeconds_(f);
+  const s = Math.min(liveElapsedSeconds_(timer), max);
+  if(s >= max) return `Tope de seguridad alcanzado (${f.minutes}+${f.maxAdded} min)`;
+  if(s > nominal) return `+${formatSeconds_(s - nominal)} de añadido`;
+  return "";
+}
+
+function liveRenderClock_(live, timer){
   const clock = document.getElementById("liveClock");
-  if(clock) clock.textContent = liveClockText_(timer);
+  if(clock) clock.textContent = liveClockText_(timer, live.format);
+  const note = document.getElementById("liveClockNote");
+  if(note){
+    note.textContent = liveClockNoteText_(timer, live.format);
+    note.classList.toggle("warn", !!note.textContent);
+  }
   const period = document.getElementById("livePeriod");
-  if(period) period.textContent = timer.period===2 ? "2ª PARTE" : "1ª PARTE";
+  if(period) period.textContent = livePeriodText_(timer, live.format);
   const toggle = document.getElementById("liveTimerToggle");
   if(toggle) toggle.textContent = timer.running ? "⏸️ Pausar" : "▶️ Iniciar";
   const next = document.getElementById("liveTimerNextPeriod");
   if(next) next.textContent = timer.period===2 ? "Finalizar" : "2ª parte";
+}
 
-  if(timer.running && liveElapsedSeconds_(timer) >= 20*60){
-    timer.elapsed = 20*60;
+function updateLiveClock_(){
+  if(!liveState || !liveState.live) return;
+  const live = liveState.live;
+  const timer = liveTimerObj_(live);
+  liveRenderClock_(live, timer);
+  renderLiveOnFieldChips_();
+  const max = matchFormatMaxSeconds_(liveFormat_(live));
+  if(timer.running && liveElapsedSeconds_(timer) >= max){
+    timer.elapsed = max;
     timer.running = false;
     timer.startedAt = null;
     const m = matchdays.find(x=>x.id===liveState.matchdayId);
-    if(m) livePersist_(m, liveState.live, {render:false});
+    if(m) livePersist_(m, live, {render:false});
     if(liveClockInterval){ clearInterval(liveClockInterval); liveClockInterval = null; }
-    if(clock) clock.textContent = liveClockText_(timer);
-    if(toggle) toggle.textContent = "▶️ Iniciar";
+    liveRenderClock_(live, timer);
   }
 }
 
@@ -14541,40 +14903,47 @@ function liveTimerToggle_(){
   if(!liveState || !liveState.live) return;
   const m = matchdays.find(x=>x.id===liveState.matchdayId);
   if(!m) return;
-  const t = liveState.live.timer || (liveState.live.timer = {period:1, running:false, startedAt:null, elapsed:0});
+  const live = liveState.live;
+  const t = liveTimerObj_(live);
+  const f = liveFormat_(live);
+  const max = matchFormatMaxSeconds_(f);
   if(t.running){
-    t.elapsed = Math.min(liveElapsedSeconds_(t), 20*60);
+    t.elapsed = Math.min(liveElapsedSeconds_(t), max);
     t.running = false;
     t.startedAt = null;
   } else {
-    if(liveElapsedSeconds_(t) >= 20*60){
-      alert("La parte ha llegado a 20:00. Pulsa '2ª parte' o 'Finalizar'.");
+    if(liveElapsedSeconds_(t) >= max){
+      alert(`La parte ha llegado al tope de ${f.minutes + f.maxAdded} minutos. Pulsa '2ª parte' o 'Finalizar'.`);
       return;
     }
     t.startedAt = Date.now();
     t.running = true;
   }
-  livePersist_(m, liveState.live);
+  livePersist_(m, live);
 }
 
 function liveTimerNextPeriod_(){
   if(!liveState || !liveState.live) return;
   const m = matchdays.find(x=>x.id===liveState.matchdayId);
   if(!m) return;
-  const t = liveState.live.timer || (liveState.live.timer = {period:1, running:false, startedAt:null, elapsed:0});
+  const live = liveState.live;
+  const t = liveTimerObj_(live);
+  const f = liveFormat_(live);
+  const max = matchFormatMaxSeconds_(f);
   if((t.period || 1) === 1){
-    if(!confirm("¿Empezar la 2ª parte? El cronómetro volverá a 00:00.")) return;
+    if(!confirm(`¿Empezar la 2ª parte? La 2ª parte será de ${f.minutes} minutos y el cronómetro volverá a 00:00.`)) return;
+    t.base = Number(t.base||0) + Math.min(liveElapsedSeconds_(t), max);
     t.period = 2;
     t.elapsed = 0;
     t.running = false;
     t.startedAt = null;
   } else {
     if(!confirm("¿Finalizar el partido? Se parará el cronómetro.")) return;
-    t.elapsed = Math.min(liveElapsedSeconds_(t), 20*60);
+    t.elapsed = Math.min(liveElapsedSeconds_(t), max);
     t.running = false;
     t.startedAt = null;
   }
-  livePersist_(m, liveState.live);
+  livePersist_(m, live);
 }
 
 function liveTimerReset_(){
@@ -14582,13 +14951,14 @@ function liveTimerReset_(){
   if(!confirm("¿Reiniciar el cronómetro a 00:00 y la 1ª parte? No se borran los goles ni las tarjetas.")) return;
   const m = matchdays.find(x=>x.id===liveState.matchdayId);
   if(!m) return;
-  liveState.live.timer = {period:1, running:false, startedAt:null, elapsed:0};
+  liveState.live.timer = {period:1, running:false, startedAt:null, elapsed:0, base:0};
   livePersist_(m, liveState.live);
 }
 
 function liveMinute_(live){
-  const elapsed = liveElapsedSeconds_(live && live.timer);
-  return Math.max(1, Math.min(20, Math.ceil(elapsed/60)));
+  const f = liveFormat_(live);
+  const elapsed = Math.min(liveElapsedSeconds_(live && live.timer), matchFormatMaxSeconds_(f));
+  return Math.max(1, Math.ceil(elapsed/60));
 }
 
 function liveAddEvent_(ev){
@@ -14596,16 +14966,18 @@ function liveAddEvent_(ev){
   const m = matchdays.find(x=>x.id===liveState.matchdayId);
   if(!m) return;
   const live = liveState.live;
-  if(!live.timer) live.timer = {period:1, running:false, startedAt:null, elapsed:0};
-  if(live.timer.running && liveElapsedSeconds_(live.timer) >= 20*60){
-    live.timer.elapsed = 20*60;
-    live.timer.running = false;
-    live.timer.startedAt = null;
+  const t = liveTimerObj_(live);
+  const max = matchFormatMaxSeconds_(liveFormat_(live));
+  if(t.running && liveElapsedSeconds_(t) >= max){
+    t.elapsed = max;
+    t.running = false;
+    t.startedAt = null;
   }
   ev.id = liveUid_();
   ev.createdAt = Date.now();
+  ev.clock = liveAbsoluteSeconds_(live);
   ev.minute = liveMinute_(live);
-  ev.period = live.timer.period || 1;
+  ev.period = t.period || 1;
   ev.playersOnField = (live.onField || []).slice();
   if(ev.type==="goal_against") ev.goalkeeperId = liveGoalkeeperId_(live, m);
   if(ev.type==="red" && ev.playerId){
@@ -14641,11 +15013,13 @@ function liveResetDirect_(){
   if(!m) return;
   const live = liveState.live;
   live.events = [];
-  live.timer = {period:1, running:false, startedAt:null, elapsed:0};
+  live.presence = [];
+  live.timer = {period:1, running:false, startedAt:null, elapsed:0, base:0};
   live.onField = ((live.base && live.base.playerStats) || [])
     .filter(s=>s.status==="Titular" && Number(s.red||0)===0)
     .map(s=>s.playerId)
     .slice(0,5);
+  live.startOnField = live.onField.slice();
   livePersist_(m, live);
 }
 
@@ -14721,11 +15095,13 @@ function renderLiveChangesModal_(){
     const s = statsMap[p.id] || {};
     const isRed = Number(s.red||0) > 0;
     const inField = onFieldSet.has(p.id);
+    const mins = s.seconds!=null ? `<span class="live-lineup-mins">⏱ ${formatMinutesShort_(s.seconds)}</span>` : "";
     return `<div class="live-lineup-row">
       <div class="live-lineup-check" style="cursor:default;">
         ${jerseyIconHtml_(p.position)}
         <span class="live-lineup-name"><strong>${p.dorsal!=null?p.dorsal:"-"}</strong> ${escapeHtml(p.name)}${isRed?' <span class="live-badge warn">Expulsado</span>':""}</span>
       </div>
+      ${mins}
       <button type="button" class="live-lineup-toggle ${inField?"active":""}" ${isRed?"disabled":""} onclick="liveToggleChangePlayer_('${p.id}')">${inField?"Quitar":"Poner"}</button>
     </div>`;
   }).join("");
@@ -14755,6 +15131,7 @@ function liveSaveChanges_(){
   const derived = liveCompute_(m, liveState.live);
   const redIds = new Set(derived.playerStats.filter(s=>Number(s.red||0)>0).map(s=>s.playerId));
   liveState.live.onField = liveChangesOnField.filter(id=>!redIds.has(id)).slice(0,5);
+  liveRecordPresence_(liveState.live, liveState.live.onField);
   livePersist_(m, liveState.live);
   document.getElementById("liveActionModal").classList.add("hidden");
 }
@@ -14790,12 +15167,14 @@ function renderLiveConvocatoriaModal_(){
     const onField = liveConvOnField.includes(p.id);
     const s = statsMap[p.id] || {};
     const isRed = Number(s.red||0) > 0;
+    const mins = s.seconds!=null ? `<span class="live-lineup-mins">⏱ ${formatMinutesShort_(s.seconds)}</span>` : "";
     return `<div class="live-lineup-row">
       <label class="live-lineup-check">
         <input type="checkbox" ${selected?"checked":""} onchange="liveConvToggleSelected_('${p.id}')">
         ${jerseyIconHtml_(p.position)}
         <span class="live-lineup-name"><strong>${p.dorsal!=null?p.dorsal:"-"}</strong> ${escapeHtml(p.name)}${isRed?' <span class="live-badge warn">Expulsado</span>':""}</span>
       </label>
+      ${mins}
       <button type="button" class="live-lineup-toggle ${onField?"active":""}" ${(!selected||isRed)?"disabled":""} onclick="liveConvToggleOnField_('${p.id}')">${onField?"En pista":"Pista"}</button>
     </div>`;
   }).join("");
@@ -14851,6 +15230,7 @@ function liveSaveConvocatoria_(){
   const derived = liveCompute_(m, live);
   const redIds = new Set(derived.playerStats.filter(s=>Number(s.red||0)>0).map(s=>s.playerId));
   live.onField = liveConvOnField.filter(id=>liveConvSelected.has(id) && !redIds.has(id)).slice(0,5);
+  liveRecordPresence_(live, live.onField);
   livePersist_(m, live);
   document.getElementById("liveActionModal").classList.add("hidden");
 }
@@ -15021,6 +15401,9 @@ liveBind_("liveTeamSelect", "onchange", (e)=>{
 });
 
 liveBind_("liveMatchdaySelect", "onchange", liveUpdateSetupSelection_);
+liveBind_("liveFormatMinutes", "onchange", liveSaveSetupFormat_);
+liveBind_("liveFormatClock", "onchange", liveSaveSetupFormat_);
+liveBind_("liveFormatTrack", "onchange", liveSaveSetupFormat_);
 liveBind_("liveContinueBtn", "onclick", liveContinue_);
 liveBind_("liveNewMatchBtn", "onclick", ()=>{
   const sel = document.getElementById("liveMatchdaySelect");

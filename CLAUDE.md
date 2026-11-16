@@ -328,6 +328,14 @@ All inside `index.html` — search for these comment banners to jump around:
     el resumen de jornada, el resumen de temporada (tabla de porteros), la ficha del jugador, el
     PDF y el Excel de estadísticas y el "máx. goleador" de Comparar equipos leen esa separación.
     Antes compartían una sola casilla y un gol del portero se guardaba como encajado.
+  - **Minutos jugados** (`playerStats[].seconds`, entero; `null` = no contado): la tabla de
+    convocatoria muestra una columna "⏱ Min" editable cuando el partido no tiene directo (se
+    guarda en minutos y se convierte a segundos) y de solo lectura cuando lo tiene (la calcula el
+    directo; al guardar se conserva `data-seconds`). Si el formato del partido tiene
+    `trackMinutes: false`, la celda muestra "—" y se guarda `null`. Los minutos aparecen también
+    en el resumen de temporada y de jornada, la ficha del jugador, el PDF y el Excel. El formato
+    del partido (2×20/25/30, parado/corrido) se muestra en la cabecera de la jornada y en el
+    resumen; ver "Estadísticas en partido" para cómo se calculan en directo.
   - **Goles a favor en propia puerta del rival** (`matchdays[].rivalOwnGoals`): campo numérico
     en la convocatoria, separado de los goles por jugador (el rival los marca en su portería y
     cuentan para nosotros; el marcador de la jornada ya debe incluirlos). Se muestra en el
@@ -336,16 +344,34 @@ All inside `index.html` — search for these comment banners to jump around:
 - **Estadísticas en partido (directo móvil)** (`ESTADÍSTICAS EN PARTIDO (DIRECTO MÓVIL)` ~13657):
   vista móvil dentro de Plantilla (y acceso desde Mi equipo → Plantilla) para registrar un
   partido en vivo: elegir equipo → partido existente o crear uno → convocatoria/quinteto →
-  dashboard a pantalla completa. El cronómetro tiene dos partes de 20:00, se puede pausar,
-  reanudar y reiniciar; corre con reloj real (`startedAt` + `elapsed`) y se autopausa al llegar
-  a 20:00.
-  - **Estado en `matchdays[].live`**: `{version, rev, startedAt, base, onField, events, timer,
-    updatedAt}`. `base` es la foto previa de la jornada (`playerStats`, `extraPlayerIds`,
-    `goalsForEvents`, `goalsAgainstEvents`, `timeline`, `goalsFor`, `goalsAgainst`,
-    `rivalOwnGoals`); `events` son las acciones del directo. `liveCompute_` recalcula desde
-    `base + events` los campos normales de la jornada, así deshacer una acción es solo
-    recalcular. Los eventos generados en directo llevan `fromLive: true`: Jornadas los muestra
-    con la etiqueta "directo" y sin botón de borrar (se deshacen desde el dashboard).
+  dashboard a pantalla completa. El cronómetro corre con reloj real (`startedAt` + `elapsed`),
+  se puede pausar, reanudar y reiniciar, y sigue contando en el tiempo añadido hasta un tope de
+  seguridad de 5 minutos por parte (`minutes + maxAdded`), momento en el que se autopausa.
+  - **Formato del partido** (`matchFormat`): `{minutes, clock, maxAdded, trackMinutes}`.
+    `clock` es `"parado"` (se para con el árbitro) o `"corrido"`; `maxAdded` está fijado en 5 y
+    no se edita; `trackMinutes: false` desactiva el conteo de minutos en ese partido. Se resuelve
+    con `matchdayMatchFormat_(m)`: manda `m.live.format` si el directo ya empezó, luego
+    `m.matchFormat` (sobrescritura del partido) y, por último, `teams[].matchFormat` (formato por
+    defecto del equipo). Sin nada guardado se asume `2×20' reloj parado`, el comportamiento
+    anterior, para no romper jornadas antiguas. El formato del equipo se edita en "Equipos del
+    club" → "⏱️ Formato" (`teamFormatModal`); el del partido, en la vista de preparar directo
+    (`liveFormatMinutes`/`liveFormatClock`/`liveFormatTrack`), que se congela en `live.format` al
+    iniciar. `liveCreateMatch_` guarda además el formato en la jornada nueva.
+  - **Minutos jugados**: se calculan como la integral de "quién está en pista" desde
+    `live.startOnField` + `live.presence` (snapshots `{clock, onField}` en cada cambio o
+    convocatoria) + las rojas de `live.events`, con el reloj absoluto
+    `liveAbsoluteSeconds_ = timer.base + min(elapsed, max)` (la 2ª parte acumula la 1ª en
+    `timer.base`). `liveCompute_` guarda `playerStats[].seconds` (entero) solo para convocados y
+    `null` si el partido no cuenta minutos o la sesión es antigua sin `startOnField`; los eventos
+    nuevos guardan `clock` y los antiguos se reconstruyen con `liveEventClock_`.
+  - **Estado en `matchdays[].live`**: `{version, rev, startedAt, format, base, onField,
+    startOnField, presence, events, timer, updatedAt}`. `base` es la foto previa de la jornada
+    (`playerStats`, `extraPlayerIds`, `goalsForEvents`, `goalsAgainstEvents`, `timeline`,
+    `goalsFor`, `goalsAgainst`, `rivalOwnGoals`); `events` son las acciones del directo.
+    `liveCompute_` recalcula desde `base + events` los campos normales de la jornada, así
+    deshacer una acción es solo recalcular. Los eventos generados en directo llevan
+    `fromLive: true`: Jornadas los muestra con la etiqueta "directo" y sin botón de borrar (se
+    deshacen desde el dashboard).
   - **Acciones**: gol a favor (jugador + categoría/subcategoría de `GOAL_CATEGORIES`), gol en
     contra (categoría/subcategoría), **PP del rival** (categoría especial `rival_own_goal`, suma
     1 gol a favor y 1 a `rivalOwnGoals`), amarilla y roja. La roja saca al jugador de `onField`;
