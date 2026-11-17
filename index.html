@@ -712,25 +712,13 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
 .live-fouls-note{font-size:.72rem;color:#b9770e;font-weight:700;margin-top:6px;min-height:1em;}
 .live-action-btn.foul{background:linear-gradient(160deg,#fff7e6,#fdebd0);color:#935116;}
 .live-action-btn.foulrival{background:linear-gradient(160deg,#fdecea,#fadbd8);color:#922b21;}
-/* --- Campo de fútbol sala (parquet) en la vista principal --- */
+/* --- Campo de fútbol sala en la vista principal (la pista de la pizarra táctica) --- */
 .live-pitch-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:12px;margin-top:10px;box-shadow:0 1px 3px rgba(0,0,0,.05);}
-/* Parquet: tablones de madera verticales con vetas y juntas, sombreado interior y borde de pista */
-.live-pitch{position:relative;height:330px;border-radius:10px;overflow:hidden;border:3px solid #6e3f18;
-  background:
-    repeating-linear-gradient(90deg, rgba(56,30,6,.28) 0 2px, transparent 2px 54px),
-    repeating-linear-gradient(90deg, rgba(255,255,255,.08) 0 27px, rgba(0,0,0,.05) 27px 54px),
-    repeating-linear-gradient(0deg, rgba(120,70,20,.06) 0 3px, transparent 3px 9px),
-    linear-gradient(180deg,#cf9a5f 0%,#c08a4e 45%,#b57840 100%);
-  box-shadow:inset 0 0 46px rgba(56,28,4,.4), inset 0 0 4px rgba(56,28,4,.5);}
-/* Líneas de la pista pintadas sobre el parquet */
-.live-pitch-line{position:absolute;left:4%;right:4%;top:50%;height:2px;background:rgba(255,255,255,.8);box-shadow:0 0 3px rgba(0,0,0,.25);}
-.live-pitch-circle{position:absolute;left:50%;top:50%;width:78px;height:78px;margin:-39px 0 0 -39px;border:2px solid rgba(255,255,255,.8);border-radius:50%;box-shadow:0 0 3px rgba(0,0,0,.25);}
-.live-pitch-dot{position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;background:rgba(255,255,255,.85);border-radius:50%;}
-/* Áreas de portería: cuartos de elipse desde los postes */
-.live-pitch-area{position:absolute;top:50%;width:66px;height:150px;margin-top:-75px;border:2px solid rgba(255,255,255,.8);box-shadow:0 0 3px rgba(0,0,0,.25);}
-.live-pitch-area.left{left:-1px;border-left:none;border-radius:0 90px 90px 0;}
-.live-pitch-area.right{right:-1px;border-right:none;border-radius:90px 0 0 90px;}
-.live-pitch-crest{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:58px;opacity:.32;pointer-events:none;filter:drop-shadow(0 1px 3px rgba(0,0,0,.35));}
+/* La pista es la misma imagen incrustada de la pizarra táctica (COURT_DATA_URI): parquet,
+   líneas, escudo en el círculo central, porterías y el nombre del club abajo. El contenedor
+   se ajusta a la proporción de la imagen y las fichas se colocan encima en porcentaje. */
+.live-pitch{position:relative;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.18);}
+.live-pitch-bg{display:block;width:100%;height:auto;pointer-events:none;user-select:none;-webkit-user-drag:none;}
 .live-pitch-chip{position:absolute;transform:translate(-50%,-50%);background:#fff;border:2px solid var(--ink,#222);border-radius:999px;padding:5px 10px;font-size:.72rem;font-weight:700;display:inline-flex;gap:4px;align-items:center;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.35);max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;z-index:2;}
 .live-pitch-chip .d{font-family:'Roboto Mono',monospace;}
 .live-pitch-chip.gk{background:var(--accent);border-color:#fff;color:#fff;}
@@ -14940,9 +14928,9 @@ function liveHideDashboardOverlay_(){
 // Posición de cada uno de los 5 puestos en el campo (en % del contenedor): portero en la
 // portería, una línea de 3 y el pivot arriba (el campo está orientado hacia arriba).
 const LIVE_PITCH_SLOTS = [
-  {x:50, y:12},
-  {x:24, y:40}, {x:50, y:40}, {x:76, y:40},
-  {x:50, y:76}
+  {x:50, y:13},
+  {x:21, y:35}, {x:50, y:30}, {x:79, y:35},
+  {x:50, y:79}
 ];
 function livePitchOrder_(onField){
   // El portero siempre en la portería (primer puesto); el resto mantiene su orden.
@@ -14951,8 +14939,9 @@ function livePitchOrder_(onField){
   if(gkIdx>0) list.unshift(list.splice(gkIdx,1)[0]);
   return list;
 }
-// Pinta el campo (parquet con líneas y escudo) y el banquillo. Los cambios se hacen
-// directamente aquí: tocar uno de pista y uno del banquillo los intercambia al instante.
+// Pinta el campo (la pista de la pizarra táctica, con líneas, escudo y porterías) y el
+// banquillo. Los cambios se hacen directamente aquí: tocar uno de pista y uno del
+// banquillo los intercambia al instante.
 function renderLivePitch_(m, live, derived){
   live = live || (liveState && liveState.live);
   if(!live) return;
@@ -14982,13 +14971,7 @@ function renderLivePitch_(m, live, derived){
   const showMins = liveFormat_(live).trackMinutes !== false && Array.isArray(live.startOnField);
   const mins = id => showMins ? `<span class="mins">⏱ ${formatMinutesShort_(secondsMap[id] || 0)}</span>` : "";
 
-  const courtLines = `
-    <div class="live-pitch-line"></div>
-    <div class="live-pitch-circle"></div>
-    <div class="live-pitch-dot"></div>
-    <div class="live-pitch-area left"></div>
-    <div class="live-pitch-area right"></div>
-    <img class="live-pitch-crest" src="${CREST_DATA_URI}" alt="">`;
+  const courtBg = `<img class="live-pitch-bg" src="${COURT_DATA_URI}" alt="">`;
   const chips = ordered.map((id,i)=>{
     const p = livePlayer_(id); if(!p) return "";
     const slot = LIVE_PITCH_SLOTS[i] || LIVE_PITCH_SLOTS[4];
@@ -14997,7 +14980,7 @@ function renderLivePitch_(m, live, derived){
       ${p.dorsal!=null?`<span class="d">${p.dorsal}</span>`:""}${escapeHtml(p.name)}${mins(id)}
     </button>`;
   }).join("");
-  pitchEl.innerHTML = courtLines + (chips || '<span class="live-pitch-empty">Pista vacía — toca el banquillo para meter jugadores</span>');
+  pitchEl.innerHTML = courtBg + (chips || '<span class="live-pitch-empty">Pista vacía — toca el banquillo para meter jugadores</span>');
 
   benchEl.innerHTML = bench.length ? bench.map(p=>{
     const isSel = sel && sel.kind==="bench" && sel.id===p.id;
