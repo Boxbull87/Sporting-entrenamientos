@@ -370,8 +370,10 @@ All inside `index.html` — search for these comment banners to jump around:
     `goalsFor`, `goalsAgainst`, `rivalOwnGoals`); `events` son las acciones del directo.
     `liveCompute_` recalcula desde `base + events` los campos normales de la jornada, así
     deshacer una acción es solo recalcular. Los eventos generados en directo llevan
-    `fromLive: true`: Jornadas los muestra con la etiqueta "directo" y sin botón de borrar (se
-    deshacen desde el dashboard).
+    `fromLive: true`: Jornadas los muestra con la etiqueta "directo". Mientras el directo está
+    abierto solo se gestionan desde el panel de directo (deshacer); una vez cerrado se pueden
+    editar y eliminar en Jornadas como cualquier otro gol ("Goles del partido" con ✏️
+    categoría/autor y ✕; cronología con ✕).
   - **Acciones**: gol a favor (jugador + categoría/subcategoría de `GOAL_CATEGORIES`), gol en
     contra (categoría/subcategoría), **PP del rival** (categoría especial `rival_own_goal`, suma
     1 gol a favor y 1 a `rivalOwnGoals`), amarilla y roja. La roja saca al jugador de `onField`;

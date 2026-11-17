@@ -9051,25 +9051,36 @@ function renderMatchdayGoalEvents_(){
   if(!m){ forWrap.innerHTML = ""; againstWrap.innerHTML = ""; warnEl.innerHTML = ""; return; }
   const forEvents = m.goalsForEvents || [];
   const againstEvents = m.goalsAgainstEvents || [];
-  forWrap.innerHTML = goalEventsListHtml_("for", forEvents);
-  againstWrap.innerHTML = goalEventsListHtml_("against", againstEvents);
+  forWrap.innerHTML = goalEventsListHtml_("for", forEvents, m);
+  againstWrap.innerHTML = goalEventsListHtml_("against", againstEvents, m);
   const warnings = [];
   if(m.goalsFor!=null && forEvents.length!==m.goalsFor) warnings.push(`⚠️ Has etiquetado ${forEvents.length} gol(es) marcado(s), pero el marcador dice ${m.goalsFor}.`);
   if(m.goalsAgainst!=null && againstEvents.length!==m.goalsAgainst) warnings.push(`⚠️ Has etiquetado ${againstEvents.length} gol(es) encajado(s), pero el marcador dice ${m.goalsAgainst}.`);
+  if(m.live) warnings.push("ℹ️ El directo de este partido está abierto: los goles registrados en directo se gestionan desde el panel de directo.");
   warnEl.innerHTML = warnings.map(w=>`<div>${w}</div>`).join("");
 }
-function goalEventsListHtml_(direction, events){
+function goalEventsListHtml_(direction, events, m){
   if(events.length===0) return '<p class="muted" style="margin:0;">Todavía no hay goles etiquetados.</p>';
+  // Los goles que vienen del directo solo se bloquean mientras la sesión de directo sigue
+  // abierta (entonces los recalcula el directo y se perderían los cambios). Cuando el
+  // directo ya está cerrado, se pueden editar y eliminar como cualquier otro gol.
+  const liveOpen = !!(m && m.live);
   return events.map(ev=>{
     const scorer = ev.playerId ? players.find(p=>p.id===ev.playerId) : null;
     const subLabel = ev.subcategory ? ` · ${escapeHtml(goalSubLabel_(ev.category, ev.subcategory))}` : "";
     const scorerLabel = scorer ? ` · ${escapeHtml(scorer.name)}` : "";
     const liveBadge = ev.fromLive ? ' <span class="badge outline" style="font-size:.62rem;">directo</span>' : "";
-    const removeBtn = ev.fromLive ? "" : `<button type="button" onclick="removeGoalEvent_('${direction}','${ev.id}')" style="background:none;border:none;color:inherit;cursor:pointer;font-size:1em;line-height:1;padding:0;">✕</button>`;
+    const canTouch = !ev.fromLive || !liveOpen;
+    const editBtn = canTouch
+      ? `<button type="button" onclick="editGoalEvent_('${direction}','${ev.id}')" style="background:none;border:none;color:inherit;cursor:pointer;font-size:1em;line-height:1;padding:0;" title="Cambiar la categoría o el autor del gol">✏️</button>`
+      : "";
+    const removeBtn = canTouch
+      ? `<button type="button" onclick="removeGoalEvent_('${direction}','${ev.id}')" style="background:none;border:none;color:inherit;cursor:pointer;font-size:1em;line-height:1;padding:0;" title="Eliminar este gol">✕</button>`
+      : "";
     return `
     <span class="badge" style="display:inline-flex;align-items:center;gap:6px;margin:0 6px 6px 0;">
       ${escapeHtml(goalCategoryLabel_(ev.category))}${subLabel}${scorerLabel}${liveBadge}
-      ${removeBtn}
+      ${editBtn}${removeBtn}
     </span>`;
   }).join("");
 }
@@ -9077,43 +9088,125 @@ document.getElementById("btnAddGoalFor").onclick = () => openGoalPicker_("for");
 document.getElementById("btnAddGoalAgainst").onclick = () => openGoalPicker_("against");
 let goalPickerDirection = null; // "for" | "against"
 let goalPickerCategory = null;  // categoría elegida (null = mostrando la lista de categorías)
+let goalPickerEdit = null;      // {direction, eventId, category} al editar un gol ya guardado
+let goalEditScorer = null;      // id del jugador que marcó (solo al editar un gol marcado)
 function openGoalPicker_(direction){
   goalPickerDirection = direction;
   goalPickerCategory = null;
+  goalPickerEdit = null;
+  goalEditScorer = null;
   document.getElementById("goalPickerTitle").textContent = direction==="for" ? "⚽ Añadir gol marcado" : "🥅 Añadir gol encajado";
   renderGoalPickerBody_();
   document.getElementById("goalPickerModal").classList.remove("hidden");
 }
+// Edita un gol ya guardado (categoría, subcategoría y autor). Solo se permite si no hay una
+// sesión de directo abierta: con el directo abierto es el propio directo quien reescribe los
+// goles, así que el cambio se perdería.
+window.editGoalEvent_ = (direction, eventId) => {
+  const m = matchdays.find(x=>x.id===statsMatchdayId);
+  if(!m) return;
+  if(m.live){
+    alert("El directo de este partido está abierto. Ciérralo (✅ Finalizar directo) para editar este gol, o deshazlo desde el panel de directo.");
+    return;
+  }
+  const field = direction==="for" ? "goalsForEvents" : "goalsAgainstEvents";
+  const ev = (m[field]||[]).find(e=>e.id===eventId);
+  if(!ev) return;
+  goalPickerDirection = direction;
+  goalPickerCategory = ev.category || null;
+  goalPickerEdit = {direction, eventId, category: ev.category};
+  goalEditScorer = ev.playerId || null;
+  document.getElementById("goalPickerTitle").textContent = direction==="for" ? "✏️ Editar gol marcado" : "✏️ Editar gol encajado";
+  renderGoalPickerBody_();
+  document.getElementById("goalPickerModal").classList.remove("hidden");
+};
 function renderGoalPickerBody_(){
   const wrap = document.getElementById("goalPickerBody");
+  const m = matchdays.find(x=>x.id===statsMatchdayId);
+  const roster = matchdayRoster_(m);
+  const isOwnGoal = goalPickerCategory === "rival_own_goal";
+  // Al editar un gol marcado se puede corregir también quién lo marcó.
+  const scorerBlock = (goalPickerEdit && goalPickerDirection==="for" && !isOwnGoal) ? `
+    <p class="muted" style="margin-top:10px;margin-bottom:4px;">¿Quién ha marcado el gol?</p>
+    <select id="goalEditScorerSel" style="width:100%;" onchange="goalSetEditScorer_(this.value)">
+      <option value="">Sin especificar</option>
+      ${roster.map(p=>`<option value="${p.id}" ${goalEditScorer===p.id?"selected":""}>${escapeHtml(p.name)}${p.position==="Portero"?" (P)":""}</option>`).join("")}
+    </select>` : "";
   if(!goalPickerCategory){
-    wrap.innerHTML = `<p class="muted" style="margin-top:0;">Elige la categoría:</p>` +
-      GOAL_CATEGORIES.map(c=>`<button type="button" class="btn ghost small" style="width:100%;text-align:left;margin-bottom:4px;" onclick="goalPickerChooseCategory_('${c.id}')">${escapeHtml(c.label)}</button>`).join("");
+    // "PP del rival" solo aparece al editar un gol que ya era un PP del rival.
+    const cats = GOAL_CATEGORIES.concat(goalPickerEdit && goalPickerEdit.category==="rival_own_goal"
+      ? [{id:"rival_own_goal", label:"PP del rival", subs:[]}]
+      : []);
+    wrap.innerHTML = `${scorerBlock}
+      <p class="muted" style="margin-top:10px;">Elige la categoría:</p>` +
+      cats.map(c=>`<button type="button" class="btn ghost small" style="width:100%;text-align:left;margin-bottom:4px;" onclick="goalPickerChooseCategory_('${c.id}')">${escapeHtml(c.label)}</button>`).join("");
     return;
   }
   const cat = goalCategoryInfo_(goalPickerCategory);
+  if(!cat){
+    // Categoría "PP del rival": no tiene subcategorías, se confirma con un botón.
+    wrap.innerHTML = `${scorerBlock}
+      <p class="muted" style="margin-top:0;">Este gol es un PP del rival (no tiene subcategoría).</p>
+      <button type="button" class="btn accent" style="width:100%;margin-top:10px;" onclick="goalPickerChooseSub_(null)">💾 Guardar cambios</button>`;
+    return;
+  }
   wrap.innerHTML = `
     <button type="button" class="btn ghost small" style="margin-bottom:8px;" onclick="goalPickerBack_()">← ${escapeHtml(cat.label)}</button>
+    ${scorerBlock}
     <p class="muted" style="margin-top:0;">Elige la subcategoría:</p>` +
     cat.subs.map(s=>`<button type="button" class="btn ghost small" style="width:100%;text-align:left;margin-bottom:4px;" onclick="goalPickerChooseSub_('${s.id}')">${escapeHtml(s.label)}</button>`).join("");
 }
+window.goalSetEditScorer_ = (val)=>{ goalEditScorer = val || null; };
 window.goalPickerChooseCategory_ = (catId) => { goalPickerCategory = catId; renderGoalPickerBody_(); };
 window.goalPickerBack_ = () => { goalPickerCategory = null; renderGoalPickerBody_(); };
 window.goalPickerChooseSub_ = async (subId) => {
   const m = matchdays.find(x=>x.id===statsMatchdayId);
   if(!m) return;
   const field = goalPickerDirection==="for" ? "goalsForEvents" : "goalsAgainstEvents";
-  const events = [...(m[field]||[]), {id: Date.now().toString(36)+Math.random().toString(36).slice(2,7), category: goalPickerCategory, subcategory: subId}];
+  const editing = goalPickerEdit;
+  let events, extra = {};
+  if(editing){
+    const prev = (m[field]||[]).find(e=>e.id===editing.eventId);
+    events = (m[field]||[]).map(e=>{
+      if(e.id!==editing.eventId) return e;
+      const upd = {...e, category: goalPickerCategory, subcategory: subId};
+      if(goalPickerDirection==="for" && e.category!=="rival_own_goal") upd.playerId = goalEditScorer || null;
+      return upd;
+    });
+    // Si cambia el autor del gol, se corrigen los goles por jugador (los contó el directo)
+    // y la cronología, para que todo siga cuadrando.
+    const oldScorer = prev ? (prev.playerId||null) : null;
+    const newScorer = goalPickerDirection==="for" && goalPickerCategory!=="rival_own_goal" ? (goalEditScorer||null) : null;
+    if(prev && oldScorer!==newScorer){
+      const stats = (m.playerStats||[]).map(s=>{
+        if(oldScorer && s.playerId===oldScorer) return {...s, goals: Math.max(0, (s.goals||0)-1)};
+        if(newScorer && s.playerId===newScorer) return {...s, goals: (s.goals||0)+1};
+        return s;
+      });
+      const timeline = (m.timeline||[]).map(ev=> ev.id===editing.eventId ? {...ev, scorer: newScorer} : ev);
+      extra = {playerStats: stats, timeline};
+    }
+  } else {
+    events = [...(m[field]||[]), {id: Date.now().toString(36)+Math.random().toString(36).slice(2,7), category: goalPickerCategory, subcategory: subId}];
+  }
   document.getElementById("goalPickerModal").classList.add("hidden");
-  try{ await db.collection("matchdays").doc(m.id).update({[field]: events}); }
+  goalPickerEdit = null;
+  goalEditScorer = null;
+  try{ await db.collection("matchdays").doc(m.id).update({[field]: events, ...extra}); }
   catch(err){ alert("No se ha podido guardar el gol: " + err.message); }
 };
 document.getElementById("btnCloseGoalPicker").onclick = () => {
   document.getElementById("goalPickerModal").classList.add("hidden");
+  goalPickerEdit = null;
+  goalEditScorer = null;
 };
 window.removeGoalEvent_ = async (direction, eventId) => {
   const m = matchdays.find(x=>x.id===statsMatchdayId);
   if(!m) return;
+  if(m.live){
+    alert("El directo de este partido está abierto. Ciérralo (✅ Finalizar directo) para poder eliminar este gol, o deshazlo desde el panel de directo.");
+    return;
+  }
   const field = direction==="for" ? "goalsForEvents" : "goalsAgainstEvents";
   const events = (m[field]||[]).filter(e=>e.id!==eventId);
   try{ await db.collection("matchdays").doc(m.id).update({[field]: events}); }
@@ -9165,7 +9258,9 @@ function matchdayTimelineListHtml_(m, editable){
     const icon = ev.ownGoalByRival ? "🙃" : (ev.direction==="for"?"⚽":"🥅");
     const ownGoalLabel = ev.ownGoalByRival ? " · PP del rival" : "";
     const liveBadge = ev.fromLive ? ' <span class="badge outline" style="font-size:.62rem;">directo</span>' : "";
-    const removeBtn = (editable && !ev.fromLive)
+    // Mientras el directo esté abierto es él quien reescribe la cronología: los goles del
+    // directo solo se quitan aquí cuando la sesión ya está cerrada.
+    const removeBtn = (editable && (!ev.fromLive || !(m && m.live)))
       ? `<button type="button" onclick="removeTimelineEvent_('${ev.id}')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:1em;line-height:1;padding:0;flex:0 0 auto;">✕</button>`
       : "";
     return `
@@ -9270,6 +9365,10 @@ document.getElementById("btnCloseTimelinePicker").onclick = () => {
 window.removeTimelineEvent_ = async (eventId) => {
   const m = matchdays.find(x=>x.id===statsMatchdayId);
   if(!m) return;
+  if(m.live){
+    alert("El directo de este partido está abierto. Ciérralo (✅ Finalizar directo) para poder quitar esta anotación, o deshazla desde el panel de directo.");
+    return;
+  }
   const timeline = (m.timeline||[]).filter(e=>e.id!==eventId);
   try{ await db.collection("matchdays").doc(m.id).update({timeline}); }
   catch(err){ alert("No se ha podido eliminar: " + err.message); }
