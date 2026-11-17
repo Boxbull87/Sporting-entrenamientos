@@ -390,13 +390,16 @@ All inside `index.html` — search for these comment banners to jump around:
     `mdFoulsRival`; `btnSaveMatchdayStats` guarda `foulsUs` (suma de jugadores, o el total del
     directo si está abierto) y `foulsRival`. Todo se propaga a resúmenes (badges/columnas),
     ficha de jugador, PDF y Excel.
-  - **Cambios con campo**: "🔄 Cambios" abre un campo de fútbol sala
-    (`renderLiveChangesModal_`): los 5 de pista como chips en posiciones fijas
-    (`LIVE_PITCH_SLOTS`, portero siempre en la portería vía `livePitchOrder_`) y el banquillo
-    debajo. Cambio en 2 toques (`liveChangesTap_`): tocar uno de pista + uno del banquillo los
-    intercambia; si hay hueco (<5), tocar el banquillo mete directo; segundo toque sobre el
-    mismo jugador cancela. "💾 Aplicar cambios" reusa `liveSaveChanges_` (filtra expulsados,
-    slice(0,5), `liveRecordPresence_`).
+  - **Cambios con campo en la vista principal**: la card "En pista" del dashboard es un campo
+    de fútbol sala de parquet con líneas y el escudo del club como marca de agua
+    (`renderLivePitch_`): los 5 de pista como chips en posiciones fijas (`LIVE_PITCH_SLOTS`,
+    portero siempre en la portería vía `livePitchOrder_`) y el banquillo debajo. Los cambios se
+    hacen directamente sin modal: tocar uno de pista + uno del banquillo los intercambia al
+    instante (`liveChangesTap_` aplica y persiste con `liveRecordPresence_` + `livePersist_`);
+    si hay hueco (<5), tocar el banquillo mete directo; segundo toque sobre un jugador de pista
+    lo manda al banquillo; segundo toque sobre el mismo banquillista cancela. Los minutos de
+    las fichas se refrescan con el reloj (`renderLiveOnFieldChips_` ya solo toca los `.mins`,
+    sin repintar el campo). El botón/modal de "Cambios" ya no existe.
   - **Cerrar la sesión**: "✅ Finalizar directo" guarda el estado actual y borra `live` de la
     jornada (los goles/tarjetas se quedan en los campos normales). "♻️ Reiniciar directo" en
     cambio vacía `events`/cronómetro y vuelve a la convocatoria inicial sin borrar la jornada.

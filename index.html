@@ -712,19 +712,38 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
 .live-fouls-note{font-size:.72rem;color:#b9770e;font-weight:700;margin-top:6px;min-height:1em;}
 .live-action-btn.foul{background:linear-gradient(160deg,#fff7e6,#fdebd0);color:#935116;}
 .live-action-btn.foulrival{background:linear-gradient(160deg,#fdecea,#fadbd8);color:#922b21;}
-/* --- Campo de fútbol sala para los cambios --- */
-.live-pitch{position:relative;background:linear-gradient(180deg,#2e8b57,#1f6e44);border:2px solid rgba(255,255,255,.85);border-radius:12px;height:300px;margin-top:8px;overflow:hidden;}
-.live-pitch-line{position:absolute;left:6%;right:6%;top:50%;height:2px;background:rgba(255,255,255,.55);}
-.live-pitch-circle{position:absolute;left:50%;top:50%;width:64px;height:64px;margin:-32px 0 0 -32px;border:2px solid rgba(255,255,255,.55);border-radius:50%;}
-.live-pitch-chip{position:absolute;transform:translate(-50%,-50%);background:#fff;border:2px solid var(--ink,#222);border-radius:999px;padding:5px 9px;font-size:.7rem;font-weight:700;display:inline-flex;gap:4px;align-items:center;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.3);max-width:104px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+/* --- Campo de fútbol sala (parquet) en la vista principal --- */
+.live-pitch-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:12px;margin-top:10px;box-shadow:0 1px 3px rgba(0,0,0,.05);}
+/* Parquet: tablones de madera verticales con vetas y juntas, sombreado interior y borde de pista */
+.live-pitch{position:relative;height:330px;border-radius:10px;overflow:hidden;border:3px solid #6e3f18;
+  background:
+    repeating-linear-gradient(90deg, rgba(56,30,6,.28) 0 2px, transparent 2px 54px),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.08) 0 27px, rgba(0,0,0,.05) 27px 54px),
+    repeating-linear-gradient(0deg, rgba(120,70,20,.06) 0 3px, transparent 3px 9px),
+    linear-gradient(180deg,#cf9a5f 0%,#c08a4e 45%,#b57840 100%);
+  box-shadow:inset 0 0 46px rgba(56,28,4,.4), inset 0 0 4px rgba(56,28,4,.5);}
+/* Líneas de la pista pintadas sobre el parquet */
+.live-pitch-line{position:absolute;left:4%;right:4%;top:50%;height:2px;background:rgba(255,255,255,.8);box-shadow:0 0 3px rgba(0,0,0,.25);}
+.live-pitch-circle{position:absolute;left:50%;top:50%;width:78px;height:78px;margin:-39px 0 0 -39px;border:2px solid rgba(255,255,255,.8);border-radius:50%;box-shadow:0 0 3px rgba(0,0,0,.25);}
+.live-pitch-dot{position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;background:rgba(255,255,255,.85);border-radius:50%;}
+/* Áreas de portería: cuartos de elipse desde los postes */
+.live-pitch-area{position:absolute;top:50%;width:66px;height:150px;margin-top:-75px;border:2px solid rgba(255,255,255,.8);box-shadow:0 0 3px rgba(0,0,0,.25);}
+.live-pitch-area.left{left:-1px;border-left:none;border-radius:0 90px 90px 0;}
+.live-pitch-area.right{right:-1px;border-right:none;border-radius:90px 0 0 90px;}
+.live-pitch-crest{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:58px;opacity:.32;pointer-events:none;filter:drop-shadow(0 1px 3px rgba(0,0,0,.35));}
+.live-pitch-chip{position:absolute;transform:translate(-50%,-50%);background:#fff;border:2px solid var(--ink,#222);border-radius:999px;padding:5px 10px;font-size:.72rem;font-weight:700;display:inline-flex;gap:4px;align-items:center;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.35);max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;z-index:2;}
 .live-pitch-chip .d{font-family:'Roboto Mono',monospace;}
 .live-pitch-chip.gk{background:var(--accent);border-color:#fff;color:#fff;}
-.live-pitch-chip.sel{outline:3px solid #ffd54a;outline-offset:2px;}
+.live-pitch-chip.sel{outline:3px solid #ffd54a;outline-offset:2px;box-shadow:0 0 0 5px rgba(255,213,74,.35);}
 .live-pitch-chip .mins{font-family:'Roboto Mono',monospace;font-size:.6rem;color:var(--muted);font-weight:700;}
 .live-pitch-chip.gk .mins{color:rgba(255,255,255,.85);}
-.live-bench{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;min-height:34px;}
+.live-pitch-empty{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:#fff;font-size:.8rem;text-shadow:0 1px 2px rgba(0,0,0,.4);z-index:2;}
+.live-bench-title{font-size:.74rem;font-weight:600;margin-top:10px;}
+.live-bench{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;min-height:34px;}
 .live-bench-chip{background:#f6f3ee;border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-size:.72rem;font-weight:600;cursor:pointer;display:inline-flex;gap:4px;align-items:center;max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .live-bench-chip.sel{outline:2px solid var(--accent);outline-offset:1px;}
+.live-bench-chip .mins{font-family:'Roboto Mono',monospace;font-size:.6rem;color:var(--muted);font-weight:700;}
+.live-bench-empty{font-size:.75rem;}
 .live-pitch-hint{font-size:.72rem;color:var(--muted);margin:6px 0 0;}
 .live-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
 .live-action-btn{border:none;border-radius:14px;min-height:74px;padding:8px 6px;font-family:'Oswald',sans-serif;font-size:.86rem;font-weight:600;line-height:1.15;text-transform:uppercase;letter-spacing:.02em;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;box-shadow:0 1px 3px rgba(0,0,0,.12);}
@@ -1703,12 +1722,14 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
           </div>
         </div>
 
-        <div class="live-onfield-card">
+        <div class="live-pitch-card">
           <div class="live-section-title">
             <span>En pista <span id="liveOnFieldCount"></span></span>
-            <button type="button" class="btn ghost small" id="liveChangesBtn">🔄 Cambios</button>
+            <span class="live-pitch-hint" id="livePitchHint" style="margin:0;"></span>
           </div>
-          <div class="live-onfield" id="liveOnFieldList"></div>
+          <div class="live-pitch" id="livePitch"></div>
+          <div class="live-bench-title muted">🔄 Banquillo — toca para cambiar</div>
+          <div class="live-bench" id="liveBench"></div>
           <div class="muted" id="liveGoalkeeperNote" style="font-size:.72rem;"></div>
         </div>
 
@@ -14005,7 +14026,6 @@ let liveActionType = null;
 let liveActionStep = null;
 let liveActionPlayerId = null;
 let liveActionCategory = null;
-let liveChangesOnField = [];
 let liveChangesSel = null;   // selección en el campo de cambios: {kind:"field"|"bench", id}
 let liveConvSelected = new Set();
 let liveConvOnField = [];
@@ -14916,20 +14936,97 @@ function liveHideDashboardOverlay_(){
   if(liveClockInterval){ clearInterval(liveClockInterval); liveClockInterval = null; }
 }
 
-function renderLiveOnFieldChips_(m, live, derived){
+/* --- Campo de fútbol sala en la vista principal (cambios directos) --- */
+// Posición de cada uno de los 5 puestos en el campo (en % del contenedor): portero en la
+// portería, una línea de 3 y el pivot arriba (el campo está orientado hacia arriba).
+const LIVE_PITCH_SLOTS = [
+  {x:50, y:12},
+  {x:24, y:40}, {x:50, y:40}, {x:76, y:40},
+  {x:50, y:76}
+];
+function livePitchOrder_(onField){
+  // El portero siempre en la portería (primer puesto); el resto mantiene su orden.
+  const list = onField.slice();
+  const gkIdx = list.findIndex(id=>{ const p=livePlayer_(id); return p && p.position==="Portero"; });
+  if(gkIdx>0) list.unshift(list.splice(gkIdx,1)[0]);
+  return list;
+}
+// Pinta el campo (parquet con líneas y escudo) y el banquillo. Los cambios se hacen
+// directamente aquí: tocar uno de pista y uno del banquillo los intercambia al instante.
+function renderLivePitch_(m, live, derived){
   live = live || (liveState && liveState.live);
   if(!live) return;
-  const wrap = document.getElementById("liveOnFieldList");
-  if(!wrap) return;
-  const onField = ((live.onField) || []).map(livePlayer_).filter(Boolean);
+  const pitchEl = document.getElementById("livePitch");
+  const benchEl = document.getElementById("liveBench");
+  const hintEl = document.getElementById("livePitchHint");
+  if(!pitchEl || !benchEl) return;
+  const statsMap = {};
+  derived.playerStats.forEach(s=>{ statsMap[s.playerId] = s; });
+  const onFieldIds = ((live.onField)||[]).filter(id=>{
+    const s = statsMap[id];
+    return s && Number(s.red||0)===0;
+  });
+  const ordered = livePitchOrder_(onFieldIds);
+  const onFieldSet = new Set(ordered);
+  const bench = liveRoster_(m, live).filter(p=>{
+    const s = statsMap[p.id];
+    return s && s.status!=="No convocado" && Number(s.red||0)===0 && !onFieldSet.has(p.id);
+  }).sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
+  // Si el jugador seleccionado ya no está ni en pista ni en banquillo (p.ej. roja), se limpia.
+  if(liveChangesSel && liveChangesSel.id!==null &&
+     !onFieldSet.has(liveChangesSel.id) && !bench.some(p=>p.id===liveChangesSel.id)){
+    liveChangesSel = null;
+  }
+  const sel = liveChangesSel;
   const secondsMap = liveComputeSeconds_(live) || {};
   const showMins = liveFormat_(live).trackMinutes !== false && Array.isArray(live.startOnField);
-  wrap.innerHTML = onField.length
-    ? onField.map(p=>{
-        const mins = showMins ? formatMinutesShort_(secondsMap[p.id] || 0) : "";
-        return `<span class="live-player-chip">${p.dorsal!=null?`<strong>${p.dorsal}</strong>`:""} ${escapeHtml(p.name)}${p.position==="Portero"?' <span class="gk">P</span>':""}${mins?`<span class="mins">⏱ ${mins}</span>`:""}</span>`;
-      }).join("")
-    : '<span class="live-player-chip empty">Sin jugadores en pista</span>';
+  const mins = id => showMins ? `<span class="mins">⏱ ${formatMinutesShort_(secondsMap[id] || 0)}</span>` : "";
+
+  const courtLines = `
+    <div class="live-pitch-line"></div>
+    <div class="live-pitch-circle"></div>
+    <div class="live-pitch-dot"></div>
+    <div class="live-pitch-area left"></div>
+    <div class="live-pitch-area right"></div>
+    <img class="live-pitch-crest" src="${CREST_DATA_URI}" alt="">`;
+  const chips = ordered.map((id,i)=>{
+    const p = livePlayer_(id); if(!p) return "";
+    const slot = LIVE_PITCH_SLOTS[i] || LIVE_PITCH_SLOTS[4];
+    const isSel = sel && sel.kind==="field" && sel.id===id;
+    return `<button type="button" class="live-pitch-chip${p.position==="Portero"?" gk":""}${isSel?" sel":""}" data-pid="${id}" style="left:${slot.x}%;top:${slot.y}%;" onclick="liveChangesTap_('field','${id}')">
+      ${p.dorsal!=null?`<span class="d">${p.dorsal}</span>`:""}${escapeHtml(p.name)}${mins(id)}
+    </button>`;
+  }).join("");
+  pitchEl.innerHTML = courtLines + (chips || '<span class="live-pitch-empty">Pista vacía — toca el banquillo para meter jugadores</span>');
+
+  benchEl.innerHTML = bench.length ? bench.map(p=>{
+    const isSel = sel && sel.kind==="bench" && sel.id===p.id;
+    return `<button type="button" class="live-bench-chip${isSel?" sel":""}" onclick="liveChangesTap_('bench','${p.id}')">
+      ${p.dorsal!=null?`<span class="d">${p.dorsal}</span>`:""}${escapeHtml(p.name)}${mins(p.id)}
+    </button>`;
+  }).join("") : '<span class="live-bench-empty muted">No hay jugadores en el banquillo.</span>';
+
+  if(hintEl){
+    hintEl.textContent = !sel
+      ? (ordered.length<5 ? "Toca el banquillo para meter a alguien" : "Toca al que sale y luego al que entra")
+      : sel.kind==="field" ? `↓ ${livePlayerName_(sel.id)} — toca quién entra`
+      : `↑ ${livePlayerName_(sel.id)} — toca quién sale`;
+  }
+}
+
+// Solo refresca los minutos de las fichas (lo llama el reloj cada 500 ms) sin repintar el
+// campo, para no romper los toques ni las selecciones mientras corre el tiempo.
+function renderLiveOnFieldChips_(){
+  if(!liveState || !liveState.live) return;
+  const secondsMap = liveComputeSeconds_(liveState.live) || {};
+  const showMins = liveFormat_(liveState.live).trackMinutes !== false && Array.isArray(liveState.live.startOnField);
+  document.querySelectorAll("#livePitch .live-pitch-chip").forEach(chip=>{
+    const el = chip.querySelector(".mins");
+    const id = chip.dataset.pid;
+    if(!el || !id) return;
+    const txt = showMins ? `⏱ ${formatMinutesShort_(secondsMap[id] || 0)}` : "";
+    if(el.textContent !== txt) el.textContent = txt;
+  });
 }
 
 // Card de faltas del dashboard: contadores por equipo y por mitad, con aviso cuando una
@@ -14981,7 +15078,7 @@ function renderLiveDashboard_(){
 
   liveRenderClock_(live, timer);
 
-  renderLiveOnFieldChips_(m, live, derived);
+  renderLivePitch_(m, live, derived);
   const count = document.getElementById("liveOnFieldCount");
   const onField = ((live.onField) || []).map(livePlayer_).filter(Boolean);
   if(count) count.textContent = `(${onField.length}/5)`;
@@ -15322,127 +15419,56 @@ async function liveFinishDirect_(){
   }
 }
 
-function liveOpenChanges_(){
-  if(!liveState || !liveState.live) return;
-  const m = matchdays.find(x=>x.id===liveState.matchdayId);
-  if(!m) return;
-  const derived = liveCompute_(m, liveState.live);
-  const redIds = new Set(derived.playerStats.filter(s=>Number(s.red||0)>0).map(s=>s.playerId));
-  liveChangesOnField = (liveState.live.onField || []).filter(id=>!redIds.has(id)).slice(0,5);
-  liveChangesSel = null;
-  renderLiveChangesModal_();
-  document.getElementById("liveActionModal").classList.remove("hidden");
-}
-
-/* --- Cambios con campo de fútbol sala --- */
-// Posición de cada uno de los 5 puestos en el campo (en % del contenedor): portero en la
-// portería, una línea de 3 y el pivot arriba (el campo está orientado hacia arriba).
-const LIVE_PITCH_SLOTS = [
-  {x:50, y:12},
-  {x:24, y:40}, {x:50, y:40}, {x:76, y:40},
-  {x:50, y:76}
-];
-function livePitchOrder_(onField){
-  // El portero siempre en la portería (primer puesto); el resto mantiene su orden.
-  const list = onField.slice();
-  const gkIdx = list.findIndex(id=>{ const p=livePlayer_(id); return p && p.position==="Portero"; });
-  if(gkIdx>0) list.unshift(list.splice(gkIdx,1)[0]);
-  return list;
-}
-function renderLiveChangesModal_(){
+/* --- Cambios directos sobre el campo de la vista principal --- */
+// Cambia jugadores tocando: campo de la vista principal + banquillo debajo. Cada cambio
+// se aplica al momento (presencia + guardado), sin modal ni botón de confirmar.
+function liveChangesTap_(kind, id){
   if(!liveState || !liveState.live) return;
   const m = matchdays.find(x=>x.id===liveState.matchdayId);
   if(!m) return;
   const live = liveState.live;
-  const derived = liveCompute_(m, live);
-  const statsMap = {};
-  derived.playerStats.forEach(s=>{ statsMap[s.playerId] = s; });
-  const roster = liveRoster_(m, live);
-  const conv = roster.filter(p=>{
-    const s = statsMap[p.id];
-    return s && s.status!=="No convocado" && Number(s.red||0)===0;
-  });
-  const ordered = livePitchOrder_(liveChangesOnField);
-  const onFieldSet = new Set(ordered);
-  const bench = conv.filter(p=>!onFieldSet.has(p.id))
-    .sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
-  const sel = liveChangesSel;
-
-  const pitch = ordered.map((id,i)=>{
-    const p = livePlayer_(id); if(!p) return "";
-    const slot = LIVE_PITCH_SLOTS[i] || LIVE_PITCH_SLOTS[4];
-    const s = statsMap[id] || {};
-    const mins = s.seconds!=null ? `<span class="mins">⏱ ${formatMinutesShort_(s.seconds)}</span>` : "";
-    const isSel = sel && sel.kind==="field" && sel.id===id;
-    return `<button type="button" class="live-pitch-chip${p.position==="Portero"?" gk":""}${isSel?" sel":""}" style="left:${slot.x}%;top:${slot.y}%;" onclick="liveChangesTap_('field','${id}')">
-      ${p.dorsal!=null?`<span class="d">${p.dorsal}</span>`:""}${escapeHtml(p.name)}${mins}
-    </button>`;
-  }).join("");
-
-  const benchHtml = bench.length
-    ? bench.map(p=>{
-        const s = statsMap[p.id] || {};
-        const mins = s.seconds!=null ? `<span class="mins">⏱ ${formatMinutesShort_(s.seconds)}</span>` : "";
-        const isSel = sel && sel.kind==="bench" && sel.id===p.id;
-        return `<button type="button" class="live-bench-chip${isSel?" sel":""}" onclick="liveChangesTap_('bench','${p.id}')">
-          ${p.dorsal!=null?`<span class="d">${p.dorsal}</span>`:""}${escapeHtml(p.name)}${mins}
-        </button>`;
-      }).join("")
-    : '<span class="muted" style="font-size:.75rem;">No hay jugadores en el banquillo.</span>';
-
-  let hint;
-  if(!sel) hint = ordered.length<5
-    ? "Toca a un jugador del banquillo para meterlo, o a uno de pista para cambiarlo."
-    : "Toca al que sale y después al que entra (o al revés).";
-  else if(sel.kind==="field") hint = "Ahora toca a un jugador del banquillo para que entre por él.";
-  else hint = "Ahora toca a un jugador de pista para que salga.";
-  const selName = sel ? livePlayerName_(sel.id) : "";
-
-  document.getElementById("liveActionTitle").textContent = "🔄 Cambios";
-  document.getElementById("liveActionBody").innerHTML = `
-    <p class="live-pitch-hint" style="margin-top:0;">${hint}${selName?` <strong>(${escapeHtml(selName)})</strong>`:""}</p>
-    <div class="live-pitch">
-      <div class="live-pitch-line"></div>
-      <div class="live-pitch-circle"></div>
-      ${pitch || '<span class="muted" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:#fff;font-size:.8rem;">Pista vacía</span>'}
-    </div>
-    <div class="live-bench">${benchHtml}</div>
-    <button type="button" class="btn accent" style="width:100%;margin-top:10px;" onclick="liveSaveChanges_()">💾 Aplicar cambios (${ordered.length}/5 en pista)</button>`;
-}
-
-function liveChangesTap_(kind, id){
-  if(!liveChangesSel){
-    if(kind==="bench" && liveChangesOnField.length<5){
-      // Hay hueco en pista: tocar el banquillo mete al jugador directamente.
-      liveChangesOnField.push(id);
-    } else {
+  const onField = (live.onField||[]).slice();
+  // Validación: en pista solo se puede tocar a quien está en pista; en el banquillo, a quien
+  // está convocado, sin roja y fuera de pista. Evita toques "stale" tras un cambio reciente.
+  if(kind==="field" && !onField.includes(id)) return;
+  if(kind==="bench" && onField.includes(id)) return;
+  const redStats = liveCompute_(m, live).playerStats.find(s=>s.playerId===id);
+  if(redStats && Number(redStats.red||0)>0) return;
+  const apply = ()=>{
+    liveRecordPresence_(live, live.onField);
+    liveChangesSel = null;
+    livePersist_(m, live, {render:false});   // el repintado se hace al final de esta función
+  };
+  if(kind==="field"){
+    if(!liveChangesSel){
       liveChangesSel = {kind, id};
+    } else if(liveChangesSel.kind==="field" && liveChangesSel.id===id){
+      // Segundo toque sobre el mismo jugador: sale al banquillo (quedan 4 y se puede meter otro).
+      live.onField = onField.filter(x=>x!==id);
+      apply();
+    } else if(liveChangesSel.kind==="bench"){
+      // Entra el seleccionado del banquillo por el jugador tocado en pista.
+      live.onField = onField.map(x=>x===id ? liveChangesSel.id : x);
+      apply();
+    } else {
+      liveChangesSel = {kind, id};   // cambia la selección a otro jugador de pista
     }
-  } else if(liveChangesSel.kind===kind && liveChangesSel.id===id){
-    liveChangesSel = null;   // segundo toque sobre el mismo: se cancela la selección
-  } else if(liveChangesSel.kind==="field" && kind==="bench"){
-    // Cambio 1 a 1: sale el seleccionado de pista, entra el del banquillo.
-    liveChangesOnField = liveChangesOnField.map(x=>x===liveChangesSel.id ? id : x);
-    liveChangesSel = null;
-  } else if(liveChangesSel.kind==="bench" && kind==="field"){
-    liveChangesOnField = liveChangesOnField.map(x=>x===id ? liveChangesSel.id : x);
-    liveChangesSel = null;
-  } else {
-    liveChangesSel = {kind, id};   // cambia la selección
+  } else { // bench
+    if(liveChangesSel && liveChangesSel.kind==="field"){
+      // Cambio 1 a 1: sale el seleccionado de pista, entra el del banquillo.
+      live.onField = onField.map(x=>x===liveChangesSel.id ? id : x);
+      apply();
+    } else if(!liveChangesSel && onField.length<5){
+      // Hay hueco en pista: tocar el banquillo mete al jugador directamente.
+      live.onField = onField.concat([id]).slice(0,5);
+      apply();
+    } else if(liveChangesSel && liveChangesSel.kind==="bench" && liveChangesSel.id===id){
+      liveChangesSel = null;   // segundo toque sobre el mismo: se cancela
+    } else {
+      liveChangesSel = {kind, id};   // selecciona (o cambia la selección) en el banquillo
+    }
   }
-  renderLiveChangesModal_();
-}
-
-function liveSaveChanges_(){
-  if(!liveState || !liveState.live) return;
-  const m = matchdays.find(x=>x.id===liveState.matchdayId);
-  if(!m) return;
-  const derived = liveCompute_(m, liveState.live);
-  const redIds = new Set(derived.playerStats.filter(s=>Number(s.red||0)>0).map(s=>s.playerId));
-  liveState.live.onField = liveChangesOnField.filter(id=>!redIds.has(id)).slice(0,5);
-  liveRecordPresence_(liveState.live, liveState.live.onField);
-  livePersist_(m, liveState.live);
-  document.getElementById("liveActionModal").classList.add("hidden");
+  renderLiveDashboard_();
 }
 
 function liveOpenConvocatoria_(){
@@ -15797,7 +15823,6 @@ liveBind_("liveDashboardChange", "onclick", ()=>{
 liveBind_("liveTimerToggle", "onclick", liveTimerToggle_);
 liveBind_("liveTimerNextPeriod", "onclick", liveTimerNextPeriod_);
 liveBind_("liveTimerReset", "onclick", liveTimerReset_);
-liveBind_("liveChangesBtn", "onclick", liveOpenChanges_);
 liveBind_("liveConvocatoriaBtn", "onclick", liveOpenConvocatoria_);
 liveBind_("liveGoalForBtn", "onclick", ()=>liveOpenAction_("goal_for"));
 liveBind_("liveGoalAgainstBtn", "onclick", ()=>liveOpenAction_("goal_against"));
