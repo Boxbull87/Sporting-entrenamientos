@@ -367,7 +367,8 @@ All inside `index.html` — search for these comment banners to jump around:
   - **Estado en `matchdays[].live`**: `{version, rev, startedAt, format, base, onField,
     startOnField, presence, events, timer, updatedAt}`. `base` es la foto previa de la jornada
     (`playerStats`, `extraPlayerIds`, `goalsForEvents`, `goalsAgainstEvents`, `timeline`,
-    `goalsFor`, `goalsAgainst`, `rivalOwnGoals`); `events` son las acciones del directo.
+    `goalsFor`, `goalsAgainst`, `rivalOwnGoals`, `foulsUs`, `foulsRival`, `foulsHalves`);
+    `events` son las acciones del directo.
     `liveCompute_` recalcula desde `base + events` los campos normales de la jornada, así
     deshacer una acción es solo recalcular. Los eventos generados en directo llevan
     `fromLive: true`: Jornadas los muestra con la etiqueta "directo". Mientras el directo está
@@ -379,6 +380,23 @@ All inside `index.html` — search for these comment banners to jump around:
     1 gol a favor y 1 a `rivalOwnGoals`), amarilla y roja. La roja saca al jugador de `onField`;
     deshacerla lo devuelve si hay hueco. Los goles encajados se suman al portero en pista o, si
     no hay, al portero convocado (`liveGoalkeeperId_`).
+  - **Faltas** (`falta_us` con `playerId` opcional y `falta_rival`): se cuentan por mitad
+    (`foulsHalves = {us:[h1,h2], rival:[h1,h2]}`, se reinician al empezar la 2ª parte según el
+    reglamento); la card "🚩 Faltas" del dashboard avisa al llegar a la 6ª falta de una mitad
+    (lanzamiento de 10 m). Las faltas propias con jugador suman a `playerStats[].fouls`; el
+    total propio de la jornada (`matchdays[].foulsUs`) incluye también las "sin especificar".
+    Las del rival van en `matchdays[].foulsRival`. En Jornadas hay columna 🚩 por jugador
+    (editable salvo con el directo abierto, que lo conserva vía `data-fouls`) e input
+    `mdFoulsRival`; `btnSaveMatchdayStats` guarda `foulsUs` (suma de jugadores, o el total del
+    directo si está abierto) y `foulsRival`. Todo se propaga a resúmenes (badges/columnas),
+    ficha de jugador, PDF y Excel.
+  - **Cambios con campo**: "🔄 Cambios" abre un campo de fútbol sala
+    (`renderLiveChangesModal_`): los 5 de pista como chips en posiciones fijas
+    (`LIVE_PITCH_SLOTS`, portero siempre en la portería vía `livePitchOrder_`) y el banquillo
+    debajo. Cambio en 2 toques (`liveChangesTap_`): tocar uno de pista + uno del banquillo los
+    intercambia; si hay hueco (<5), tocar el banquillo mete directo; segundo toque sobre el
+    mismo jugador cancela. "💾 Aplicar cambios" reusa `liveSaveChanges_` (filtra expulsados,
+    slice(0,5), `liveRecordPresence_`).
   - **Cerrar la sesión**: "✅ Finalizar directo" guarda el estado actual y borra `live` de la
     jornada (los goles/tarjetas se quedan en los campos normales). "♻️ Reiniciar directo" en
     cambio vacía `events`/cronómetro y vuelve a la convocatoria inicial sin borrar la jornada.

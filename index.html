@@ -700,6 +700,32 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
 .live-clock-note{font-family:'Roboto Mono',monospace;font-size:.68rem;color:var(--muted);min-height:1em;margin:-4px 0 8px;}
 .live-clock-note.warn{color:#b9770e;font-weight:700;}
 .live-lineup-mins{font-family:'Roboto Mono',monospace;font-size:.66rem;color:var(--muted);font-weight:700;flex:0 0 auto;margin-right:2px;}
+/* --- Faltas en el directo --- */
+.live-fouls-card{background:var(--paper2,#fff);border:1px solid var(--border);border-radius:14px;padding:10px 12px;margin-top:10px;}
+.live-fouls{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.live-foul-team{border:1px solid var(--border);border-radius:10px;padding:7px 10px;background:#faf8f5;}
+.live-foul-team .t{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);}
+.live-foul-team .n{font-family:'Oswald',sans-serif;font-size:1.35rem;font-weight:600;line-height:1.1;}
+.live-foul-team .h{font-family:'Roboto Mono',monospace;font-size:.66rem;color:var(--muted);}
+.live-foul-team.warn{border-color:#e59866;background:#fef5e7;}
+.live-foul-team.warn .n{color:#b9770e;}
+.live-fouls-note{font-size:.72rem;color:#b9770e;font-weight:700;margin-top:6px;min-height:1em;}
+.live-action-btn.foul{background:linear-gradient(160deg,#fff7e6,#fdebd0);color:#935116;}
+.live-action-btn.foulrival{background:linear-gradient(160deg,#fdecea,#fadbd8);color:#922b21;}
+/* --- Campo de fútbol sala para los cambios --- */
+.live-pitch{position:relative;background:linear-gradient(180deg,#2e8b57,#1f6e44);border:2px solid rgba(255,255,255,.85);border-radius:12px;height:300px;margin-top:8px;overflow:hidden;}
+.live-pitch-line{position:absolute;left:6%;right:6%;top:50%;height:2px;background:rgba(255,255,255,.55);}
+.live-pitch-circle{position:absolute;left:50%;top:50%;width:64px;height:64px;margin:-32px 0 0 -32px;border:2px solid rgba(255,255,255,.55);border-radius:50%;}
+.live-pitch-chip{position:absolute;transform:translate(-50%,-50%);background:#fff;border:2px solid var(--ink,#222);border-radius:999px;padding:5px 9px;font-size:.7rem;font-weight:700;display:inline-flex;gap:4px;align-items:center;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.3);max-width:104px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.live-pitch-chip .d{font-family:'Roboto Mono',monospace;}
+.live-pitch-chip.gk{background:var(--accent);border-color:#fff;color:#fff;}
+.live-pitch-chip.sel{outline:3px solid #ffd54a;outline-offset:2px;}
+.live-pitch-chip .mins{font-family:'Roboto Mono',monospace;font-size:.6rem;color:var(--muted);font-weight:700;}
+.live-pitch-chip.gk .mins{color:rgba(255,255,255,.85);}
+.live-bench{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;min-height:34px;}
+.live-bench-chip{background:#f6f3ee;border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-size:.72rem;font-weight:600;cursor:pointer;display:inline-flex;gap:4px;align-items:center;max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.live-bench-chip.sel{outline:2px solid var(--accent);outline-offset:1px;}
+.live-pitch-hint{font-size:.72rem;color:var(--muted);margin:6px 0 0;}
 .live-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
 .live-action-btn{border:none;border-radius:14px;min-height:74px;padding:8px 6px;font-family:'Oswald',sans-serif;font-size:.86rem;font-weight:600;line-height:1.15;text-transform:uppercase;letter-spacing:.02em;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;box-shadow:0 1px 3px rgba(0,0,0,.12);}
 .live-action-btn .ico{font-size:1.55rem;line-height:1;}
@@ -1686,10 +1712,29 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
           <div class="muted" id="liveGoalkeeperNote" style="font-size:.72rem;"></div>
         </div>
 
+        <div class="live-fouls-card">
+          <div class="live-section-title"><span>🚩 Faltas</span></div>
+          <div class="live-fouls">
+            <div class="live-foul-team" id="liveFoulUsBox">
+              <div class="t">Nuestro equipo</div>
+              <div class="n" id="liveFoulUsCount">0</div>
+              <div class="h" id="liveFoulUsHalves">1ª: 0 · 2ª: 0</div>
+            </div>
+            <div class="live-foul-team" id="liveFoulRivalBox">
+              <div class="t">Rival</div>
+              <div class="n" id="liveFoulRivalCount">0</div>
+              <div class="h" id="liveFoulRivalHalves">1ª: 0 · 2ª: 0</div>
+            </div>
+          </div>
+          <div class="live-fouls-note" id="liveFoulsNote"></div>
+        </div>
+
         <div class="live-actions">
           <button type="button" class="live-action-btn goal" id="liveGoalForBtn"><span class="ico">⚽</span>Gol a favor</button>
           <button type="button" class="live-action-btn against" id="liveGoalAgainstBtn"><span class="ico">🥅</span>Gol en contra</button>
           <button type="button" class="live-action-btn pp" id="livePPBtn"><span class="ico">🙃</span>PP del rival</button>
+          <button type="button" class="live-action-btn foul" id="liveFoulUsBtn"><span class="ico">🚩</span>Falta propia</button>
+          <button type="button" class="live-action-btn foulrival" id="liveFoulRivalBtn"><span class="ico">🚩</span>Falta rival</button>
           <button type="button" class="live-action-btn yellow" id="liveYellowBtn"><span class="ico">🟨</span>Amarilla</button>
           <button type="button" class="live-action-btn red" id="liveRedBtn"><span class="ico">🟥</span>Roja</button>
           <button type="button" class="live-action-btn neutral" id="liveConvocatoriaBtn"><span class="ico">📋</span>Convocatoria</button>
@@ -2017,6 +2062,11 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
                   <label style="font-size:.8rem;font-weight:600;">🙃 Goles a favor en propia puerta del rival</label>
                   <p class="muted" style="margin:4px 0 6px;font-size:.78rem;">Goles que el rival ha marcado en su propia portería y que cuentan para nosotros. No se asignan a ningún jugador; el marcador de la jornada ya debe incluirlos.</p>
                   <input type="number" min="0" id="mdRivalOwnGoals" style="width:80px;" placeholder="0">
+                </div>
+                <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px;">
+                  <label style="font-size:.8rem;font-weight:600;">🚩 Faltas del rival</label>
+                  <p class="muted" style="margin:4px 0 6px;font-size:.78rem;">Faltas cometidas por el rival. Si el partido se registró en directo se calculan solas; aquí puedes corregirlas en partidos no grabados en directo.</p>
+                  <input type="number" min="0" id="mdFoulsRival" style="width:80px;" placeholder="0">
                 </div>
                 <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px;">
                   <label style="font-size:.8rem;font-weight:600;">¿Se ha convocado a algún jugador de otra categoría a este partido?</label>
@@ -8771,6 +8821,8 @@ function renderMatchdayStatsTable(){
   if(!m){ wrap.innerHTML = ""; document.getElementById("matchdayVideoWrap").innerHTML = ""; return; }
   const rivalOwnEl = document.getElementById("mdRivalOwnGoals");
   if(rivalOwnEl) rivalOwnEl.value = m.rivalOwnGoals!=null ? m.rivalOwnGoals : "";
+  const foulsRivalEl = document.getElementById("mdFoulsRival");
+  if(foulsRivalEl) foulsRivalEl.value = m.foulsRival!=null ? m.foulsRival : "";
   const liveStarted = !!m.live;
   const matchFormat = matchdayMatchFormat_(m);
   const trackMinutes = matchFormat.trackMinutes !== false;
@@ -8787,14 +8839,14 @@ function renderMatchdayStatsTable(){
   const statsMap = {};
   (m.playerStats||[]).forEach(s=>{ statsMap[s.playerId] = s; });
   const rowOpts = {live: liveStarted, track: trackMinutes};
-  wrap.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:.85rem;min-width:620px;">
+  wrap.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:.85rem;min-width:680px;">
     <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
-      <th style="padding:4px;">Jugador</th><th style="padding:4px;">Estado</th><th style="padding:4px;">Motivo</th><th style="padding:4px;" title="Minutos jugados">⏱ Min</th><th style="padding:4px;" title="Goles marcados (porteros incluidos)">⚽ Goles</th><th style="padding:4px;" title="Goles encajados (solo porteros)">🥅 Enc.</th><th style="padding:4px;">🟨</th><th style="padding:4px;">🟥</th><th style="padding:4px;"></th>
+      <th style="padding:4px;">Jugador</th><th style="padding:4px;">Estado</th><th style="padding:4px;">Motivo</th><th style="padding:4px;" title="Minutos jugados">⏱ Min</th><th style="padding:4px;" title="Goles marcados (porteros incluidos)">⚽ Goles</th><th style="padding:4px;" title="Goles encajados (solo porteros)">🥅 Enc.</th><th style="padding:4px;">🟨</th><th style="padding:4px;">🟥</th><th style="padding:4px;" title="Faltas cometidas">🚩</th><th style="padding:4px;"></th>
     </tr></thead>
     <tbody>
     ${roster.map(p=>matchdayStatsRowHtml_(p, statsMap[p.id]||{}, false, rowOpts)).join("")}
     ${guests.length ? `
-      <tr><td colspan="9" style="padding:8px 4px 2px;font-size:.8rem;font-weight:600;color:var(--accent);">Convocados de otras categorías</td></tr>
+      <tr><td colspan="10" style="padding:8px 4px 2px;font-size:.8rem;font-weight:600;color:var(--accent);">Convocados de otras categorías</td></tr>
       ${guests.map(p=>matchdayStatsRowHtml_(p, statsMap[p.id]||{}, true, rowOpts)).join("")}` : ""}
     </tbody>
   </table>`;
@@ -8812,7 +8864,7 @@ function matchdayStatsRowHtml_(p, s, isGuest, opts){
   // un portero puede marcar, y antes compartían la misma casilla, así que un gol suyo se
   // guardaba como "encajado". Los jugadores de campo no tienen casilla de encajados.
   return `
-  <tr data-player-id="${p.id}" data-is-gk="${isGk?"1":"0"}" data-guest="${isGuest?"1":"0"}" data-seconds="${s.seconds!=null?s.seconds:""}" style="border-bottom:1px solid var(--border);">
+  <tr data-player-id="${p.id}" data-is-gk="${isGk?"1":"0"}" data-guest="${isGuest?"1":"0"}" data-seconds="${s.seconds!=null?s.seconds:""}" data-fouls="${s.fouls!=null?s.fouls:""}" style="border-bottom:1px solid var(--border);">
     <td style="padding:4px;">${jerseyNameHtml_(p.position, (p.dorsal!=null?escapeHtml(String(p.dorsal))+". ":"")+escapeHtml(p.name))}${isGuest?` <span class="badge outline" style="font-size:.68rem;">${escapeHtml((teams.find(t=>t.id===p.teamId)||{}).name||"otra categoría")}</span>`:""}</td>
     <td style="padding:4px;">
       <select class="md-status">
@@ -8829,6 +8881,9 @@ function matchdayStatsRowHtml_(p, s, isGuest, opts){
       : `<span class="muted" title="Solo se rellena en la fila del portero">—</span>`}</td>
     <td style="padding:4px;"><input type="number" min="0" max="2" class="md-yellow" value="${s.yellow!=null?s.yellow:""}" style="width:48px;"></td>
     <td style="padding:4px;"><input type="number" min="0" max="1" class="md-red" value="${s.red!=null?s.red:""}" style="width:48px;"></td>
+    <td style="padding:4px;">${opts.live
+      ? `<span class="muted" title="Se contabiliza en el directo">${s.fouls!=null?s.fouls:"0"}</span>`
+      : `<input type="number" min="0" class="md-fouls" value="${s.fouls!=null?s.fouls:""}" title="Faltas cometidas" style="width:48px;">`}</td>
     <td style="padding:4px;">${isGuest?`<button type="button" class="btn danger small" onclick="quitarMatchdayGuest_('${p.id}')" title="Quitar de esta convocatoria">🗑️</button>`:""}</td>
   </tr>`;
 }
@@ -8860,13 +8915,18 @@ document.getElementById("btnSaveMatchdayStats").onclick = async () => {
     const minutesEl = row.querySelector(".md-minutes");
     const minutesVal = minutesEl ? minutesEl.value : null;
     const existingSeconds = row.dataset.seconds !== "" ? Number(row.dataset.seconds) : null;
+    // Faltas: si hay directo la celda es de solo lectura y se conserva lo que contó el
+    // directo (data-fouls); si no, se guarda lo escrito a mano.
+    const foulsEl = row.querySelector(".md-fouls");
+    const existingFouls = row.dataset.fouls !== "" ? Number(row.dataset.fouls) : 0;
     const entry = {
       playerId, status,
       reason: status==="No convocado" ? reason : "",
       yellow: yellowVal!=="" ? Number(yellowVal) : 0,
       red: redVal!=="" ? Number(redVal) : 0,
       // Goles marcados: se guardan para TODOS, porteros incluidos (un portero puede marcar).
-      goals: goalsVal!=="" ? Number(goalsVal) : 0
+      goals: goalsVal!=="" ? Number(goalsVal) : 0,
+      fouls: foulsEl ? (foulsEl.value!=="" ? Math.max(0, Number(foulsEl.value)) : 0) : existingFouls
     };
     // Minutos: si la celda es editable se guarda lo escrito; si el partido está en directo
     // (sin celda) se conserva lo que ya hubiera calculado el directo. Si el partido tiene
@@ -8889,8 +8949,20 @@ document.getElementById("btnSaveMatchdayStats").onclick = async () => {
   const extraPlayerIds = matchdayExtraIdsEditing.filter(id=>players.some(p=>p.id===id));
   const rivalOwnGoalsVal = document.getElementById("mdRivalOwnGoals").value;
   const rivalOwnGoals = rivalOwnGoalsVal!=="" ? Number(rivalOwnGoalsVal) : 0;
+  // Faltas del equipo: el total propio es la suma de las faltas por jugador. Las del rival
+  // van aparte (input "Faltas del rival"). Si el directo está abierto, tanto el total propio
+  // como el desglose por mitad los calcula el directo: aquí solo se conservan.
+  const foulsUsSum = playerStats.reduce((n,s)=>n+Number(s.fouls||0), 0);
+  const foulsRivalEl = document.getElementById("mdFoulsRival");
+  const foulsRival = foulsRivalEl && foulsRivalEl.value!=="" ? Number(foulsRivalEl.value) : 0;
+  const mdLive = mdForFormat && mdForFormat.live;
+  const savePayload = {playerStats, extraPlayerIds, rivalOwnGoals, foulsUs: foulsUsSum, foulsRival};
+  if(mdLive){
+    if(mdForFormat.foulsUs!=null) savePayload.foulsUs = mdForFormat.foulsUs;
+    if(mdForFormat.foulsHalves) savePayload.foulsHalves = mdForFormat.foulsHalves;
+  }
   try{
-    await db.collection("matchdays").doc(statsMatchdayId).update({playerStats, extraPlayerIds, rivalOwnGoals});
+    await db.collection("matchdays").doc(statsMatchdayId).update(savePayload);
     matchdayExtraIdsEditing = extraPlayerIds.slice();
     // Los invitados acaban de cambiar: se refrescan las secciones que usan matchdayRoster_
     // para no tener que reabrir la jornada (la tabla se repinta sola con el snapshot).
@@ -9905,7 +9977,12 @@ async function exportMatchdayReportPDF(matchdayId){
   doc.setFont("helvetica","bold"); doc.setFontSize(12);
   doc.text(`${team ? team.name : ""} — Jornada ${m.number}`, margin, y); y += 6;
   doc.setFont("helvetica","normal"); doc.setFontSize(10);
-  doc.text(`vs ${m.rival||"?"}  ·  ${m.date||"-"}  ·  ${m.homeAway||"-"}  ·  ${m.competition||"-"}`, margin, y); y += 10;
+  doc.text(`vs ${m.rival||"?"}  ·  ${m.date||"-"}  ·  ${m.homeAway||"-"}  ·  ${m.competition||"-"}`, margin, y); y += 6;
+  if(m.foulsUs!=null || m.foulsRival!=null || (m.playerStats||[]).some(s=>s.fouls)){
+    const foulsUsPdf = m.foulsUs!=null ? m.foulsUs : (m.playerStats||[]).reduce((n,s)=>n+(s.fouls||0),0);
+    doc.text(`Faltas (nuestras/rival): ${foulsUsPdf}/${m.foulsRival||0}`, margin, y); y += 6;
+  }
+  y += 4;
 
   // ---- Tabla de convocatoria ----
   const dorsalX = margin+3, jugadorX = margin+30, estadoX = pageW-margin-55, motivoX = pageW-margin-25;
@@ -10198,7 +10275,7 @@ document.getElementById("btnExportSummaryPDF").onclick = () => {
   doc.setFont("helvetica","bold"); doc.setFontSize(12);
   doc.text(`${team ? team.name : ""} — Temporada ${selectedSeason||"-"}`, margin, y); y += 6;
   doc.setFont("helvetica","normal"); doc.setFontSize(10);
-  doc.text(`Jornadas jugadas: ${sum.played}  ·  Goles a favor: ${sum.goalsFor}  ·  Goles en contra: ${sum.goalsAgainst}  ·  PP del rival: ${sum.rivalOwnGoals}`, margin, y); y += 10;
+  doc.text(`Jornadas jugadas: ${sum.played}  ·  Goles a favor: ${sum.goalsFor}  ·  Goles en contra: ${sum.goalsAgainst}  ·  PP del rival: ${sum.rivalOwnGoals}  ·  Faltas (nuestras/rival): ${sum.foulsUs}/${sum.foulsRival}`, margin, y); y += 10;
 
   function drawSimpleTable(headers, rows){
     const colW = (pageW-margin*2)/headers.length;
@@ -10226,8 +10303,8 @@ document.getElementById("btnExportSummaryPDF").onclick = () => {
   doc.setFont("helvetica","bold"); doc.setFontSize(10.5);
   doc.text("Jugadores", margin, y); y += 3;
   drawSimpleTable(
-    ["Jugador","PJ","Titular","Suplente","Convoc.","Min","Goles","Am.","Roj.","Nota"],
-    outfield.map(s=>[`${s.player.dorsal!=null?s.player.dorsal+". ":""}${s.player.name}${s.guest?` (${(teams.find(t=>t.id===s.player.teamId)||{}).name||"otra categoría"})`:""}`, s.played, s.starts, s.subs, s.called, formatMinutesShort_(s.seconds), s.goals, s.yellow, s.red, s.avgRating!=null?s.avgRating.toFixed(1):"-"])
+    ["Jugador","PJ","Titular","Suplente","Convoc.","Min","Goles","Faltas","Am.","Roj.","Nota"],
+    outfield.map(s=>[`${s.player.dorsal!=null?s.player.dorsal+". ":""}${s.player.name}${s.guest?` (${(teams.find(t=>t.id===s.player.teamId)||{}).name||"otra categoría"})`:""}`, s.played, s.starts, s.subs, s.called, formatMinutesShort_(s.seconds), s.goals, s.fouls, s.yellow, s.red, s.avgRating!=null?s.avgRating.toFixed(1):"-"])
   );
 
   doc.setFont("helvetica","bold"); doc.setFontSize(10.5);
@@ -10248,10 +10325,10 @@ document.getElementById("btnExportSummaryExcel").onclick = () => {
   const outfield = sum.stats.filter(s=>s.player.position!=="Portero").sort((a,b)=> b.goals-a.goals || b.played-a.played);
   const gks = sum.stats.filter(s=>s.player.position==="Portero").sort((a,b)=> b.cleanSheets-a.cleanSheets || a.goalsConceded-b.goalsConceded);
 
-  const outHeader = ["Dorsal","Jugador","PJ","Titular","Suplente","Convocatorias","Minutos","Goles","Amarillas","Rojas","Nota media"];
-  const outRows = outfield.map(s=>[s.player.dorsal!=null?s.player.dorsal:"", `${s.player.name}${s.guest?` (${(teams.find(t=>t.id===s.player.teamId)||{}).name||"otra categoría"})`:""}`, s.played, s.starts, s.subs, s.called, Math.round((Number(s.seconds)||0)/60), s.goals, s.yellow, s.red, s.avgRating!=null?Number(s.avgRating.toFixed(1)):""]);
+  const outHeader = ["Dorsal","Jugador","PJ","Titular","Suplente","Convocatorias","Minutos","Goles","Faltas","Amarillas","Rojas","Nota media"];
+  const outRows = outfield.map(s=>[s.player.dorsal!=null?s.player.dorsal:"", `${s.player.name}${s.guest?` (${(teams.find(t=>t.id===s.player.teamId)||{}).name||"otra categoría"})`:""}`, s.played, s.starts, s.subs, s.called, Math.round((Number(s.seconds)||0)/60), s.goals, s.fouls, s.yellow, s.red, s.avgRating!=null?Number(s.avgRating.toFixed(1)):""]);
   const wsOut = XLSX.utils.aoa_to_sheet([outHeader, ...outRows]);
-  wsOut["!cols"] = [{wch:8},{wch:26},{wch:6},{wch:8},{wch:9},{wch:12},{wch:8},{wch:8},{wch:10},{wch:8},{wch:10}];
+  wsOut["!cols"] = [{wch:8},{wch:26},{wch:6},{wch:8},{wch:9},{wch:12},{wch:8},{wch:8},{wch:8},{wch:10},{wch:8},{wch:10}];
 
   const gkHeader = ["Dorsal","Portero","PJ","Minutos","Goles","Encajados","Porterías a cero","Amarillas","Rojas","Nota media"];
   const gkRows = gks.map(s=>[s.player.dorsal!=null?s.player.dorsal:"", `${s.player.name}${s.guest?` (${(teams.find(t=>t.id===s.player.teamId)||{}).name||"otra categoría"})`:""}`, s.gkMatches, Math.round((Number(s.seconds)||0)/60), s.goals, s.goalsConceded, s.cleanSheets, s.yellow, s.red, s.avgRating!=null?Number(s.avgRating.toFixed(1)):""]);
@@ -10280,15 +10357,18 @@ function computeTeamSummary_(teamId, season, difficultyFilter, competitionFilter
   roster.forEach(p=>{
     stats[p.id] = {
       player: p, guest: p.teamId!==teamId, played:0, starts:0, subs:0, called:0,
-      goals:0, yellow:0, red:0, goalsConceded:0, cleanSheets:0, gkMatches:0,
+      goals:0, yellow:0, red:0, fouls:0, goalsConceded:0, cleanSheets:0, gkMatches:0,
       seconds:0, ratingSum:0, ratingCount:0
     };
   });
-  let goalsFor = 0, goalsAgainst = 0, rivalOwnGoals = 0, played = 0;
+  let goalsFor = 0, goalsAgainst = 0, rivalOwnGoals = 0, foulsUs = 0, foulsRival = 0, played = 0;
   teamMds.forEach(m=>{
     if(m.goalsFor!=null) goalsFor += m.goalsFor;
     if(m.goalsAgainst!=null) goalsAgainst += m.goalsAgainst;
     rivalOwnGoals += m.rivalOwnGoals||0;
+    // Faltas: si la jornada las trae, se suman. El total propio se recalcula por jugador
+    // para que cuadre con lo que se muestra en la tabla.
+    let mdFoulsUs = 0;
     if(Array.isArray(m.playerStats) && m.playerStats.length) played++;
     (m.playerStats||[]).forEach(s=>{
       const st = stats[s.playerId];
@@ -10298,6 +10378,8 @@ function computeTeamSummary_(teamId, season, difficultyFilter, competitionFilter
       st.goals += s.goals||0;
       st.yellow += s.yellow||0;
       st.red += s.red||0;
+      st.fouls += s.fouls||0;
+      mdFoulsUs += s.fouls||0;
       st.seconds += s.seconds||0;
       if(st.player.position==="Portero" && (s.status==="Titular"||s.status==="Suplente")){
         st.gkMatches++;
@@ -10315,9 +10397,13 @@ function computeTeamSummary_(teamId, season, difficultyFilter, competitionFilter
       st.ratingSum += Number(rating);
       st.ratingCount++;
     });
+    // Total propio de la jornada: si la jornada trae campo foulsUs (p.ej. con faltas "sin
+    // especificar" del directo) manda ese; si no, la suma por jugador.
+    foulsUs += m.foulsUs!=null ? Number(m.foulsUs) : mdFoulsUs;
+    foulsRival += m.foulsRival||0;
   });
   const statsArr = Object.values(stats).map(st=>({...st, avgRating: st.ratingCount>0 ? (st.ratingSum/st.ratingCount) : null}));
-  return {roster, teamMds, played, goalsFor, goalsAgainst, rivalOwnGoals, stats: statsArr};
+  return {roster, teamMds, played, goalsFor, goalsAgainst, rivalOwnGoals, foulsUs, foulsRival, stats: statsArr};
 }
 let summaryMode = "season"; // "season" | "matchday"
 let summarySelectedMatchdayId = null;
@@ -10487,6 +10573,7 @@ function renderSeasonSummary_(wrap){
       <div class="badge outline" style="padding:8px 12px;">⚽ Goles a favor: ${sum.goalsFor}</div>
       <div class="badge outline" style="padding:8px 12px;">🥅 Goles en contra: ${sum.goalsAgainst}</div>
       <div class="badge outline" style="padding:8px 12px;">🙃 PP del rival: ${sum.rivalOwnGoals}</div>
+      <div class="badge outline" style="padding:8px 12px;">🚩 Faltas (nuestras / rival): ${sum.foulsUs} / ${sum.foulsRival}</div>
       <div class="badge outline" style="padding:8px 12px;">⏱️ Minutos acumulados: ${Math.round(totalSeconds/60)}'</div>
     </div>
     <h3 style="font-size:.9rem;">Goles por categoría (temporada)</h3>
@@ -10498,7 +10585,7 @@ function renderSeasonSummary_(wrap){
     <div style="overflow-x:auto;">
     <table style="width:100%;border-collapse:collapse;font-size:.85rem;min-width:480px;">
       <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
-        <th style="padding:5px;">Jugador</th><th style="padding:5px;">PJ</th><th style="padding:5px;">Titular</th><th style="padding:5px;">Suplente</th><th style="padding:5px;">Convoc.</th><th style="padding:5px;">⏱ Min</th><th style="padding:5px;">⚽</th><th style="padding:5px;">🟨</th><th style="padding:5px;">🟥</th><th style="padding:5px;">⭐ Nota media</th>
+        <th style="padding:5px;">Jugador</th><th style="padding:5px;">PJ</th><th style="padding:5px;">Titular</th><th style="padding:5px;">Suplente</th><th style="padding:5px;">Convoc.</th><th style="padding:5px;">⏱ Min</th><th style="padding:5px;">⚽</th><th style="padding:5px;">🚩</th><th style="padding:5px;">🟨</th><th style="padding:5px;">🟥</th><th style="padding:5px;">⭐ Nota media</th>
       </tr></thead>
       <tbody>
       ${outfield.length ? outfield.map(s=>`
@@ -10510,10 +10597,11 @@ function renderSeasonSummary_(wrap){
           <td style="padding:5px;">${s.called}</td>
           <td style="padding:5px;">${formatMinutesShort_(s.seconds)}</td>
           <td style="padding:5px;">${s.goals}</td>
+          <td style="padding:5px;">${s.fouls}</td>
           <td style="padding:5px;">${s.yellow}</td>
           <td style="padding:5px;">${s.red}</td>
           <td style="padding:5px;">${s.avgRating!=null ? s.avgRating.toFixed(1) : "-"}</td>
-        </tr>`).join("") : `<tr><td colspan="10" style="padding:5px;" class="muted">Sin jugadores de campo en la plantilla.</td></tr>`}
+        </tr>`).join("") : `<tr><td colspan="11" style="padding:5px;" class="muted">Sin jugadores de campo en la plantilla.</td></tr>`}
       </tbody>
     </table>
     </div>
@@ -10569,6 +10657,7 @@ function renderMatchdaySummary_(wrap){
       <div class="badge outline" style="padding:8px 12px;">🏆 ${escapeHtml(m.competition||"-")}</div>
       <div class="badge outline" style="padding:8px 12px;">${m.goalsFor!=null&&m.goalsAgainst!=null ? `⚽ ${matchScoreText_(m)}` : "Sin resultado"}</div>
       <div class="badge outline" style="padding:8px 12px;">🙃 PP del rival: ${rivalOwnGoals}</div>
+      <div class="badge outline" style="padding:8px 12px;">🚩 Faltas (nuestras / rival): ${m.foulsUs!=null?m.foulsUs:(m.playerStats||[]).reduce((n,s)=>n+(s.fouls||0),0)} / ${m.foulsRival||0}</div>
       <div class="badge outline" style="padding:8px 12px;">⏱️ ${matchFormatLabel_(matchdayMatchFormat_(m))}</div>
       ${diff ? `<div class="badge outline" title="${diff.label}" style="padding:8px 10px;display:flex;align-items:center;gap:0;"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:${diff.bg};border:1px solid ${diff.border};"></span></div>` : ""}
     </div>
@@ -10593,7 +10682,7 @@ function renderMatchdaySummary_(wrap){
     <div style="overflow-x:auto;">
     <table style="width:100%;border-collapse:collapse;font-size:.85rem;min-width:480px;">
       <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
-        <th style="padding:5px;">Jugador</th><th style="padding:5px;">Estado</th><th style="padding:5px;">Motivo</th><th style="padding:5px;">⏱ Min</th><th style="padding:5px;">⚽ Goles</th><th style="padding:5px;">🥅 Enc.</th><th style="padding:5px;">🟨</th><th style="padding:5px;">🟥</th><th style="padding:5px;">⭐ Nota</th>
+        <th style="padding:5px;">Jugador</th><th style="padding:5px;">Estado</th><th style="padding:5px;">Motivo</th><th style="padding:5px;">⏱ Min</th><th style="padding:5px;">⚽ Goles</th><th style="padding:5px;">🥅 Enc.</th><th style="padding:5px;">🚩</th><th style="padding:5px;">🟨</th><th style="padding:5px;">🟥</th><th style="padding:5px;">⭐ Nota</th>
       </tr></thead>
       <tbody>
       ${roster.length ? roster.map(p=>{
@@ -10607,11 +10696,12 @@ function renderMatchdaySummary_(wrap){
           <td style="padding:5px;">${formatSeconds_(s.seconds)}</td>
           <td style="padding:5px;">${s.goals!=null?s.goals:"-"}</td>
           <td style="padding:5px;">${isGk ? (s.goalsConceded!=null?s.goalsConceded:"-") : "—"}</td>
+          <td style="padding:5px;">${s.fouls||0}</td>
           <td style="padding:5px;">${s.yellow||0}</td>
           <td style="padding:5px;">${s.red||0}</td>
           <td style="padding:5px;">${ratings[p.id]!=null?ratings[p.id]:"-"}</td>
         </tr>`;
-      }).join("") : `<tr><td colspan="9" style="padding:5px;" class="muted">Este equipo todavía no tiene jugadores en la plantilla.</td></tr>`}
+      }).join("") : `<tr><td colspan="10" style="padding:5px;" class="muted">Este equipo todavía no tiene jugadores en la plantilla.</td></tr>`}
       </tbody>
     </table>
     </div>
@@ -10648,12 +10738,12 @@ window.openPlayerProfile = (id) => {
   // también esos partidos jugados con otra categoría.
   const teamMds = matchdays.filter(m=> matchdayRosterIds_(m).has(p.id) && matchdaySeason_(m, team)===selectedSeason).sort((a,b)=>(a.number||0)-(b.number||0));
   const isGk = p.position === "Portero";
-  let played=0, starts=0, subs=0, called=0, goals=0, yellow=0, red=0, goalsConceded=0, cleanSheets=0, gkMatches=0, seconds=0;
+  let played=0, starts=0, subs=0, called=0, goals=0, fouls=0, yellow=0, red=0, goalsConceded=0, cleanSheets=0, gkMatches=0, seconds=0;
   const rows = teamMds.map(m=>{
     const s = (m.playerStats||[]).find(x=>x.playerId===id) || {status:"No convocado"};
     if(s.status==="Titular"){ starts++; played++; called++; }
     else if(s.status==="Suplente"){ subs++; played++; called++; }
-    goals += s.goals||0; yellow += s.yellow||0; red += s.red||0;
+    goals += s.goals||0; fouls += s.fouls||0; yellow += s.yellow||0; red += s.red||0;
     seconds += s.seconds||0;
     if(isGk && (s.status==="Titular"||s.status==="Suplente")){
       gkMatches++;
@@ -10674,12 +10764,13 @@ window.openPlayerProfile = (id) => {
         : `<div class="badge outline" style="padding:8px 12px;">⚽ Goles: ${goals}</div>`}
       <div class="badge outline" style="padding:8px 12px;">🟨 ${yellow}</div>
       <div class="badge outline" style="padding:8px 12px;">🟥 ${red}</div>
+      <div class="badge outline" style="padding:8px 12px;">🚩 Faltas: ${fouls}</div>
     </div>
     <h3 style="font-size:.9rem;">Jornada a jornada</h3>
     <div style="overflow-x:auto;">
     <table style="width:100%;border-collapse:collapse;font-size:.85rem;min-width:460px;">
       <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
-        <th style="padding:5px;">J.</th><th style="padding:5px;">Rival</th><th style="padding:5px;">Estado</th><th style="padding:5px;">⏱ Min</th><th style="padding:5px;">⚽ Goles</th>${isGk?`<th style="padding:5px;">🥅 Enc.</th>`:""}<th style="padding:5px;">🟨</th><th style="padding:5px;">🟥</th>
+        <th style="padding:5px;">J.</th><th style="padding:5px;">Rival</th><th style="padding:5px;">Estado</th><th style="padding:5px;">⏱ Min</th><th style="padding:5px;">⚽ Goles</th>${isGk?`<th style="padding:5px;">🥅 Enc.</th>`:""}<th style="padding:5px;">🚩</th><th style="padding:5px;">🟨</th><th style="padding:5px;">🟥</th>
       </tr></thead>
       <tbody>
       ${rows.length ? rows.map(r=>`
@@ -10690,9 +10781,10 @@ window.openPlayerProfile = (id) => {
           <td style="padding:5px;">${formatSeconds_(r.s.seconds)}</td>
           <td style="padding:5px;">${r.s.goals||0}</td>
           ${isGk?`<td style="padding:5px;">${r.s.goalsConceded!=null?r.s.goalsConceded:"-"}</td>`:""}
+          <td style="padding:5px;">${r.s.fouls||0}</td>
           <td style="padding:5px;">${r.s.yellow||0}</td>
           <td style="padding:5px;">${r.s.red||0}</td>
-        </tr>`).join("") : `<tr><td colspan="${isGk?7:6}" style="padding:5px;" class="muted">Todavía no hay jornadas para este equipo.</td></tr>`}
+        </tr>`).join("") : `<tr><td colspan="${isGk?8:7}" style="padding:5px;" class="muted">Todavía no hay jornadas para este equipo.</td></tr>`}
       </tbody>
     </table>
     </div>`;
@@ -13914,6 +14006,7 @@ let liveActionStep = null;
 let liveActionPlayerId = null;
 let liveActionCategory = null;
 let liveChangesOnField = [];
+let liveChangesSel = null;   // selección en el campo de cambios: {kind:"field"|"bench", id}
 let liveConvSelected = new Set();
 let liveConvOnField = [];
 let liveClockInterval = null;
@@ -14016,7 +14109,8 @@ function liveNormalizePlayerStats_(m, live){
       reason: s.reason || "",
       goals: Number(s.goals||0),
       yellow: Number(s.yellow||0),
-      red: Number(s.red||0)
+      red: Number(s.red||0),
+      fouls: Number(s.fouls||0)
     };
     if(p.position==="Portero"){
       row.goalsConceded = (s.goalsConceded!=null ? Number(s.goalsConceded) : null);
@@ -14162,6 +14256,16 @@ function liveCompute_(m, live){
   let goalsFor = base.goalsFor!=null ? Number(base.goalsFor) : goalsForEvents.length;
   let goalsAgainst = base.goalsAgainst!=null ? Number(base.goalsAgainst) : goalsAgainstEvents.length;
   let rivalOwnGoals = Number(base.rivalOwnGoals || 0);
+  // Faltas: las de equipo son totales guardados en la jornada (más las que lleguen por
+  // eventos del directo); las propias se desglosan además por jugador. El desglose por
+  // mitad se usa para el aviso de la 6ª falta (lanzamiento de 10 m).
+  let foulsUs = Number(base.foulsUs||0);
+  let foulsRival = Number(base.foulsRival||0);
+  const fh = base.foulsHalves || {};
+  const foulsHalves = {
+    us: [Number(fh.us && fh.us[0]||0), Number(fh.us && fh.us[1]||0)],
+    rival: [Number(fh.rival && fh.rival[0]||0), Number(fh.rival && fh.rival[1]||0)]
+  };
 
   const events = ((live && live.events) || []).slice().sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
   const expelled = new Set();
@@ -14231,6 +14335,16 @@ function liveCompute_(m, live){
         expelled.add(ev.playerId);
         if(statsMap[ev.playerId]) statsMap[ev.playerId].red = (statsMap[ev.playerId].red || 0) + 1;
       }
+    } else if(ev.type==="falta_us"){
+      // Falta propia: con jugador si se ha indicado (se suma a su ficha) o sin especificar.
+      if(ev.playerId && statsMap[ev.playerId]){
+        statsMap[ev.playerId].fouls = (statsMap[ev.playerId].fouls || 0) + 1;
+      }
+      foulsUs++;
+      foulsHalves.us[Math.min(1, (period||1)-1)]++;
+    } else if(ev.type==="falta_rival"){
+      foulsRival++;
+      foulsHalves.rival[Math.min(1, (period||1)-1)]++;
     }
   });
 
@@ -14247,7 +14361,7 @@ function liveCompute_(m, live){
     }
   });
 
-  return {playerStats, goalsForEvents, goalsAgainstEvents, timeline, goalsFor, goalsAgainst, rivalOwnGoals};
+  return {playerStats, goalsForEvents, goalsAgainstEvents, timeline, goalsFor, goalsAgainst, rivalOwnGoals, foulsUs, foulsRival, foulsHalves};
 }
 
 function livePersist_(m, live, opts){
@@ -14265,6 +14379,9 @@ function livePersist_(m, live, opts){
     goalsAgainstEvents: derived.goalsAgainstEvents,
     timeline: derived.timeline,
     rivalOwnGoals: derived.rivalOwnGoals,
+    foulsUs: derived.foulsUs,
+    foulsRival: derived.foulsRival,
+    foulsHalves: derived.foulsHalves,
     live: live
   }));
 
@@ -14735,7 +14852,8 @@ function liveLineupStart_(){
       reason: s.reason || "",
       goals: Number(s.goals||0),
       yellow: Number(s.yellow||0),
-      red: Number(s.red||0)
+      red: Number(s.red||0),
+      fouls: Number(s.fouls||0)
     };
     if(p.position==="Portero"){
       row.goalsConceded = (s.goalsConceded!=null ? Number(s.goalsConceded) : null);
@@ -14751,7 +14869,10 @@ function liveLineupStart_(){
     timeline: JSON.parse(JSON.stringify(m.timeline || [])),
     goalsFor: m.goalsFor!=null ? Number(m.goalsFor) : (m.goalsForEvents || []).length,
     goalsAgainst: m.goalsAgainst!=null ? Number(m.goalsAgainst) : (m.goalsAgainstEvents || []).length,
-    rivalOwnGoals: Number(m.rivalOwnGoals || 0)
+    rivalOwnGoals: Number(m.rivalOwnGoals || 0),
+    foulsUs: Number(m.foulsUs||0),
+    foulsRival: Number(m.foulsRival||0),
+    foulsHalves: m.foulsHalves ? JSON.parse(JSON.stringify(m.foulsHalves)) : null
   };
   const live = {
     version: 1,
@@ -14811,6 +14932,31 @@ function renderLiveOnFieldChips_(m, live, derived){
     : '<span class="live-player-chip empty">Sin jugadores en pista</span>';
 }
 
+// Card de faltas del dashboard: contadores por equipo y por mitad, con aviso cuando una
+// mitad llega a la 6ª falta (lanzamiento desde 10 m según el reglamento).
+function renderLiveFouls_(live, derived){
+  const set = (id, v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
+  set("liveFoulUsCount", derived.foulsUs||0);
+  set("liveFoulRivalCount", derived.foulsRival||0);
+  const fh = derived.foulsHalves || {us:[0,0], rival:[0,0]};
+  set("liveFoulUsHalves", `1ª: ${fh.us[0]} · 2ª: ${fh.us[1]}`);
+  set("liveFoulRivalHalves", `1ª: ${fh.rival[0]} · 2ª: ${fh.rival[1]}`);
+  const period = live && live.timer && live.timer.period===2 ? 1 : 0;
+  const usBox = document.getElementById("liveFoulUsBox");
+  const rivalBox = document.getElementById("liveFoulRivalBox");
+  if(usBox) usBox.classList.toggle("warn", fh.us[period]>=6);
+  if(rivalBox) rivalBox.classList.toggle("warn", fh.rival[period]>=6);
+  const note = document.getElementById("liveFoulsNote");
+  if(note){
+    const usWarn = fh.us[period]>=6;
+    const rivalWarn = fh.rival[period]>=6;
+    note.textContent = usWarn && rivalWarn ? "🚨 Las dos mitades: 6ª falta → lanzamiento de 10 m"
+      : usWarn ? "🚨 Nuestro equipo: 6ª falta en esta mitad → lanzamiento de 10 m"
+      : rivalWarn ? "🚨 Rival: 6ª falta en esta mitad → lanzamiento de 10 m"
+      : "";
+  }
+}
+
 function renderLiveDashboard_(){
   if(!liveState) return;
   const m = matchdays.find(x=>x.id===liveState.matchdayId);
@@ -14850,6 +14996,7 @@ function renderLiveDashboard_(){
 
   const feed = document.getElementById("liveFeed");
   if(feed) feed.innerHTML = renderLiveFeedHtml_(m, live, derived);
+  renderLiveFouls_(live, derived);
   const syncEl = document.getElementById("liveSyncStatus");
   if(syncEl && !syncEl.textContent){
     syncEl.textContent = liveState.pending ? "⏳ Cambios pendientes de sincronizar" : "✅ Guardado";
@@ -14904,6 +15051,13 @@ function renderLiveFeedHtml_(m, live, derived){
     } else if(ev.type==="red"){
       icon = "🟥";
       main = `Roja · ${escapeHtml(livePlayerName_(ev.playerId))}`;
+    } else if(ev.type==="falta_us"){
+      icon = "🚩";
+      main = ev.playerId ? `Falta propia · ${escapeHtml(livePlayerName_(ev.playerId))}` : "Falta propia";
+      sub = "Sin especificar";
+    } else if(ev.type==="falta_rival"){
+      icon = "🚩";
+      main = "Falta del rival";
     }
     const scoreLabel = (ev.type==="goal_for" || ev.type==="rival_own_goal" || ev.type==="goal_against") && x.scoreFor!=null
       ? `<span class="live-feed-score">${matchScoreText_(m, x.scoreFor, x.scoreAgainst)}</span>`
@@ -15107,7 +15261,7 @@ function liveUndoEvent_(eventId){
 
 function liveResetDirect_(){
   if(!liveState || !liveState.live) return;
-  if(!confirm("¿Reiniciar el directo? Se borrarán los goles y tarjetas registrados en esta sesión y se volverá a la convocatoria inicial. No se borra la jornada.")) return;
+  if(!confirm("¿Reiniciar el directo? Se borrarán los goles, faltas y tarjetas registrados en esta sesión y se volverá a la convocatoria inicial. No se borra la jornada.")) return;
   const m = matchdays.find(x=>x.id===liveState.matchdayId);
   if(!m) return;
   const live = liveState.live;
@@ -15126,7 +15280,7 @@ async function liveFinishDirect_(){
   if(!liveState || !liveState.live) return;
   const m = matchdays.find(x=>x.id===liveState.matchdayId);
   if(!m) return;
-  if(!confirm("¿Finalizar el directo? Se cerrará la sesión y la jornada quedará con las estadísticas actuales. No se borran goles ni tarjetas.")) return;
+  if(!confirm("¿Finalizar el directo? Se cerrará la sesión y la jornada quedará con las estadísticas actuales. No se borran goles, faltas ni tarjetas.")) return;
   // Espera a la última escritura en curso para que no pueda volver a añadir "live" después
   // de cerrar la sesión. Si falló, el update final de abajo ya guarda el estado actual.
   try{ if(liveLastWrite_) await liveLastWrite_; }catch(e){}
@@ -15140,6 +15294,9 @@ async function liveFinishDirect_(){
     goalsAgainstEvents: derived.goalsAgainstEvents,
     timeline: derived.timeline,
     rivalOwnGoals: derived.rivalOwnGoals,
+    foulsUs: derived.foulsUs,
+    foulsRival: derived.foulsRival,
+    foulsHalves: derived.foulsHalves,
     live: firebase.firestore.FieldValue.delete()
   };
   try{
@@ -15172,10 +15329,26 @@ function liveOpenChanges_(){
   const derived = liveCompute_(m, liveState.live);
   const redIds = new Set(derived.playerStats.filter(s=>Number(s.red||0)>0).map(s=>s.playerId));
   liveChangesOnField = (liveState.live.onField || []).filter(id=>!redIds.has(id)).slice(0,5);
+  liveChangesSel = null;
   renderLiveChangesModal_();
   document.getElementById("liveActionModal").classList.remove("hidden");
 }
 
+/* --- Cambios con campo de fútbol sala --- */
+// Posición de cada uno de los 5 puestos en el campo (en % del contenedor): portero en la
+// portería, una línea de 3 y el pivot arriba (el campo está orientado hacia arriba).
+const LIVE_PITCH_SLOTS = [
+  {x:50, y:12},
+  {x:24, y:40}, {x:50, y:40}, {x:76, y:40},
+  {x:50, y:76}
+];
+function livePitchOrder_(onField){
+  // El portero siempre en la portería (primer puesto); el resto mantiene su orden.
+  const list = onField.slice();
+  const gkIdx = list.findIndex(id=>{ const p=livePlayer_(id); return p && p.position==="Portero"; });
+  if(gkIdx>0) list.unshift(list.splice(gkIdx,1)[0]);
+  return list;
+}
 function renderLiveChangesModal_(){
   if(!liveState || !liveState.live) return;
   const m = matchdays.find(x=>x.id===liveState.matchdayId);
@@ -15187,38 +15360,75 @@ function renderLiveChangesModal_(){
   const roster = liveRoster_(m, live);
   const conv = roster.filter(p=>{
     const s = statsMap[p.id];
-    return s && s.status!=="No convocado";
+    return s && s.status!=="No convocado" && Number(s.red||0)===0;
   });
-  const onFieldSet = new Set(liveChangesOnField);
-  const rows = conv.map(p=>{
-    const s = statsMap[p.id] || {};
-    const isRed = Number(s.red||0) > 0;
-    const inField = onFieldSet.has(p.id);
-    const mins = s.seconds!=null ? `<span class="live-lineup-mins">⏱ ${formatMinutesShort_(s.seconds)}</span>` : "";
-    return `<div class="live-lineup-row">
-      <div class="live-lineup-check" style="cursor:default;">
-        ${jerseyIconHtml_(p.position)}
-        <span class="live-lineup-name"><strong>${p.dorsal!=null?p.dorsal:"-"}</strong> ${escapeHtml(p.name)}${isRed?' <span class="live-badge warn">Expulsado</span>':""}</span>
-      </div>
-      ${mins}
-      <button type="button" class="live-lineup-toggle ${inField?"active":""}" ${isRed?"disabled":""} onclick="liveToggleChangePlayer_('${p.id}')">${inField?"Quitar":"Poner"}</button>
-    </div>`;
+  const ordered = livePitchOrder_(liveChangesOnField);
+  const onFieldSet = new Set(ordered);
+  const bench = conv.filter(p=>!onFieldSet.has(p.id))
+    .sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
+  const sel = liveChangesSel;
+
+  const pitch = ordered.map((id,i)=>{
+    const p = livePlayer_(id); if(!p) return "";
+    const slot = LIVE_PITCH_SLOTS[i] || LIVE_PITCH_SLOTS[4];
+    const s = statsMap[id] || {};
+    const mins = s.seconds!=null ? `<span class="mins">⏱ ${formatMinutesShort_(s.seconds)}</span>` : "";
+    const isSel = sel && sel.kind==="field" && sel.id===id;
+    return `<button type="button" class="live-pitch-chip${p.position==="Portero"?" gk":""}${isSel?" sel":""}" style="left:${slot.x}%;top:${slot.y}%;" onclick="liveChangesTap_('field','${id}')">
+      ${p.dorsal!=null?`<span class="d">${p.dorsal}</span>`:""}${escapeHtml(p.name)}${mins}
+    </button>`;
   }).join("");
+
+  const benchHtml = bench.length
+    ? bench.map(p=>{
+        const s = statsMap[p.id] || {};
+        const mins = s.seconds!=null ? `<span class="mins">⏱ ${formatMinutesShort_(s.seconds)}</span>` : "";
+        const isSel = sel && sel.kind==="bench" && sel.id===p.id;
+        return `<button type="button" class="live-bench-chip${isSel?" sel":""}" onclick="liveChangesTap_('bench','${p.id}')">
+          ${p.dorsal!=null?`<span class="d">${p.dorsal}</span>`:""}${escapeHtml(p.name)}${mins}
+        </button>`;
+      }).join("")
+    : '<span class="muted" style="font-size:.75rem;">No hay jugadores en el banquillo.</span>';
+
+  let hint;
+  if(!sel) hint = ordered.length<5
+    ? "Toca a un jugador del banquillo para meterlo, o a uno de pista para cambiarlo."
+    : "Toca al que sale y después al que entra (o al revés).";
+  else if(sel.kind==="field") hint = "Ahora toca a un jugador del banquillo para que entre por él.";
+  else hint = "Ahora toca a un jugador de pista para que salga.";
+  const selName = sel ? livePlayerName_(sel.id) : "";
+
   document.getElementById("liveActionTitle").textContent = "🔄 Cambios";
   document.getElementById("liveActionBody").innerHTML = `
-    <p class="muted" style="margin-top:0;">Elige quién está en pista (${liveChangesOnField.length}/5).</p>
-    <div style="max-height:52vh;overflow-y:auto;">${rows || '<p class="muted">No hay jugadores convocados.</p>'}</div>
-    <button type="button" class="btn accent" style="width:100%;margin-top:10px;" onclick="liveSaveChanges_()">💾 Guardar cambios</button>`;
+    <p class="live-pitch-hint" style="margin-top:0;">${hint}${selName?` <strong>(${escapeHtml(selName)})</strong>`:""}</p>
+    <div class="live-pitch">
+      <div class="live-pitch-line"></div>
+      <div class="live-pitch-circle"></div>
+      ${pitch || '<span class="muted" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:#fff;font-size:.8rem;">Pista vacía</span>'}
+    </div>
+    <div class="live-bench">${benchHtml}</div>
+    <button type="button" class="btn accent" style="width:100%;margin-top:10px;" onclick="liveSaveChanges_()">💾 Aplicar cambios (${ordered.length}/5 en pista)</button>`;
 }
 
-function liveToggleChangePlayer_(id){
-  if(liveChangesOnField.includes(id)){
-    liveChangesOnField = liveChangesOnField.filter(x=>x!==id);
-  } else if(liveChangesOnField.length>=5){
-    alert("Ya hay 5 jugadores en pista.");
-    return;
+function liveChangesTap_(kind, id){
+  if(!liveChangesSel){
+    if(kind==="bench" && liveChangesOnField.length<5){
+      // Hay hueco en pista: tocar el banquillo mete al jugador directamente.
+      liveChangesOnField.push(id);
+    } else {
+      liveChangesSel = {kind, id};
+    }
+  } else if(liveChangesSel.kind===kind && liveChangesSel.id===id){
+    liveChangesSel = null;   // segundo toque sobre el mismo: se cancela la selección
+  } else if(liveChangesSel.kind==="field" && kind==="bench"){
+    // Cambio 1 a 1: sale el seleccionado de pista, entra el del banquillo.
+    liveChangesOnField = liveChangesOnField.map(x=>x===liveChangesSel.id ? id : x);
+    liveChangesSel = null;
+  } else if(liveChangesSel.kind==="bench" && kind==="field"){
+    liveChangesOnField = liveChangesOnField.map(x=>x===id ? liveChangesSel.id : x);
+    liveChangesSel = null;
   } else {
-    liveChangesOnField.push(id);
+    liveChangesSel = {kind, id};   // cambia la selección
   }
   renderLiveChangesModal_();
 }
@@ -15339,7 +15549,7 @@ function liveOpenAction_(type){
   liveActionType = type;
   liveActionPlayerId = null;
   liveActionCategory = null;
-  liveActionStep = (type==="goal_for" || type==="yellow" || type==="red")
+  liveActionStep = (type==="goal_for" || type==="yellow" || type==="red" || type==="falta_us")
     ? "player"
     : (type==="goal_against" ? "category" : "confirm");
   renderLiveActionModal_();
@@ -15370,6 +15580,23 @@ function renderLiveActionModal_(){
   if(liveActionType==="rival_own_goal"){
     title.textContent = "🙃 PP del rival";
     body.innerHTML = livePPConfirmHtml_(m, live, derived);
+    return;
+  }
+  if(liveActionType==="falta_us"){
+    title.textContent = "🚩 Falta propia";
+    if(liveActionStep==="player"){
+      body.innerHTML = livePlayerChoiceHtml_(m, live, derived, "¿Quién ha cometido la falta?")
+        + `<button type="button" class="btn ghost small" style="width:100%;margin-top:6px;" onclick="liveActionSaveFoulUs_('')">🚩 Sin especificar jugador</button>`;
+      return;
+    }
+  }
+  if(liveActionType==="falta_rival"){
+    title.textContent = "🚩 Falta del rival";
+    const minute = liveMinute_(live);
+    const period = live.timer && live.timer.period===2 ? "2ª" : "1ª";
+    body.innerHTML = `<p style="margin-top:0;">Se sumará <strong>1 falta al rival</strong> en el minuto <strong>${period} ${minute}'</strong>.</p>
+      <p class="muted">Faltas del rival hasta ahora: <strong>${derived.foulsRival||0}</strong></p>
+      <button type="button" class="btn accent" style="width:100%;margin-top:8px;" onclick="liveActionSaveFoulRival_()">✅ Registrar falta</button>`;
     return;
   }
   if(liveActionType==="yellow" || liveActionType==="red"){
@@ -15445,8 +15672,22 @@ function liveActionChoosePlayer_(id){
     if(liveActionType==="red" && !confirm(`¿Registrar roja para ${name}?`)) return;
     liveAddEvent_({type:liveActionType, playerId:id});
     document.getElementById("liveActionModal").classList.add("hidden");
+    return;
+  }
+  if(liveActionType==="falta_us"){
+    liveAddEvent_({type:"falta_us", playerId:id});
+    document.getElementById("liveActionModal").classList.add("hidden");
   }
 }
+
+window.liveActionSaveFoulUs_ = () => {
+  liveAddEvent_({type:"falta_us"});
+  document.getElementById("liveActionModal").classList.add("hidden");
+};
+window.liveActionSaveFoulRival_ = () => {
+  liveAddEvent_({type:"falta_rival"});
+  document.getElementById("liveActionModal").classList.add("hidden");
+};
 
 function liveActionChooseCategory_(catId){
   liveActionCategory = catId;
@@ -15563,6 +15804,8 @@ liveBind_("liveGoalAgainstBtn", "onclick", ()=>liveOpenAction_("goal_against"));
 liveBind_("livePPBtn", "onclick", ()=>liveOpenAction_("rival_own_goal"));
 liveBind_("liveYellowBtn", "onclick", ()=>liveOpenAction_("yellow"));
 liveBind_("liveRedBtn", "onclick", ()=>liveOpenAction_("red"));
+liveBind_("liveFoulUsBtn", "onclick", ()=>liveOpenAction_("falta_us"));
+liveBind_("liveFoulRivalBtn", "onclick", ()=>liveOpenAction_("falta_rival"));
 liveBind_("liveResetBtn", "onclick", liveResetDirect_);
 liveBind_("liveFinishBtn", "onclick", liveFinishDirect_);
 liveBind_("btnCloseLiveAction", "onclick", ()=>{
