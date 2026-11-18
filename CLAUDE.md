@@ -390,10 +390,11 @@ All inside `index.html` — search for these comment banners to jump around:
     `mdFoulsRival`; `btnSaveMatchdayStats` guarda `foulsUs` (suma de jugadores, o el total del
     directo si está abierto) y `foulsRival`. Todo se propaga a resúmenes (badges/columnas),
     ficha de jugador, PDF y Excel.
-  - **Cambios con campo en la vista principal**: la card "En pista" del dashboard es un campo
-    de fútbol sala que reutiliza la imagen de la pizarra táctica (`COURT_DATA_URI`, con parquet,
-    líneas, escudo en el círculo central y porterías; `.live-pitch-bg` a tamaño completo)
-    (`renderLivePitch_`): los 5 de pista como chips en posiciones fijas (`LIVE_PITCH_SLOTS`,
+  - **Cambios con campo en la vista principal**: la card "En pista" del dashboard es un **medio
+    campo en vertical** (portería arriba, círculo central con el escudo abajo) derivado de la
+    imagen de la pizarra táctica (`COURT_HALF_DATA_URI`, recorte rotado de `COURT_DATA_URI`;
+    `.live-pitch-bg` a tamaño completo) (`renderLivePitch_`): los 5 de pista como chips en
+    posiciones fijas (`LIVE_PITCH_SLOTS`,
     portero siempre en la portería vía `livePitchOrder_`) y el banquillo debajo. Los cambios se
     hacen directamente sin modal: tocar uno de pista + uno del banquillo los intercambia al
     instante (`liveChangesTap_` aplica y persiste con `liveRecordPresence_` + `livePersist_`);
