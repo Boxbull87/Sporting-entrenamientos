@@ -7655,6 +7655,14 @@ function jerseyIconHtml_(position){
 function jerseyNameHtml_(position, nameHtml){
   return `<span class="jersey-name-row">${jerseyIconHtml_(position)}<span class="jn-name">${nameHtml}</span></span>`;
 }
+// Jugador dado de baja (p.baja === true): sigue existiendo con sus estadísticas, partidos y
+// asistencias (el histórico se conserva), pero no se ofrece para nuevas convocatorias de
+// partidos, entrenamientos, equipos de sesión ni en el directo. Solo se reactiva desde
+// Plantilla → "Dados de baja".
+function playerIsBaja_(p){ return !!(p && p.baja === true); }
+function playerBajaBadge_(p){
+  return playerIsBaja_(p) ? ' <span class="badge outline" style="font-size:.68rem;">Baja</span>' : "";
+}
 function renderPlayersList(){
   const wrap = document.getElementById("playersList");
   if(!wrap) return;
@@ -7664,29 +7672,39 @@ function renderPlayersList(){
   }
   const canEdit = canEditRoster_(selectedTeamId);
   document.getElementById("addPlayerPanel").classList.toggle("hidden", !canEdit);
-  const list = players.filter(p=>p.teamId===selectedTeamId).sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
-  if(list.length===0){ wrap.innerHTML = '<div class="empty">Todavía no hay jugadores en este equipo.</div>'; return; }
-  wrap.innerHTML = `
+  const all = players.filter(p=>p.teamId===selectedTeamId).sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
+  if(all.length===0){ wrap.innerHTML = '<div class="empty">Todavía no hay jugadores en este equipo.</div>'; return; }
+  const list = all.filter(p=>!playerIsBaja_(p));
+  const bajas = all.filter(playerIsBaja_);
+  const tableHtml = rows => `
     <div style="overflow-x:auto;">
     <table style="width:100%;border-collapse:collapse;min-width:420px;">
       <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
         <th style="padding:6px;">Dorsal</th><th style="padding:6px;">Nombre y apellidos</th><th style="padding:6px;">Posición</th><th></th>
       </tr></thead>
-      <tbody>
-      ${list.map(p=>`
-        <tr style="border-bottom:1px solid var(--border);">
-          <td style="padding:6px;">${p.dorsal!=null ? p.dorsal : "-"}</td>
-          <td style="padding:6px;">${jerseyNameHtml_(p.position, escapeHtml(p.name))}</td>
-          <td style="padding:6px;">${escapeHtml(p.position||"")}</td>
-          <td style="padding:6px;text-align:right;white-space:nowrap;">
-            <button class="btn ghost small" onclick="openPlayerProfile('${p.id}')">📊</button>
-            ${canEdit ? `<button class="btn ghost small" onclick="editPlayer('${p.id}')">✏️</button>` : ""}
-            ${canEdit ? `<button class="btn danger small" onclick="deletePlayer('${p.id}')">🗑️</button>` : ""}
-          </td>
-        </tr>`).join("")}
-      </tbody>
+      <tbody>${rows}</tbody>
     </table>
     </div>`;
+  const rowHtml = (p, isBaja) => `
+    <tr style="border-bottom:1px solid var(--border);${isBaja?"opacity:.78;":""}">
+      <td style="padding:6px;">${p.dorsal!=null ? p.dorsal : "-"}</td>
+      <td style="padding:6px;">${jerseyNameHtml_(p.position, escapeHtml(p.name))}${playerBajaBadge_(p)}</td>
+      <td style="padding:6px;">${escapeHtml(p.position||"")}</td>
+      <td style="padding:6px;text-align:right;white-space:nowrap;">
+        <button class="btn ghost small" onclick="openPlayerProfile('${p.id}')">📊</button>
+        ${canEdit && !isBaja ? `<button class="btn ghost small" onclick="editPlayer('${p.id}')">✏️</button>` : ""}
+        ${canEdit && !isBaja ? `<button class="btn ghost small" title="Dar de baja" onclick="setPlayerBaja('${p.id}', true)">🚪</button>` : ""}
+        ${canEdit && isBaja ? `<button class="btn ghost small" title="Reactivar jugador" onclick="setPlayerBaja('${p.id}', false)">♻️</button>` : ""}
+        ${canEdit && isBaja ? `<button class="btn danger small" onclick="deletePlayer('${p.id}')">🗑️</button>` : ""}
+      </td>
+    </tr>`;
+  wrap.innerHTML =
+    (list.length ? tableHtml(list.map(p=>rowHtml(p,false)).join("")) : '<div class="empty">No hay jugadores activos en este equipo.</div>') +
+    (bajas.length ? `<details style="margin-top:14px;">
+        <summary style="cursor:pointer;font-weight:600;">🚪 Dados de baja (${bajas.length})</summary>
+        <p class="muted" style="font-size:.78rem;margin:6px 0;">No aparecen en convocatorias nuevas, entrenamientos ni en el directo. Sus estadísticas, partidos y asistencias se conservan.</p>
+        ${tableHtml(bajas.map(p=>rowHtml(p,true)).join(""))}
+      </details>` : "");
 }
 document.getElementById("btnAddPlayer").onclick = async () => {
   const msgEl = document.getElementById("playersMsg");
@@ -7726,6 +7744,21 @@ window.editPlayer = async (id) => {
       dorsal: dorsalStr.trim() ? Number(dorsalStr.trim()) : null,
       position
     });
+  }catch(err){ alert("No se ha podido guardar: " + err.message); }
+};
+window.setPlayerBaja = async (id, baja) => {
+  const p = players.find(x=>x.id===id);
+  if(!p) return;
+  if(!canEditRoster_(p.teamId)){ alert("No tienes este equipo asignado, no puedes editar su plantilla."); return; }
+  if(baja && !confirm(`¿Dar de baja a ${p.name}?\n\nDejará de aparecer en convocatorias de partidos, entrenamientos y directo, pero sus estadísticas, partidos y asistencias se conservan y podrás reactivarlo cuando quieras.`)) return;
+  try{
+    await db.collection("players").doc(id).update({
+      baja: !!baja,
+      bajaAt: baja ? firebase.firestore.FieldValue.serverTimestamp() : null
+    });
+    // Si la ficha del jugador está abierta, se repinta con el estado nuevo.
+    const prof = document.getElementById("plantillaPlayerView");
+    if(prof && !prof.classList.contains("hidden")) openPlayerProfile(id);
   }catch(err){ alert("No se ha podido guardar: " + err.message); }
 };
 window.deletePlayer = async (id) => {
@@ -8777,13 +8810,17 @@ function matchdayGuestBadgeHtml_(m, p){
   return ` <span class="badge outline" style="font-size:.68rem;">${escapeHtml(t?t.name:"otra categoría")}</span>`;
 }
 // Plantilla del equipo de la jornada + invitados de otras categorías, ordenados por dorsal.
+// Los jugadores dados de baja solo entran si YA tienen estadísticas en esta jornada: así el
+// histórico no cambia, pero no se ofrecen para partidos nuevos.
 function matchdayRoster_(m){
   if(!m) return [];
-  const base = players.filter(p=>p.teamId===m.teamId);
+  const statsIds = new Set((m.playerStats||[]).map(s=>s.playerId));
+  const keep = p => !playerIsBaja_(p) || statsIds.has(p.id);
+  const base = players.filter(p=>p.teamId===m.teamId && keep(p));
   const baseIds = new Set(base.map(p=>p.id));
   const extras = matchdayExtraIds_(m)
     .map(id=>players.find(p=>p.id===id))
-    .filter(p=>p && !baseIds.has(p.id));
+    .filter(p=>p && !baseIds.has(p.id) && keep(p));
   return base.concat(extras).sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
 }
 function matchdayRosterIds_(m){
@@ -8794,9 +8831,10 @@ function matchdayRosterIds_(m){
 let matchdayExtraIdsEditing = [];
 function matchdayExtraPlayersEditing_(){
   const m = matchdays.find(x=>x.id===statsMatchdayId);
+  const statsIds = new Set(((m && m.playerStats) || []).map(s=>s.playerId));
   return matchdayExtraIdsEditing
     .map(id=>players.find(p=>p.id===id))
-    .filter(p=>p && (!m || p.teamId!==m.teamId))
+    .filter(p=>p && (!m || p.teamId!==m.teamId) && (!playerIsBaja_(p) || statsIds.has(p.id)))
     .sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
 }
 // Buscador de "convocar jugador de otra categoría": mismo método que el de Control de
@@ -8811,7 +8849,7 @@ function renderMatchdayAddResults_(){
   if(!m || !query){ wrap.innerHTML = ""; return; }
   const excluded = new Set([...players.filter(p=>p.teamId===m.teamId), ...matchdayExtraPlayersEditing_()].map(p=>p.id));
   const matches = players
-    .filter(p=> !excluded.has(p.id) && p.teamId!==m.teamId && p.name.toLowerCase().includes(query))
+    .filter(p=> !excluded.has(p.id) && !playerIsBaja_(p) && p.teamId!==m.teamId && p.name.toLowerCase().includes(query))
     .sort((a,b)=> a.name.localeCompare(b.name,'es'))
     .slice(0,15);
   if(matches.length===0){ wrap.innerHTML = '<p class="muted" style="font-size:.8rem;margin:4px 0;">Sin resultados.</p>'; return; }
@@ -8848,7 +8886,10 @@ function renderMatchdayStatsTable(){
   document.getElementById("matchdayStatsTitle").textContent =
     `Jornada ${m.number} — vs ${m.rival||"?"} (${matchScoreText_(m)}) · ${matchFormatLabel_(matchFormat)}`;
   document.getElementById("matchdayVideoWrap").innerHTML = m.videoUrl ? videoEmbedHtml(m.videoUrl) : "";
-  const roster = players.filter(p=>p.teamId===m.teamId).sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
+  const statsIds = new Set((m.playerStats||[]).map(s=>s.playerId));
+  const roster = players
+    .filter(p=>p.teamId===m.teamId && (!playerIsBaja_(p) || statsIds.has(p.id)))
+    .sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
   const guests = matchdayExtraPlayersEditing_();
   if(roster.length===0 && guests.length===0){
     wrap.innerHTML = '<p class="muted">Este equipo todavía no tiene jugadores en la plantilla. Puedes convocar a alguien de otra categoría más abajo.</p>';
@@ -8884,7 +8925,7 @@ function matchdayStatsRowHtml_(p, s, isGuest, opts){
   // guardaba como "encajado". Los jugadores de campo no tienen casilla de encajados.
   return `
   <tr data-player-id="${p.id}" data-is-gk="${isGk?"1":"0"}" data-guest="${isGuest?"1":"0"}" data-seconds="${s.seconds!=null?s.seconds:""}" data-fouls="${s.fouls!=null?s.fouls:""}" style="border-bottom:1px solid var(--border);">
-    <td style="padding:4px;">${jerseyNameHtml_(p.position, (p.dorsal!=null?escapeHtml(String(p.dorsal))+". ":"")+escapeHtml(p.name))}${isGuest?` <span class="badge outline" style="font-size:.68rem;">${escapeHtml((teams.find(t=>t.id===p.teamId)||{}).name||"otra categoría")}</span>`:""}</td>
+    <td style="padding:4px;">${jerseyNameHtml_(p.position, (p.dorsal!=null?escapeHtml(String(p.dorsal))+". ":"")+escapeHtml(p.name))}${playerBajaBadge_(p)}${isGuest?` <span class="badge outline" style="font-size:.68rem;">${escapeHtml((teams.find(t=>t.id===p.teamId)||{}).name||"otra categoría")}</span>`:""}</td>
     <td style="padding:4px;">
       <select class="md-status">
         <option value="Titular" ${s.status==="Titular"?"selected":""}>Titular</option>
@@ -10567,7 +10608,7 @@ function renderAttendanceControlView_(){
         const guestTag = r.guest ? ` <span class="badge outline" style="font-size:.68rem;">${escapeHtml((teams.find(t=>t.id===r.player.teamId)||{}).name || "otra categoría")}</span>` : "";
         return `
         <tr style="border-bottom:1px solid var(--border);">
-          <td style="padding:5px;">${jerseyNameHtml_(r.player.position, (r.player.dorsal!=null?escapeHtml(String(r.player.dorsal))+". ":"")+escapeHtml(r.player.name))}${guestTag}</td>
+          <td style="padding:5px;">${jerseyNameHtml_(r.player.position, (r.player.dorsal!=null?escapeHtml(String(r.player.dorsal))+". ":"")+escapeHtml(r.player.name))}${playerBajaBadge_(r.player)}${guestTag}</td>
           <td style="padding:5px;">${r.sesiones}</td>
           <td style="padding:5px;">${r.presentes}</td>
           <td style="padding:5px;${r.faltas>0?"font-weight:600;color:#c0392b;":""}">${r.faltas}</td>
@@ -10609,7 +10650,7 @@ function renderSeasonSummary_(wrap){
       <tbody>
       ${outfield.length ? outfield.map(s=>`
         <tr style="border-bottom:1px solid var(--border);">
-          <td style="padding:5px;">${jerseyNameHtml_(s.player.position, (s.player.dorsal!=null?escapeHtml(String(s.player.dorsal))+". ":"")+escapeHtml(s.player.name))}${s.guest?` <span class="badge outline" style="font-size:.68rem;">${escapeHtml((teams.find(t=>t.id===s.player.teamId)||{}).name||"otra categoría")}</span>`:""}</td>
+          <td style="padding:5px;">${jerseyNameHtml_(s.player.position, (s.player.dorsal!=null?escapeHtml(String(s.player.dorsal))+". ":"")+escapeHtml(s.player.name))}${playerBajaBadge_(s.player)}${s.guest?` <span class="badge outline" style="font-size:.68rem;">${escapeHtml((teams.find(t=>t.id===s.player.teamId)||{}).name||"otra categoría")}</span>`:""}</td>
           <td style="padding:5px;">${s.played}</td>
           <td style="padding:5px;">${s.starts}</td>
           <td style="padding:5px;">${s.subs}</td>
@@ -10633,7 +10674,7 @@ function renderSeasonSummary_(wrap){
       <tbody>
       ${gks.length ? gks.map(s=>`
         <tr style="border-bottom:1px solid var(--border);">
-          <td style="padding:5px;">${jerseyNameHtml_(s.player.position, (s.player.dorsal!=null?escapeHtml(String(s.player.dorsal))+". ":"")+escapeHtml(s.player.name))}${s.guest?` <span class="badge outline" style="font-size:.68rem;">${escapeHtml((teams.find(t=>t.id===s.player.teamId)||{}).name||"otra categoría")}</span>`:""}</td>
+          <td style="padding:5px;">${jerseyNameHtml_(s.player.position, (s.player.dorsal!=null?escapeHtml(String(s.player.dorsal))+". ":"")+escapeHtml(s.player.name))}${playerBajaBadge_(s.player)}${s.guest?` <span class="badge outline" style="font-size:.68rem;">${escapeHtml((teams.find(t=>t.id===s.player.teamId)||{}).name||"otra categoría")}</span>`:""}</td>
           <td style="padding:5px;">${s.gkMatches}</td>
           <td style="padding:5px;">${formatMinutesShort_(s.seconds)}</td>
           <td style="padding:5px;">${s.goals}</td>
@@ -10749,7 +10790,7 @@ window.openPlayerProfile = (id) => {
   const p = players.find(x=>x.id===id);
   if(!p) return;
   document.getElementById("playerProfileTitle").innerHTML =
-    jerseyNameHtml_(p.position, (p.dorsal!=null ? escapeHtml(String(p.dorsal))+". " : "")+escapeHtml(p.name));
+    jerseyNameHtml_(p.position, (p.dorsal!=null ? escapeHtml(String(p.dorsal))+". " : "")+escapeHtml(p.name)) + playerBajaBadge_(p);
   const wrap = document.getElementById("playerProfileContent");
   const team = teams.find(t=>t.id===p.teamId);
   // Jornadas en las que este jugador aparece en la convocatoria de SU equipo o de otro equipo
@@ -10773,6 +10814,7 @@ window.openPlayerProfile = (id) => {
   });
   wrap.innerHTML = `
     <p class="muted" style="margin-top:-6px;">Temporada: ${escapeHtml(selectedSeason||"-")}</p>
+    ${canEditRoster_(p.teamId) ? `<div style="margin-bottom:12px;"><button type="button" class="btn ghost small" onclick="setPlayerBaja('${p.id}', ${playerIsBaja_(p)?"false":"true"})">${playerIsBaja_(p)?"♻️ Reactivar jugador":"🚪 Dar de baja"}</button>${playerIsBaja_(p)?' <span class="muted" style="font-size:.76rem;">No aparecerá en convocatorias nuevas.</span>':""}</div>` : ""}
     <div class="row" style="margin-bottom:12px;">
       <div class="badge outline" style="padding:8px 12px;">🗓️ Partidos jugados: ${played}</div>
       <div class="badge outline" style="padding:8px 12px;">🟢 Titular: ${starts}</div>
@@ -10968,9 +11010,12 @@ function renderGroupPlayersModal_(){
   const wrap = document.getElementById("groupPlayersList");
   if(!g){ wrap.innerHTML = ""; return; }
   const byDorsal = (a,b)=>(a.dorsal||0)-(b.dorsal||0);
-  const roster = players.filter(p=>p.teamId===g.teamId).sort(byDorsal);
+  // Las bajas solo aparecen si ya estaban marcadas en este equipo (así no se pierde lo guardado).
+  const roster = players.filter(p=>p.teamId===g.teamId && (!playerIsBaja_(p) || groupPickerIds.includes(p.id))).sort(byDorsal);
   const rosterIds = new Set(roster.map(p=>p.id));
-  const guests = groupPickerGuests.map(id=>players.find(p=>p.id===id)).filter(p=>p && !rosterIds.has(p.id)).sort(byDorsal);
+  const guests = groupPickerGuests.map(id=>players.find(p=>p.id===id))
+    .filter(p=>p && !rosterIds.has(p.id) && (!playerIsBaja_(p) || groupPickerIds.includes(p.id)))
+    .sort(byDorsal);
   const rosterHtml = roster.length ? roster.map(p=>`
     <label style="display:flex;align-items:center;gap:8px;padding:6px 2px;border-bottom:1px solid var(--border);cursor:pointer;">
       <input type="checkbox" ${groupPickerIds.includes(p.id)?"checked":""} style="width:auto;" onchange="toggleGroupPlayer_('${p.id}', this.checked)">
@@ -11010,7 +11055,7 @@ function renderGroupPlayersResults_(){
   const query = (document.getElementById("groupPlayersSearch").value||"").trim().toLowerCase();
   if(!g || !query){ wrap.innerHTML = ""; return; }
   const matches = players
-    .filter(p=> p.teamId!==g.teamId && !groupPickerGuests.includes(p.id) && (p.name||"").toLowerCase().includes(query))
+    .filter(p=> p.teamId!==g.teamId && !groupPickerGuests.includes(p.id) && !playerIsBaja_(p) && (p.name||"").toLowerCase().includes(query))
     .sort((a,b)=> (a.name||"").localeCompare(b.name||"",'es'))
     .slice(0,15);
   if(matches.length===0){ wrap.innerHTML = '<p class="muted" style="font-size:.8rem;margin:4px 0;">Sin resultados.</p>'; return; }
@@ -11035,7 +11080,7 @@ document.getElementById("groupPlayersSearch").oninput = renderGroupPlayersResult
 document.getElementById("btnGroupPlayersAll").onclick = () => {
   const g = pickerGroup_();
   if(!g) return;
-  players.filter(p=>p.teamId===g.teamId).forEach(p=>{ if(!groupPickerIds.includes(p.id)) groupPickerIds.push(p.id); });
+  players.filter(p=>p.teamId===g.teamId && !playerIsBaja_(p)).forEach(p=>{ if(!groupPickerIds.includes(p.id)) groupPickerIds.push(p.id); });
   renderGroupPlayersModal_();
 };
 document.getElementById("btnGroupPlayersNone").onclick = () => {
@@ -11579,7 +11624,7 @@ function attendanceRowHtml_(p, a, isGuest){
   const team = isGuest ? teams.find(t=>t.id===p.teamId) : null;
   return `
     <div class="row" data-player-id="${p.id}" style="align-items:center;border-bottom:1px solid var(--border);padding:6px 0;gap:6px;">
-      <div style="flex:1;min-width:130px;">${jerseyNameHtml_(p.position, (p.dorsal!=null?escapeHtml(String(p.dorsal))+". ":"")+escapeHtml(p.name))}${isGuest ? ` <span class="badge outline" style="font-size:.68rem;">${escapeHtml(team?team.name:"otra categoría")}</span>` : ""}</div>
+      <div style="flex:1;min-width:130px;">${jerseyNameHtml_(p.position, (p.dorsal!=null?escapeHtml(String(p.dorsal))+". ":"")+escapeHtml(p.name))}${playerBajaBadge_(p)}${isGuest ? ` <span class="badge outline" style="font-size:.68rem;">${escapeHtml(team?team.name:"otra categoría")}</span>` : ""}</div>
       <select class="att-status" style="max-width:130px;flex:0 0 auto;">
         <option value="Asiste" ${!absent?"selected":""}>✅ Asiste</option>
         <option value="No asiste" ${absent?"selected":""}>❌ No asiste</option>
@@ -11592,8 +11637,12 @@ function renderAttendanceModalRows_(){
   const s = sessions.find(x=>x.id===attendanceTargetSessionId);
   const wrap = document.getElementById("attendanceModalList");
   if(!s){ wrap.innerHTML = ""; return; }
-  const roster = attendanceBaseRoster_(attendanceTargetTeamId);
-  const guests = attendanceGuestPlayers_(attendanceTargetTeamId);
+  // Las bajas solo salen si YA tienen asistencia guardada en esta sesión (histórico intacto);
+  // en sesiones nuevas no se ofrecen para convocar.
+  const attIds = new Set(attendanceDataFor_(s, attendanceTargetTeamId).map(a=>a.playerId));
+  const keep = p => !playerIsBaja_(p) || attIds.has(p.id);
+  const roster = attendanceBaseRoster_(attendanceTargetTeamId).filter(keep);
+  const guests = attendanceGuestPlayers_(attendanceTargetTeamId).filter(keep);
   const attMap = {};
   attendanceDataFor_(s, attendanceTargetTeamId).forEach(a=>{ attMap[a.playerId] = a; });
   if(roster.length===0 && guests.length===0){
@@ -11615,7 +11664,7 @@ function renderAttendanceAddResults_(){
   if(!query){ wrap.innerHTML = ""; return; }
   const excluded = new Set([...attendanceBaseRoster_(attendanceTargetTeamId), ...attendanceGuestPlayers_(attendanceTargetTeamId)].map(p=>p.id));
   const matches = players
-    .filter(p=> !excluded.has(p.id) && p.teamId!==attendanceTargetTeamId && p.name.toLowerCase().includes(query))
+    .filter(p=> !excluded.has(p.id) && !playerIsBaja_(p) && p.teamId!==attendanceTargetTeamId && p.name.toLowerCase().includes(query))
     .sort((a,b)=> a.name.localeCompare(b.name,'es'))
     .slice(0,15);
   if(matches.length===0){ wrap.innerHTML = '<p class="muted" style="font-size:.8rem;margin:4px 0;">Sin resultados.</p>'; return; }
@@ -14114,7 +14163,10 @@ function liveRoster_(m, live){
 // Normaliza playerStats para que todos los jugadores de la plantilla tengan entrada, sin
 // perder goles/tarjetas ya guardados. Los porteros llevan goalsConceded; el resto no.
 function liveNormalizePlayerStats_(m, live){
-  const roster = liveRoster_(m, live);
+  // Las bajas no se añaden a un directo nuevo; si ya tienen entrada guardada se conserva
+  // (el segundo bucle de abajo las mantiene aunque no estén en el roster filtrado).
+  const existingIds = new Set((((live && live.base && live.base.playerStats) || [])).map(s=>s && s.playerId));
+  const roster = liveRoster_(m, live).filter(p=>!playerIsBaja_(p) || existingIds.has(p.id));
   const byId = {};
   ((live && live.base && live.base.playerStats) || []).forEach(s=>{
     if(s && s.playerId) byId[s.playerId] = {...s};
@@ -14746,7 +14798,10 @@ function renderLiveLineup_(){
   const msg = document.getElementById("liveLineupMsg");
   if(msg) msg.innerHTML = "";
 
-  const roster = liveRoster_(m, null);
+  // Las bajas no se ofrecen para un directo nuevo; si ya tienen estadísticas en esta jornada
+  // (directo empezado antes de la baja), se mantienen para no perder el histórico.
+  const existingStatsIds = new Set((m.playerStats||[]).map(s=>s.playerId));
+  const roster = liveRoster_(m, null).filter(p=>!playerIsBaja_(p) || existingStatsIds.has(p.id));
   if(liveLineupInitializedFor !== m.id){
     const existing = m.playerStats || [];
     const hasStatuses = existing.some(s=>s && s.status);
@@ -14857,8 +14912,8 @@ function liveLineupStart_(){
     return;
   }
 
-  const roster = liveRoster_(m, null);
   const existing = m.playerStats || [];
+  const roster = liveRoster_(m, null).filter(p=>!playerIsBaja_(p) || existing.some(x=>x.playerId===p.id));
   const basePlayerStats = roster.map(p=>{
     const s = existing.find(x=>x.playerId===p.id) || {};
     const status = liveLineupOnField.includes(p.id)
@@ -15489,7 +15544,9 @@ function renderLiveConvocatoriaModal_(){
   const derived = liveCompute_(m, live);
   const statsMap = {};
   derived.playerStats.forEach(s=>{ statsMap[s.playerId] = s; });
-  const roster = liveRoster_(m, live);
+  // Igual que en la convocatoria de la jornada: las bajas solo si ya están convocadas.
+  const roster = liveRoster_(m, live)
+    .filter(p=>!playerIsBaja_(p) || liveConvSelected.has(p.id));
   const rows = roster.map(p=>{
     const selected = liveConvSelected.has(p.id);
     const onField = liveConvOnField.includes(p.id);
@@ -15794,7 +15851,7 @@ liveBind_("liveLineupBack", "onclick", ()=>{
 liveBind_("liveLineupAllBtn", "onclick", ()=>{
   const m = liveMatchday_();
   if(!m) return;
-  liveLineupSelected = new Set(liveRoster_(m, null).map(p=>p.id));
+  liveLineupSelected = new Set(liveRoster_(m, null).filter(p=>!playerIsBaja_(p)).map(p=>p.id));
   renderLiveLineup_();
 });
 liveBind_("liveLineupNoneBtn", "onclick", ()=>{

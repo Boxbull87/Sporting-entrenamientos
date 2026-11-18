@@ -116,6 +116,20 @@ markers, the match PDF, the season summary (`computeTeamSummary_`) and the indiv
 card. It mirrors `attendanceExtraPlayerIds` in "Control de asistencia" — same pattern, different
 collection. No rules change is needed for it (`matchdays` write is `isActive()` for any field).
 
+**Jugadores dados de baja** (`players[].baja` + `bajaAt`): un jugador que deja el equipo no se
+borra. `baja:true` (con `bajaAt`, `null` al reactivar) lo mueve a un estado aparte: sigue
+existiendo con todo su histórico (estadísticas, partidos, asistencias, ficha) pero **no se ofrece
+para seleccionar** en convocatorias de partidos nuevos, entrenamientos, equipos de sesión ni en el
+directo. Helpers `playerIsBaja_(p)` / `playerBajaBadge_(p)` (badge "Baja"). Regla clave: el
+filtrado se hace **solo en los puntos de selección**, nunca en la lista global `players` — así los
+resúmenes, PDF, Excel, fichas y asistencias siguen mostrando el histórico. En los sitios donde el
+jugador ya tiene datos guardados (una jornada/sesión/directo anteriores) se mantiene visible con
+la condición "está de baja **y** no tiene entrada guardada → se oculta". `matchdayRoster_(m)`,
+`liveNormalizePlayerStats_`, `renderAttendanceModalRows_`, el selector de equipos de sesión
+(`renderGroupPlayersModal_`), el lineup del directo y su modal de convocatoria aplican esa regla;
+las búsquedas de invitados nunca ofrecen bajas. Se gestiona en Plantilla: sección colapsable
+"🚪 Dados de baja (N)" con ♻️ reactivar, y botón 🚪 en la fila y en la ficha del jugador.
+
 **Private matchday notes**: player notes + match report live in a separate subdocument
 `matchdays/{id}/private/report` with its own rule, *not* as fields on the matchday doc — Firestore
 can't filter field-by-field within a document, so the only way to keep other coaches from reading
@@ -311,7 +325,9 @@ All inside `index.html` — search for these comment banners to jump around:
   and per-match player stats; también la vista móvil **Estadísticas en partido** (ver abajo),
   una vista de comparación de equipos ("Comparar equipos"), el submenú "Estadísticas" (ver Panel
   de Estadísticas arriba) y la ficha individual del jugador (`openPlayerProfile`), que lista sus
-  jornadas **incluidas las jugadas como invitado con otro equipo**.
+  jornadas **incluidas las jugadas como invitado con otro equipo**. Los jugadores con
+  `baja:true` salen en una sección aparte ("🚪 Dados de baja") y no se ofrecen en convocatorias
+  nuevas (ver "Jugadores dados de baja" en el modelo de datos).
 - **Jornadas** (`JORNADAS — CRONOLOGÍA DEL PARTIDO` ~8567): one matchday's detail — goal events
   timeline, per-player stats, `rivalReport` (opponent scouting), convocatoria PDF, rival-report
   PDF, season summary PDF/Excel, and the embedded Scouting FS panel. The
