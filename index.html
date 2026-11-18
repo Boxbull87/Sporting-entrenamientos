@@ -722,18 +722,21 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
    se ajusta a la proporción de la imagen y las fichas se colocan encima en porcentaje. */
 .live-pitch{position:relative;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.18);}
 .live-pitch-bg{display:block;width:100%;height:auto;pointer-events:none;user-select:none;-webkit-user-drag:none;}
-.live-pitch-chip{position:absolute;transform:translate(-50%,-50%);background:#fff;border:2px solid var(--ink,#222);border-radius:999px;padding:5px 10px;font-size:.72rem;font-weight:700;display:inline-flex;gap:4px;align-items:center;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.35);max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;z-index:2;}
-.live-pitch-chip .d{font-family:'Roboto Mono',monospace;}
+.live-pitch-chip{position:absolute;transform:translate(-50%,-50%);background:#fff;border:2px solid var(--ink,#222);border-radius:999px;padding:5px 10px;font-size:.72rem;font-weight:700;display:inline-flex;gap:4px;align-items:center;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.35);max-width:150px;max-width:min(150px,38%);white-space:nowrap;z-index:2;}
+.live-pitch-chip .d{font-family:'Roboto Mono',monospace;flex:0 0 auto;}
+.live-pitch-chip .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .live-pitch-chip.gk{background:var(--accent);border-color:#fff;color:#fff;}
 .live-pitch-chip.sel{outline:3px solid #ffd54a;outline-offset:2px;box-shadow:0 0 0 5px rgba(255,213,74,.35);}
-.live-pitch-chip .mins{font-family:'Roboto Mono',monospace;font-size:.6rem;color:var(--muted);font-weight:700;}
+.live-pitch-chip .mins{font-family:'Roboto Mono',monospace;font-size:.6rem;color:var(--muted);font-weight:700;flex:0 0 auto;}
 .live-pitch-chip.gk .mins{color:rgba(255,255,255,.85);}
 .live-pitch-empty{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:#fff;font-size:.8rem;text-shadow:0 1px 2px rgba(0,0,0,.4);z-index:2;}
 .live-bench-title{font-size:.74rem;font-weight:600;margin-top:10px;}
 .live-bench{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;min-height:34px;}
-.live-bench-chip{background:#f6f3ee;border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-size:.72rem;font-weight:600;cursor:pointer;display:inline-flex;gap:4px;align-items:center;max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.live-bench-chip{background:#f6f3ee;border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-size:.72rem;font-weight:600;cursor:pointer;display:inline-flex;gap:4px;align-items:center;max-width:190px;white-space:nowrap;}
+.live-bench-chip .d{flex:0 0 auto;}
+.live-bench-chip .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .live-bench-chip.sel{outline:2px solid var(--accent);outline-offset:1px;}
-.live-bench-chip .mins{font-family:'Roboto Mono',monospace;font-size:.6rem;color:var(--muted);font-weight:700;}
+.live-bench-chip .mins{font-family:'Roboto Mono',monospace;font-size:.6rem;color:var(--muted);font-weight:700;flex:0 0 auto;}
 .live-bench-empty{font-size:.75rem;}
 .live-pitch-hint{font-size:.72rem;color:var(--muted);margin:6px 0 0;}
 .live-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
@@ -777,6 +780,10 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
   .live-shell{padding:10px 10px calc(20px + env(safe-area-inset-bottom,0px));}
   .live-score{font-size:2.3rem;}
   .live-action-btn{min-height:70px;}
+  /* Fichas más estrechas en móvil para que no se solapen en el medio campo */
+  .live-pitch-chip{max-width:118px;font-size:.66rem;padding:4px 8px;gap:3px;}
+  .live-pitch-chip .mins{font-size:.56rem;}
+  .live-bench-chip{max-width:170px;}
 }
 </style>
 </head>
@@ -14980,7 +14987,7 @@ function renderLivePitch_(m, live, derived){
     const slot = LIVE_PITCH_SLOTS[i] || LIVE_PITCH_SLOTS[4];
     const isSel = sel && sel.kind==="field" && sel.id===id;
     return `<button type="button" class="live-pitch-chip${p.position==="Portero"?" gk":""}${isSel?" sel":""}" data-pid="${id}" style="left:${slot.x}%;top:${slot.y}%;" onclick="liveChangesTap_('field','${id}')">
-      ${p.dorsal!=null?`<span class="d">${p.dorsal}</span>`:""}${escapeHtml(p.name)}${mins(id)}
+      ${p.dorsal!=null?`<span class="d">${p.dorsal}</span>`:""}<span class="nm">${escapeHtml(p.name)}</span>${mins(id)}
     </button>`;
   }).join("");
   pitchEl.innerHTML = courtBg + (chips || '<span class="live-pitch-empty">Pista vacía — toca el banquillo para meter jugadores</span>');
@@ -14988,7 +14995,7 @@ function renderLivePitch_(m, live, derived){
   benchEl.innerHTML = bench.length ? bench.map(p=>{
     const isSel = sel && sel.kind==="bench" && sel.id===p.id;
     return `<button type="button" class="live-bench-chip${isSel?" sel":""}" onclick="liveChangesTap_('bench','${p.id}')">
-      ${p.dorsal!=null?`<span class="d">${p.dorsal}</span>`:""}${escapeHtml(p.name)}${mins(p.id)}
+      ${p.dorsal!=null?`<span class="d">${p.dorsal}</span>`:""}<span class="nm">${escapeHtml(p.name)}</span>${mins(p.id)}
     </button>`;
   }).join("") : '<span class="live-bench-empty muted">No hay jugadores en el banquillo.</span>';
 
