@@ -776,6 +776,14 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
 .live-badge.warn{color:#b9770e;border-color:#f5cba7;background:#fef5e7;}
 .live-modal{max-width:520px;}
 .live-modal .live-choice-btn{min-height:48px;}
+/* Selector de categoría de gol: en horizontal (pantallas bajas) dos columnas para que quepa
+   sin tener que hacer scroll dentro del modal. */
+.live-cat-grid{display:grid;grid-template-columns:1fr;gap:6px;}
+@media (max-height:520px){
+  .live-cat-grid{grid-template-columns:1fr 1fr;}
+  .live-modal{max-width:min(720px,96vw);}
+  .live-modal .live-choice-btn{min-height:40px;}
+}
 @media (max-width:520px){
   .live-shell{padding:10px 10px calc(20px + env(safe-area-inset-bottom,0px));}
   .live-score{font-size:2.3rem;}
@@ -784,6 +792,92 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
   .live-pitch-chip{max-width:118px;font-size:.66rem;padding:4px 8px;gap:3px;}
   .live-pitch-chip .mins{font-size:.56rem;}
   .live-bench-chip{max-width:170px;}
+}
+
+/* ---------- Vista horizontal a pantalla completa del directo ----------
+   Se abre desde el botón "⛶" del directo. Usa el mismo estado (liveState) y las mismas
+   funciones que la vista vertical, así que marcador, reloj, faltas y estadísticas son
+   exactamente los mismos. En móvil se pide pantalla completa + bloqueo horizontal; si el
+   navegador no lo permite (iOS), se muestra un aviso para girar el teléfono. */
+.live-landscape{position:fixed;inset:0;z-index:120;background:#0a0a0b;color:#fff;display:flex;flex-direction:column;overflow:hidden;}
+.ll-top{display:flex;align-items:center;gap:8px;padding:6px calc(10px + env(safe-area-inset-right,0px)) 6px calc(10px + env(safe-area-inset-left,0px));background:#131315;border-bottom:1px solid rgba(255,255,255,.09);flex:0 0 auto;position:relative;z-index:5;}
+.ll-icon{background:#232327;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:10px;min-width:38px;height:38px;padding:0 8px;font-size:1.05rem;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto;}
+.ll-icon:active{transform:scale(.96);}
+.ll-clock-btn{display:inline-flex;align-items:center;gap:7px;background:#232327;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:999px;padding:5px 12px;cursor:pointer;flex:0 0 auto;}
+.ll-period{font-family:'Roboto Mono',monospace;font-size:.58rem;font-weight:700;letter-spacing:.08em;color:#f0ad00;text-transform:uppercase;}
+.ll-clock{font-family:'Roboto Mono',monospace;font-size:1.02rem;font-weight:700;line-height:1;}
+.ll-clock-run{font-size:.62rem;color:rgba(255,255,255,.6);}
+.ll-score{flex:1 1 auto;display:flex;align-items:center;justify-content:center;gap:10px;min-width:0;}
+.ll-team{font-family:'Oswald',sans-serif;font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:20vw;}
+.ll-num{font-family:'Oswald',sans-serif;font-size:1.55rem;font-weight:700;line-height:1;white-space:nowrap;letter-spacing:.02em;}
+.ll-fouls{display:flex;gap:5px;flex:0 0 auto;}
+.ll-foul{display:inline-flex;align-items:center;gap:4px;background:#232327;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:4px 8px;font-family:'Roboto Mono',monospace;font-size:.68rem;font-weight:700;}
+.ll-foul.warn{background:#7a4a00;border-color:#b9770e;}
+.ll-court-wrap{position:relative;flex:1 1 auto;min-height:0;overflow:hidden;background:#0a0a0b;}
+.ll-court{position:absolute;inset:0;background-position:center;background-size:cover;background-repeat:no-repeat;}
+.ll-court::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.42),transparent 16%,transparent 84%,rgba(0,0,0,.5));pointer-events:none;}
+.ll-player{position:absolute;transform:translate(-50%,-50%);background:none;border:none;padding:0;color:#fff;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;z-index:3;max-width:124px;}
+.ll-kit{position:relative;display:inline-flex;width:36px;height:36px;border-radius:50%;background:#fff;border:2px solid #141414;box-shadow:0 2px 8px rgba(0,0,0,.55);}
+.ll-kit .jersey-icon{width:100%;height:100%;margin:0;border-radius:50%;vertical-align:0;}
+.ll-player.gk .ll-kit{background:var(--accent);border-color:#fff;}
+.ll-dorsal{position:absolute;right:-6px;bottom:-6px;min-width:17px;height:17px;padding:0 3px;border-radius:999px;background:#141414;border:1px solid #fff;color:#fff;font-family:'Roboto Mono',monospace;font-size:.55rem;font-weight:700;display:flex;align-items:center;justify-content:center;}
+.ll-pname{font-family:'Oswald',sans-serif;font-size:.62rem;font-weight:600;text-transform:uppercase;letter-spacing:.02em;line-height:1.15;background:rgba(0,0,0,.74);padding:2px 6px;border-radius:5px;max-width:124px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ll-pmin{font-family:'Roboto Mono',monospace;font-size:.55rem;font-weight:700;color:#ffd54a;background:rgba(0,0,0,.62);padding:0 5px;border-radius:4px;min-height:12px;line-height:1.2;}
+.ll-player.sel .ll-kit{outline:3px solid #ffd54a;outline-offset:2px;box-shadow:0 0 0 7px rgba(255,213,74,.22),0 2px 8px rgba(0,0,0,.55);}
+.ll-player.sel .ll-pname{background:#ffd54a;color:#141414;}
+.ll-log{position:absolute;right:8px;bottom:8px;z-index:4;max-width:46%;background:rgba(0,0,0,.58);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:4px 8px;font-family:'Roboto Mono',monospace;font-size:.56rem;line-height:1.35;color:rgba(255,255,255,.82);text-align:right;pointer-events:none;}
+.ll-log b{color:#fff;}
+.ll-bottom{display:flex;align-items:center;gap:10px;padding:5px calc(10px + env(safe-area-inset-right,0px)) 5px calc(10px + env(safe-area-inset-left,0px));background:#131315;border-top:1px solid rgba(255,255,255,.09);flex:0 0 auto;min-height:46px;}
+.ll-bench-wrap{display:flex;align-items:center;gap:8px;min-width:0;flex:1 1 auto;}
+.ll-bench-label{font-family:'Roboto Mono',monospace;font-size:.55rem;font-weight:700;letter-spacing:.1em;color:rgba(255,255,255,.45);flex:0 0 auto;}
+.ll-bench{display:flex;gap:6px;overflow-x:auto;padding:2px 0;scrollbar-width:none;min-height:34px;align-items:center;}
+.ll-bench::-webkit-scrollbar{display:none;}
+.ll-bench-chip{display:inline-flex;align-items:center;gap:6px;background:#232327;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:999px;padding:5px 10px;font-size:.66rem;font-weight:600;white-space:nowrap;flex:0 0 auto;cursor:pointer;}
+.ll-bench-chip .d{font-family:'Roboto Mono',monospace;font-size:.62rem;}
+.ll-bench-chip .nm{max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ll-bench-chip .m{font-family:'Roboto Mono',monospace;font-size:.55rem;color:rgba(255,255,255,.55);}
+.ll-bench-chip.sel{border-color:#ffd54a;box-shadow:0 0 0 2px rgba(255,213,74,.25);}
+.ll-bench.arm .ll-bench-chip{border-color:#ffd54a;animation:llPulse 1.2s ease-in-out infinite;}
+@keyframes llPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,213,74,0);}50%{box-shadow:0 0 0 3px rgba(255,213,74,.28);}}
+.ll-bench-empty{font-size:.66rem;color:rgba(255,255,255,.5);}
+.ll-actionbar{display:flex;align-items:center;gap:6px;padding:6px calc(10px + env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) calc(10px + env(safe-area-inset-left,0px));background:#0e0e10;border-top:1px solid rgba(255,255,255,.09);flex:0 0 auto;overflow-x:auto;scrollbar-width:none;}
+.ll-actionbar::-webkit-scrollbar{display:none;}
+.ll-sel{flex:1 1 140px;min-width:80px;font-size:.66rem;color:rgba(255,255,255,.62);line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ll-sel b{color:#fff;font-weight:700;}
+.ll-act{border:none;border-radius:10px;padding:9px 11px;font-family:'Oswald',sans-serif;font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.02em;display:inline-flex;align-items:center;gap:5px;flex:0 0 auto;cursor:pointer;line-height:1;}
+.ll-act:disabled{opacity:.3;}
+.ll-act:active:not(:disabled){transform:scale(.96);}
+.ll-act.goal{background:#1e8449;color:#fff;}
+.ll-act.yellow{background:#f1c40f;color:#1a1a1a;}
+.ll-act.red{background:#c0392b;color:#fff;}
+.ll-act.foul{background:#b9770e;color:#fff;}
+.ll-act.sub{background:#2f3b4a;color:#fff;}
+.ll-act.clear{background:#232327;color:#fff;border:1px solid rgba(255,255,255,.14);}
+.ll-menu-panel{position:absolute;right:10px;top:50px;z-index:20;background:#1b1b1f;border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:6px;display:flex;flex-direction:column;gap:2px;min-width:210px;max-height:calc(100% - 60px);overflow-y:auto;box-shadow:0 16px 40px rgba(0,0,0,.6);}
+.ll-menu-item{display:flex;align-items:center;gap:8px;background:none;border:none;color:#fff;text-align:left;padding:9px 10px;border-radius:8px;font-size:.78rem;font-family:inherit;cursor:pointer;}
+.ll-menu-item:hover{background:rgba(255,255,255,.08);}
+.ll-menu-item.danger{color:#ff8a80;}
+.ll-rotate{position:absolute;inset:0;z-index:40;background:rgba(8,8,9,.96);display:flex;align-items:center;justify-content:center;padding:20px;text-align:center;}
+.ll-rotate-card{max-width:340px;}
+.ll-rotate-icon{font-size:2.6rem;transform:rotate(90deg);margin-bottom:8px;}
+.ll-rotate p{font-size:.9rem;color:rgba(255,255,255,.8);margin:0 0 14px;}
+@media (max-height:430px){
+  .ll-top{padding-top:4px;padding-bottom:4px;gap:6px;}
+  .ll-icon{min-width:32px;height:32px;font-size:.95rem;}
+  .ll-clock-btn{padding:4px 9px;}
+  .ll-clock{font-size:.95rem;}
+  .ll-num{font-size:1.3rem;}
+  .ll-kit{width:30px;height:30px;}
+  .ll-pname{font-size:.56rem;max-width:104px;}
+  .ll-pmin{font-size:.5rem;}
+  .ll-bottom{min-height:40px;padding-top:3px;padding-bottom:3px;}
+  .ll-bench-chip{padding:4px 8px;font-size:.62rem;}
+  .ll-act{padding:7px 9px;font-size:.64rem;}
+  .ll-log{font-size:.5rem;max-width:40%;}
+}
+@media (max-width:700px){
+  .ll-team{max-width:16vw;}
+  .ll-fouls .ll-foul{padding:3px 6px;}
 }
 </style>
 </head>
@@ -1699,6 +1793,7 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
         <div class="live-header">
           <button type="button" class="btn ghost small" id="liveDashboardExit">← Salir</button>
           <div class="live-header-title" id="liveDashboardTitle">Directo</div>
+          <button type="button" class="btn ghost small" id="liveLandscapeBtnTop" title="Pantalla completa horizontal" aria-label="Pantalla completa horizontal">⛶</button>
           <button type="button" class="btn ghost small" id="liveDashboardChange">Cambiar</button>
         </div>
 
@@ -1757,6 +1852,7 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
           <button type="button" class="live-action-btn yellow" id="liveYellowBtn"><span class="ico">🟨</span>Amarilla</button>
           <button type="button" class="live-action-btn red" id="liveRedBtn"><span class="ico">🟥</span>Roja</button>
           <button type="button" class="live-action-btn neutral" id="liveConvocatoriaBtn"><span class="ico">📋</span>Convocatoria</button>
+          <button type="button" class="live-action-btn neutral" id="liveLandscapeBtn" style="grid-column:1/-1;min-height:52px;flex-direction:row;gap:8px;"><span class="ico" style="font-size:1.15rem;">⛶</span>Pantalla completa horizontal</button>
         </div>
 
         <div class="live-feed-card">
@@ -1768,6 +1864,70 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
           <button type="button" class="btn accent" id="liveFinishBtn" style="flex:1;min-width:150px;">✅ Finalizar directo</button>
           <button type="button" class="btn danger" id="liveResetBtn" style="flex:1;min-width:150px;">♻️ Reiniciar directo</button>
+        </div>
+      </div>
+
+      <!-- Vista horizontal a pantalla completa: mismo estado que la vista vertical. -->
+      <div id="liveLandscape" class="live-landscape hidden">
+        <div class="ll-top">
+          <button type="button" class="ll-icon" id="llExit" title="Volver a la vista normal">←</button>
+          <button type="button" class="ll-clock-btn" id="llClockBtn" title="Pausar / reanudar el cronómetro">
+            <span class="ll-period" id="llPeriod">1ª PARTE</span>
+            <span class="ll-clock" id="llClock">00:00</span>
+            <span class="ll-clock-run" id="llClockRun">▶</span>
+          </button>
+          <div class="ll-score">
+            <span class="ll-team" id="llHome">Mi equipo</span>
+            <span class="ll-num" id="llScore">0 - 0</span>
+            <span class="ll-team" id="llAway">Rival</span>
+          </div>
+          <div class="ll-fouls">
+            <span class="ll-foul" id="llFoulUs" title="Faltas de nuestro equipo">🚩 <b>0</b></span>
+            <span class="ll-foul" id="llFoulRival" title="Faltas del rival">🚩 <b>0</b></span>
+          </div>
+          <button type="button" class="ll-icon" id="llUndo" title="Deshacer la última acción">↶</button>
+          <button type="button" class="ll-icon" id="llMenuBtn" title="Más acciones">⋯</button>
+        </div>
+
+        <div class="ll-court-wrap">
+          <div class="ll-court" id="llCourt"></div>
+          <div class="ll-log" id="llLog"></div>
+        </div>
+
+        <div class="ll-bottom">
+          <div class="ll-bench-wrap">
+            <span class="ll-bench-label">BANQUILLO</span>
+            <div class="ll-bench" id="llBench"></div>
+          </div>
+        </div>
+
+        <div class="ll-actionbar">
+          <span class="ll-sel" id="llSelected">Toca un jugador en pista</span>
+          <button type="button" class="ll-act goal" data-act="goal" onclick="liveLandscapeAction_('goal')" disabled>⚽ Gol</button>
+          <button type="button" class="ll-act yellow" data-act="yellow" onclick="liveLandscapeAction_('yellow')" disabled>🟨 Amarilla</button>
+          <button type="button" class="ll-act red" data-act="red" onclick="liveLandscapeAction_('red')" disabled>🟥 Roja</button>
+          <button type="button" class="ll-act foul" data-act="foul" onclick="liveLandscapeAction_('foul')" disabled>🚩 Falta</button>
+          <button type="button" class="ll-act sub" data-act="sub" onclick="liveLandscapeAction_('sub')" disabled>🔄 Cambio</button>
+          <button type="button" class="ll-act clear" onclick="liveLandscapeClearSel_()" title="Quitar selección">✕</button>
+        </div>
+
+        <div id="llMenuPanel" class="ll-menu-panel hidden">
+          <button type="button" class="ll-menu-item" onclick="liveLandscapeMenu_('goal_against')">🥅 Gol en contra</button>
+          <button type="button" class="ll-menu-item" onclick="liveLandscapeMenu_('rival_own_goal')">🙃 PP del rival</button>
+          <button type="button" class="ll-menu-item" onclick="liveLandscapeMenu_('falta_rival')">🚩 Falta del rival</button>
+          <button type="button" class="ll-menu-item" onclick="liveLandscapeMenu_('convocatoria')">📋 Convocatoria</button>
+          <button type="button" class="ll-menu-item" onclick="liveLandscapeMenu_('next')">⏱️ 2ª parte / finalizar</button>
+          <button type="button" class="ll-menu-item" onclick="liveLandscapeMenu_('reset')">♻️ Reiniciar directo</button>
+          <button type="button" class="ll-menu-item" onclick="liveLandscapeMenu_('finish')">✅ Finalizar directo</button>
+          <button type="button" class="ll-menu-item danger" onclick="liveLandscapeMenu_('close')">⛶ Salir de pantalla completa</button>
+        </div>
+
+        <div id="llRotate" class="ll-rotate hidden">
+          <div class="ll-rotate-card">
+            <div class="ll-rotate-icon">📱</div>
+            <p>Gira el móvil para ver el partido en horizontal.</p>
+            <button type="button" class="btn ghost small" id="llRotateAnyway">Continuar así</button>
+          </div>
         </div>
       </div>
     </div>
@@ -14982,6 +15142,7 @@ function openLiveDashboard_(){
 }
 
 function liveHideDashboardOverlay_(){
+  if(liveLandscapeOpen) liveLandscapeClose_();
   const overlay = document.getElementById("liveDashboardOverlay");
   if(overlay) overlay.classList.add("hidden");
   document.body.style.overflow = "";
@@ -15004,16 +15165,8 @@ function livePitchOrder_(onField){
   if(gkIdx>0) list.unshift(list.splice(gkIdx,1)[0]);
   return list;
 }
-// Pinta el campo (la pista de la pizarra táctica, con líneas, escudo y porterías) y el
-// banquillo. Los cambios se hacen directamente aquí: tocar uno de pista y uno del
-// banquillo los intercambia al instante.
-function renderLivePitch_(m, live, derived){
-  live = live || (liveState && liveState.live);
-  if(!live) return;
-  const pitchEl = document.getElementById("livePitch");
-  const benchEl = document.getElementById("liveBench");
-  const hintEl = document.getElementById("livePitchHint");
-  if(!pitchEl || !benchEl) return;
+// Datos comunes de pista/banquillo para las dos vistas del directo (vertical y horizontal).
+function livePitchData_(m, live, derived){
   const statsMap = {};
   derived.playerStats.forEach(s=>{ statsMap[s.playerId] = s; });
   const onFieldIds = ((live.onField)||[]).filter(id=>{
@@ -15026,14 +15179,28 @@ function renderLivePitch_(m, live, derived){
     const s = statsMap[p.id];
     return s && s.status!=="No convocado" && Number(s.red||0)===0 && !onFieldSet.has(p.id);
   }).sort((a,b)=>(a.dorsal||0)-(b.dorsal||0));
+  const secondsMap = liveComputeSeconds_(live) || {};
+  const showMins = liveFormat_(live).trackMinutes !== false && Array.isArray(live.startOnField);
+  return { statsMap, ordered, bench, secondsMap, showMins };
+}
+// Pinta el campo (la pista de la pizarra táctica, con líneas, escudo y porterías) y el
+// banquillo. Los cambios se hacen directamente aquí: tocar uno de pista y uno del
+// banquillo los intercambia al instante.
+function renderLivePitch_(m, live, derived){
+  live = live || (liveState && liveState.live);
+  if(!live) return;
+  const pitchEl = document.getElementById("livePitch");
+  const benchEl = document.getElementById("liveBench");
+  const hintEl = document.getElementById("livePitchHint");
+  if(!pitchEl || !benchEl) return;
+  const { ordered, bench, secondsMap, showMins } = livePitchData_(m, live, derived);
+  const onFieldSet = new Set(ordered);
   // Si el jugador seleccionado ya no está ni en pista ni en banquillo (p.ej. roja), se limpia.
   if(liveChangesSel && liveChangesSel.id!==null &&
      !onFieldSet.has(liveChangesSel.id) && !bench.some(p=>p.id===liveChangesSel.id)){
     liveChangesSel = null;
   }
   const sel = liveChangesSel;
-  const secondsMap = liveComputeSeconds_(live) || {};
-  const showMins = liveFormat_(live).trackMinutes !== false && Array.isArray(live.startOnField);
   const mins = id => showMins ? `<span class="mins">⏱ ${formatMinutesShort_(secondsMap[id] || 0)}</span>` : "";
 
   const courtBg = `<img class="live-pitch-bg" src="${COURT_HALF_DATA_URI}" alt="">`;
@@ -15070,6 +15237,256 @@ function renderLiveOnFieldChips_(){
   const showMins = liveFormat_(liveState.live).trackMinutes !== false && Array.isArray(liveState.live.startOnField);
   document.querySelectorAll("#livePitch .live-pitch-chip").forEach(chip=>{
     const el = chip.querySelector(".mins");
+    const id = chip.dataset.pid;
+    if(!el || !id) return;
+    const txt = showMins ? `⏱ ${formatMinutesShort_(secondsMap[id] || 0)}` : "";
+    if(el.textContent !== txt) el.textContent = txt;
+  });
+}
+
+/* --- Vista horizontal a pantalla completa del directo ---
+   Mismo liveState y mismas funciones que la vista vertical: aquí solo cambia la disposición
+   (pista completa horizontal, banquillo y barra fija de acciones). Nada se guarda aparte. */
+const LIVE_LANDSCAPE_SLOTS = [
+  {x:12, y:50},
+  {x:31, y:29}, {x:31, y:71},
+  {x:65, y:34}, {x:65, y:66}
+];
+let liveLandscapeOpen = false;
+let liveLandscapeSubArm = false;
+let liveLandscapeAllowPortrait = false;
+
+function liveLandscapeCheckOrientation_(){
+  const box = document.getElementById("llRotate");
+  if(!box) return;
+  const portrait = window.innerHeight > window.innerWidth;
+  box.classList.toggle("hidden", !(portrait && !liveLandscapeAllowPortrait));
+}
+
+function liveLandscapeOpenView_(){
+  if(!liveState || !liveState.live) return;
+  liveLandscapeOpen = true;
+  liveLandscapeSubArm = false;
+  liveLandscapeAllowPortrait = false;
+  const layer = document.getElementById("liveLandscape");
+  if(layer) layer.classList.remove("hidden");
+  // Se pinta primero: si el navegador no concede la pantalla completa (iOS, escritorio sin
+  // gesto, etc.) la vista tiene que funcionar igualmente. Por eso no se espera (await) a
+  // requestFullscreen: sin gesto de usuario esa promesa puede quedarse pendiente para siempre.
+  renderLiveDashboard_();
+  liveLandscapeCheckOrientation_();
+  // Pantalla completa sobre <html> (no sobre el overlay) para que los modales de acciones,
+  // que viven fuera del overlay, sigan siendo visibles.
+  try{
+    if(!document.fullscreenElement && document.documentElement.requestFullscreen){
+      const req = document.documentElement.requestFullscreen();
+      if(req && req.catch) req.catch(()=>{});
+    }
+  }catch(e){}
+  try{
+    if(screen.orientation && screen.orientation.lock){
+      const lock = screen.orientation.lock("landscape");
+      if(lock && lock.catch) lock.catch(()=>{});
+    }
+  }catch(e){}
+  // Al girar o entrar en pantalla completa el viewport cambia: se revisa el aviso un poco
+  // después para no enseñarlo por un tamaño transitorio.
+  setTimeout(()=>{ if(liveLandscapeOpen) liveLandscapeCheckOrientation_(); }, 350);
+}
+
+function liveLandscapeClose_(){
+  liveLandscapeOpen = false;
+  liveLandscapeSubArm = false;
+  const layer = document.getElementById("liveLandscape");
+  if(layer) layer.classList.add("hidden");
+  const panel = document.getElementById("llMenuPanel");
+  if(panel) panel.classList.add("hidden");
+  try{ if(screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); }catch(e){}
+  try{
+    if(document.fullscreenElement && document.exitFullscreen){
+      const ex = document.exitFullscreen();
+      if(ex && ex.catch) ex.catch(()=>{});
+    }
+  }catch(e){}
+  renderLiveDashboard_();
+}
+
+function liveLandscapeAllowPortrait_(){
+  liveLandscapeAllowPortrait = true;
+  liveLandscapeCheckOrientation_();
+}
+
+function liveLandscapeTapField_(id){
+  liveLandscapeSubArm = false;
+  liveChangesTap_("field", id);
+}
+
+function liveLandscapeTapBench_(id){
+  liveLandscapeSubArm = false;
+  liveChangesTap_("bench", id);
+}
+
+function liveLandscapeClearSel_(){
+  liveLandscapeSubArm = false;
+  liveChangesSel = null;
+  renderLiveDashboard_();
+}
+
+function liveLandscapeToggleMenu_(show){
+  const panel = document.getElementById("llMenuPanel");
+  if(!panel) return;
+  const next = (show===undefined) ? panel.classList.contains("hidden") : !!show;
+  panel.classList.toggle("hidden", !next);
+}
+
+function liveLandscapeMenu_(act){
+  liveLandscapeToggleMenu_(false);
+  if(act==="goal_against" || act==="rival_own_goal" || act==="falta_rival"){ liveOpenAction_(act); return; }
+  if(act==="convocatoria"){ liveOpenConvocatoria_(); return; }
+  if(act==="next"){ liveTimerNextPeriod_(); return; }
+  if(act==="reset"){ liveResetDirect_(); return; }
+  if(act==="finish"){ liveFinishDirect_(); return; }
+  if(act==="close"){ liveLandscapeClose_(); }
+}
+
+function liveLandscapeUndo_(){
+  if(!liveState || !liveState.live) return;
+  const last = ((liveState.live.events) || []).slice()
+    .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0))[0];
+  if(last) liveUndoEvent_(last.id);
+}
+
+// Acción de la barra fija sobre el jugador seleccionado. Reutiliza los mismos flujos:
+// el gol pasa por el selector de categoría y el resto se registra al instante.
+function liveLandscapeAction_(act){
+  if(!liveState || !liveState.live) return;
+  const sel = liveChangesSel && liveChangesSel.kind==="field" ? liveChangesSel.id : null;
+  if(!sel) return;
+  if(act==="sub"){
+    liveLandscapeSubArm = true;
+    renderLiveLandscape_();
+    return;
+  }
+  liveLandscapeSubArm = false;
+  if(act==="goal"){
+    liveActionType = "goal_for";
+    liveActionPlayerId = sel;
+    liveActionCategory = null;
+    liveActionStep = "category";
+    renderLiveActionModal_();
+    document.getElementById("liveActionModal").classList.remove("hidden");
+    return;
+  }
+  liveActionType = act==="yellow" ? "yellow" : act==="red" ? "red" : "falta_us";
+  liveActionChoosePlayer_(sel);
+}
+
+function renderLiveLandscape_(){
+  if(!liveLandscapeOpen || !liveState || !liveState.live) return;
+  const m = matchdays.find(x=>x.id===liveState.matchdayId);
+  if(!m) return;
+  const live = liveState.live;
+  const derived = liveCompute_(m, live);
+  const timer = liveTimerObj_(live);
+  const { ordered, bench, secondsMap, showMins } = livePitchData_(m, live, derived);
+  const setText = (id, txt)=>{ const el=document.getElementById(id); if(el) el.textContent=txt; };
+
+  setText("llPeriod", (timer.period===2 ? "2ª" : "1ª") + " PARTE");
+  setText("llClock", liveClockText_(timer, live.format));
+  setText("llClockRun", timer.running ? "❚❚" : "▶");
+  setText("llScore", matchScoreText_(m, derived.goalsFor, derived.goalsAgainst));
+  const isAway = m.homeAway === "Visitante";
+  const teamName = liveTeamName_(m.teamId);
+  setText("llHome", isAway ? (m.rival || "Rival") : teamName);
+  setText("llAway", isAway ? teamName : (m.rival || "Rival"));
+  const period = timer.period===2 ? 1 : 0;
+  const fh = derived.foulsHalves || {us:[0,0], rival:[0,0]};
+  const usEl = document.getElementById("llFoulUs");
+  if(usEl){
+    usEl.innerHTML = `🚩 <b>${derived.foulsUs||0}</b>`;
+    usEl.classList.toggle("warn", fh.us[period]>=6);
+  }
+  const rivalEl = document.getElementById("llFoulRival");
+  if(rivalEl){
+    rivalEl.innerHTML = `🚩 <b>${derived.foulsRival||0}</b>`;
+    rivalEl.classList.toggle("warn", fh.rival[period]>=6);
+  }
+
+  const court = document.getElementById("llCourt");
+  if(court){
+    if(!court.style.backgroundImage) court.style.backgroundImage = `url("${COURT_DATA_URI}")`;
+    court.innerHTML = ordered.map((id,i)=>{
+      const p = livePlayer_(id); if(!p) return "";
+      const slot = LIVE_LANDSCAPE_SLOTS[i] || LIVE_LANDSCAPE_SLOTS[4];
+      const isSel = liveChangesSel && liveChangesSel.kind==="field" && liveChangesSel.id===id;
+      const mins = showMins ? `⏱ ${formatMinutesShort_(secondsMap[id] || 0)}` : "";
+      return `<button type="button" class="ll-player${p.position==="Portero"?" gk":""}${isSel?" sel":""}" data-pid="${id}" style="left:${slot.x}%;top:${slot.y}%;" onclick="liveLandscapeTapField_('${id}')">
+        <span class="ll-kit">${jerseyIconHtml_(p.position)}${p.dorsal!=null?`<span class="ll-dorsal">${p.dorsal}</span>`:""}</span>
+        <span class="ll-pname">${escapeHtml(p.name)}</span>
+        <span class="ll-pmin">${mins}</span>
+      </button>`;
+    }).join("") || '<span class="live-pitch-empty">Pista vacía — toca el banquillo para meter jugadores</span>';
+  }
+
+  const benchEl = document.getElementById("llBench");
+  if(benchEl){
+    benchEl.innerHTML = bench.length ? bench.map(p=>{
+      const isSel = liveChangesSel && liveChangesSel.kind==="bench" && liveChangesSel.id===p.id;
+      const mins = showMins ? `⏱ ${formatMinutesShort_(secondsMap[p.id] || 0)}` : "";
+      return `<button type="button" class="ll-bench-chip${isSel?" sel":""}" onclick="liveLandscapeTapBench_('${p.id}')">
+        ${p.dorsal!=null?`<span class="d">${p.dorsal}</span>`:""}<span class="nm">${escapeHtml(p.name)}</span><span class="m">${mins}</span>
+      </button>`;
+    }).join("") : '<span class="ll-bench-empty">Sin suplentes.</span>';
+    benchEl.classList.toggle("arm", liveLandscapeSubArm);
+  }
+
+  const selField = liveChangesSel && liveChangesSel.kind==="field" ? liveChangesSel.id : null;
+  const selBench = liveChangesSel && liveChangesSel.kind==="bench" ? liveChangesSel.id : null;
+  const selEl = document.getElementById("llSelected");
+  if(selEl){
+    selEl.innerHTML = selField
+      ? `<b>${escapeHtml(livePlayerName_(selField))}</b> · elige acción`
+      : selBench
+        ? `Entra <b>${escapeHtml(livePlayerName_(selBench))}</b> · toca quién sale`
+        : "Toca un jugador en pista";
+  }
+  document.querySelectorAll("#liveLandscape .ll-act[data-act]").forEach(b=>{
+    b.disabled = !selField;
+  });
+
+  const log = document.getElementById("llLog");
+  if(log){
+    const events = ((live.events) || []).slice()
+      .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).slice(0,3);
+    log.innerHTML = events.length ? events.map(ev=>{
+      const minute = `${ev.period===2 ? "2ª" : "1ª"} ${ev.minute!=null ? ev.minute+"'" : "?"}`;
+      let txt = "Acción";
+      if(ev.type==="goal_for") txt = `⚽ Gol · ${escapeHtml(livePlayerName_(ev.playerId))}`;
+      else if(ev.type==="goal_against") txt = "🥅 Gol en contra";
+      else if(ev.type==="rival_own_goal") txt = "🙃 PP del rival";
+      else if(ev.type==="yellow") txt = `🟨 Amarilla · ${escapeHtml(livePlayerName_(ev.playerId))}`;
+      else if(ev.type==="red") txt = `🟥 Roja · ${escapeHtml(livePlayerName_(ev.playerId))}`;
+      else if(ev.type==="falta_us") txt = ev.playerId ? `🚩 Falta · ${escapeHtml(livePlayerName_(ev.playerId))}` : "🚩 Falta propia";
+      else if(ev.type==="falta_rival") txt = "🚩 Falta rival";
+      return `<div>${txt} <span style="color:rgba(255,255,255,.45)">${minute}</span></div>`;
+    }).join("") : '<div style="color:rgba(255,255,255,.45)">Sin acciones todavía</div>';
+  }
+  liveLandscapeCheckOrientation_();
+}
+
+// El reloj corre cada 500 ms: en horizontal solo se tocan los textos (reloj y minutos de las
+// fichas) para no repintar la pista ni perder toques/selecciones.
+function updateLiveLandscapeClock_(){
+  if(!liveLandscapeOpen || !liveState || !liveState.live) return;
+  const live = liveState.live;
+  const timer = liveTimerObj_(live);
+  const setText = (id, txt)=>{ const el=document.getElementById(id); if(el) el.textContent=txt; };
+  setText("llClock", liveClockText_(timer, live.format));
+  setText("llClockRun", timer.running ? "❚❚" : "▶");
+  const secondsMap = liveComputeSeconds_(live) || {};
+  const showMins = liveFormat_(live).trackMinutes !== false && Array.isArray(live.startOnField);
+  document.querySelectorAll("#llCourt .ll-player").forEach(chip=>{
+    const el = chip.querySelector(".ll-pmin");
     const id = chip.dataset.pid;
     if(!el || !id) return;
     const txt = showMins ? `⏱ ${formatMinutesShort_(secondsMap[id] || 0)}` : "";
@@ -15142,6 +15559,7 @@ function renderLiveDashboard_(){
   const feed = document.getElementById("liveFeed");
   if(feed) feed.innerHTML = renderLiveFeedHtml_(m, live, derived);
   renderLiveFouls_(live, derived);
+  if(liveLandscapeOpen) renderLiveLandscape_();
   const syncEl = document.getElementById("liveSyncStatus");
   if(syncEl && !syncEl.textContent){
     syncEl.textContent = liveState.pending ? "⏳ Cambios pendientes de sincronizar" : "✅ Guardado";
@@ -15285,6 +15703,7 @@ function updateLiveClock_(){
   const timer = liveTimerObj_(live);
   liveRenderClock_(live, timer);
   renderLiveOnFieldChips_();
+  updateLiveLandscapeClock_();
   const max = matchFormatMaxSeconds_(liveFormat_(live));
   if(timer.running && liveElapsedSeconds_(timer) >= max){
     timer.elapsed = max;
@@ -15715,8 +16134,10 @@ function livePlayerChoiceHtml_(m, live, derived, prompt){
 }
 
 function liveCategoryChoiceHtml_(){
-  return `<p class="muted" style="margin-top:0;">Elige la categoría:</p>` +
+  return `<p class="muted" style="margin-top:0;">Elige la categoría:</p>
+    <div class="live-cat-grid">` +
     GOAL_CATEGORIES.map(c=>`<button type="button" class="live-choice-btn" onclick="liveActionChooseCategory_('${c.id}')">${escapeHtml(c.label)}</button>`).join("") +
+    `</div>` +
     `<button type="button" class="btn ghost small" style="width:100%;margin-top:6px;" onclick="liveActionBack_()">← Volver</button>`;
 }
 
@@ -15883,6 +16304,23 @@ liveBind_("liveFoulUsBtn", "onclick", ()=>liveOpenAction_("falta_us"));
 liveBind_("liveFoulRivalBtn", "onclick", ()=>liveOpenAction_("falta_rival"));
 liveBind_("liveResetBtn", "onclick", liveResetDirect_);
 liveBind_("liveFinishBtn", "onclick", liveFinishDirect_);
+liveBind_("liveLandscapeBtn", "onclick", liveLandscapeOpenView_);
+liveBind_("liveLandscapeBtnTop", "onclick", liveLandscapeOpenView_);
+liveBind_("llExit", "onclick", liveLandscapeClose_);
+liveBind_("llClockBtn", "onclick", liveTimerToggle_);
+liveBind_("llUndo", "onclick", liveLandscapeUndo_);
+liveBind_("llMenuBtn", "onclick", ()=>liveLandscapeToggleMenu_());
+liveBind_("llRotateAnyway", "onclick", liveLandscapeAllowPortrait_);
+document.getElementById("liveLandscape").addEventListener("click", (e)=>{
+  if(!e.target.closest("#llMenuPanel") && !e.target.closest("#llMenuBtn")) liveLandscapeToggleMenu_(false);
+});
+document.addEventListener("fullscreenchange", ()=>{
+  // Salir de pantalla completa (Esc, gesto del sistema) devuelve a la vista normal.
+  if(liveLandscapeOpen && !document.fullscreenElement) liveLandscapeClose_();
+});
+window.addEventListener("resize", ()=>{
+  if(liveLandscapeOpen) liveLandscapeCheckOrientation_();
+});
 liveBind_("btnCloseLiveAction", "onclick", ()=>{
   document.getElementById("liveActionModal").classList.add("hidden");
 });

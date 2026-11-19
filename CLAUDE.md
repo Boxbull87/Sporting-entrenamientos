@@ -418,6 +418,31 @@ All inside `index.html` — search for these comment banners to jump around:
     lo manda al banquillo; segundo toque sobre el mismo banquillista cancela. Los minutos de
     las fichas se refrescan con el reloj (`renderLiveOnFieldChips_` ya solo toca los `.mins`,
     sin repintar el campo). El botón/modal de "Cambios" ya no existe.
+  - **Vista horizontal a pantalla completa** (`#liveLandscape`, `renderLiveLandscape_` ~15180):
+    modo adicional del directo, no lo sustituye. Se abre con "⛶" en la cabecera
+    (`liveLandscapeBtnTop`) o con la tarjeta "⛶ Pantalla completa horizontal"
+    (`liveLandscapeBtn`) y se cierra con "←" o saliendo de pantalla completa (Esc/gesto).
+    Al abrir pide `requestFullscreen` sobre `<html>` (no sobre el overlay, para que el modal de
+    acciones siga visible) y `screen.orientation.lock("landscape")`; **no se espera** a esas
+    promesas (sin gesto de usuario pueden quedarse pendientes) y la vista se pinta igualmente.
+    Si el navegador no las concede (iOS) y el móvil está en vertical, `llRotate` muestra "gira
+    el móvil" con "Continuar así" (`liveLandscapeAllowPortrait_`).
+    - Reutiliza `liveState` y las mismas funciones: `livePitchData_` (datos comunes de
+      pista/banquillo, compartido con `renderLivePitch_`), `liveChangesTap_`, `liveOpenAction_`,
+      `liveUndoEvent_`, `liveTimerToggle_`, `liveTimerNextPeriod_`, `liveResetDirect_` y
+      `liveFinishDirect_`. No guarda nada aparte.
+    - Pista completa horizontal con `COURT_DATA_URI` (`.ll-court`, `background-size:cover`) y 5
+      posiciones fijas `LIVE_LANDSCAPE_SLOTS` (portero en `x:12` para no tapar la portería).
+      Arriba: salir, reloj (tocar = pausar/reanudar), marcador, faltas de cada equipo (avisan a
+      la 6ª de la mitad), deshacer y menú `⋯` (gol en contra, PP del rival, falta rival,
+      convocatoria, 2ª parte/finalizar, reiniciar, finalizar y salir). Abajo: banquillo
+      horizontal y **barra fija de acciones** (Gol/Amarilla/Roja/Falta/Cambio) que actúa sobre
+      el jugador seleccionado; sin selección están deshabilitadas. El gol abre el selector de
+      categoría de siempre. "Cambio" arma el banquillo (pulsa) y el intercambio se cierra
+      tocando un suplente.
+    - Las 3 últimas acciones (`llLog`) y el reloj se refrescan con `updateLiveLandscapeClock_`
+      (solo texto, sin repintar la pista). En pantallas bajas el selector de categoría pasa a
+      dos columnas (`.live-cat-grid`, `@media (max-height:520px)`).
   - **Cerrar la sesión**: "✅ Finalizar directo" guarda el estado actual y borra `live` de la
     jornada (los goles/tarjetas se quedan en los campos normales). "♻️ Reiniciar directo" en
     cambio vacía `events`/cronómetro y vuelve a la convocatoria inicial sin borrar la jornada.
