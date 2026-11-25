@@ -767,6 +767,9 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
 .live-lineup-check{display:flex;align-items:center;gap:8px;flex:1;min-width:0;cursor:pointer;text-transform:none;font-family:inherit;font-weight:400;font-size:.88rem;color:var(--ink);margin:0;}
 .live-lineup-check input{width:auto;flex:0 0 auto;}
 .live-lineup-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+/* Badges de la alineación (categoría del invitado / expulsado): compactos y sin encogerse,
+   para que el nombre sea lo único que se recorte en pantallas estrechas. */
+.live-lineup-check .badge{font-size:.6rem;padding:2px 6px;flex:0 0 auto;}
 .live-lineup-toggle{flex:0 0 auto;border:1px solid var(--border);background:#fff;color:var(--ink);border-radius:999px;padding:6px 10px;font-family:'Roboto Mono',monospace;font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.02em;min-height:34px;}
 .live-lineup-toggle.active{background:var(--accent);border-color:var(--accent);color:#fff;}
 .live-lineup-toggle:disabled{opacity:.4;}
@@ -2456,6 +2459,12 @@ table.scout-detail td.num{font-family:'Roboto Mono',monospace;}
             <p class="muted" style="margin-top:-4px;">Marca quién va convocado y elige los 5 que están en pista. Los goles y tarjetas se registrarán sobre esta convocatoria.</p>
             <div class="live-lineup-summary" id="liveLineupSummary"></div>
             <div id="liveLineupList"></div>
+            <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
+              <label style="font-size:.8rem;font-weight:600;">➕ Convocar jugador de otra categoría</label>
+              <p class="muted" style="margin:4px 0 6px;font-size:.78rem;">Jugadores de otros equipos del club que suben puntualmente a este partido (p. ej. un juvenil con el sénior). Se guardan en la convocatoria de la jornada.</p>
+              <input type="text" id="liveLineupGuestSearch" placeholder="🔍 Escribe el nombre del jugador..." autocomplete="off">
+              <div id="liveLineupGuestResults" style="max-height:180px;overflow-y:auto;"></div>
+            </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
               <button type="button" class="btn ghost small" id="liveLineupAllBtn">✅ Todos convocados</button>
               <button type="button" class="btn ghost small" id="liveLineupNoneBtn">🚫 Ninguno</button>
@@ -15002,15 +15011,18 @@ function renderLiveLineup_(){
   if(listEl) listEl.innerHTML = roster.map(p=>{
     const selected = liveLineupSelected.has(p.id);
     const onField = liveLineupOnField.includes(p.id);
+    const isGuest = p.teamId!==m.teamId;
     const existingStat = (m.playerStats || []).find(s=>s.playerId===p.id);
     const isRed = existingStat && Number(existingStat.red||0) > 0;
     return `<div class="live-lineup-row">
       <label class="live-lineup-check">
         <input type="checkbox" ${selected?"checked":""} onchange="liveLineupToggleSelected_('${p.id}')">
         ${jerseyIconHtml_(p.position)}
-        <span class="live-lineup-name"><strong>${p.dorsal!=null?p.dorsal:"-"}</strong> ${escapeHtml(p.name)}${matchdayGuestBadgeHtml_(m,p)}${isRed?' <span class="live-badge warn">Expulsado</span>':""}</span>
+        <span class="live-lineup-name"><strong>${p.dorsal!=null?p.dorsal:"-"}</strong> ${escapeHtml(p.name)}</span>
+        ${matchdayGuestBadgeHtml_(m,p)}${isRed?'<span class="live-badge warn">Expulsado</span>':""}
       </label>
       <button type="button" class="live-lineup-toggle ${onField?"active":""}" ${(!selected||isRed)?"disabled":""} onclick="liveLineupToggleOnField_('${p.id}')">${onField?"En pista":"Pista"}</button>
+      ${isGuest?`<button type="button" class="live-lineup-toggle" title="Quitar de la convocatoria" aria-label="Quitar de la convocatoria" onclick="liveLineupRemoveGuest_('${p.id}')">✕</button>`:""}
     </div>`;
   }).join("");
 
@@ -15020,6 +15032,78 @@ function renderLiveLineup_(){
     start.textContent = "▶️ Empezar directo";
   }
 }
+
+/* --- Invitados de otras categorías en la alineación del directo ---
+   Se guardan en m.extraPlayerIds (el mismo campo que la convocatoria de la jornada), así que el
+   jugador sale también en Jornadas, resúmenes y PDF, y en el propio directo (liveRoster_). Al
+   empezar el directo la lista se congela en live.base.extraPlayerIds. */
+function liveLineupGuestResults_(){
+  const wrap = document.getElementById("liveLineupGuestResults");
+  if(!wrap) return;
+  const m = liveMatchday_();
+  const input = document.getElementById("liveLineupGuestSearch");
+  const q = ((input && input.value) || "").trim().toLowerCase();
+  if(!m || !q){ wrap.innerHTML = ""; return; }
+  const rosterIds = new Set(liveRoster_(m, null).map(p=>p.id));
+  const matches = players
+    .filter(p=> p.teamId!==m.teamId && !rosterIds.has(p.id) && !playerIsBaja_(p)
+                && String(p.name||"").toLowerCase().includes(q))
+    .sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""), "es"))
+    .slice(0,15);
+  if(!matches.length){
+    wrap.innerHTML = '<p class="muted" style="font-size:.8rem;margin:4px 0;">Sin resultados.</p>';
+    return;
+  }
+  wrap.innerHTML = matches.map(p=>{
+    const t = teams.find(x=>x.id===p.teamId);
+    return `<button type="button" class="btn ghost small" style="display:flex;justify-content:space-between;align-items:center;width:100%;margin-top:4px;text-align:left;" onclick="liveLineupAddGuest_('${p.id}')">
+      <span>${escapeHtml(p.name)}${p.dorsal!=null?` <span class="muted">(${escapeHtml(String(p.dorsal))})</span>`:""}</span>
+      <span class="badge outline" style="font-size:.68rem;flex:0 0 auto;">${escapeHtml(t?t.name:"?")}</span>
+    </button>`;
+  }).join("");
+}
+
+// Guarda los invitados en la jornada. Se actualiza en local al momento (la lista se repinta
+// enseguida) y se escribe en Firestore; si falla, el directo los guardará al empezar.
+function liveSaveMatchdayExtras_(m, ids){
+  if(!m) return;
+  m.extraPlayerIds = ids.slice();
+  const msg = document.getElementById("liveLineupMsg");
+  if(msg) msg.innerHTML = "";
+  const fail = err=>{
+    if(msg) msg.innerHTML = `<p class="error-msg">No se ha podido guardar en el servidor: ${escapeHtml(err.message||String(err))}. Se guardará al empezar el directo.</p>`;
+  };
+  try{
+    db.collection("matchdays").doc(m.id).update({extraPlayerIds: m.extraPlayerIds}).catch(fail);
+  }catch(err){ fail(err); }
+}
+
+window.liveLineupAddGuest_ = (playerId)=>{
+  const m = liveMatchday_();
+  const p = players.find(x=>x.id===playerId);
+  if(!m || !p || p.teamId===m.teamId) return;
+  const ids = matchdayExtraIds_(m).slice();
+  if(!ids.includes(playerId)) ids.push(playerId);
+  liveSaveMatchdayExtras_(m, ids);
+  liveLineupSelected.add(playerId);   // al convocarlo se marca solo
+  const input = document.getElementById("liveLineupGuestSearch");
+  if(input) input.value = "";
+  renderLiveLineup_();
+};
+
+window.liveLineupRemoveGuest_ = (playerId)=>{
+  const m = liveMatchday_();
+  if(!m) return;
+  const hasStats = (m.playerStats||[]).some(s=>s && s.playerId===playerId);
+  if(hasStats && !confirm("Ese jugador ya tiene estadísticas en esta jornada. ¿Quitarlo de la convocatoria?")) return;
+  const ids = matchdayExtraIds_(m).filter(id=>id!==playerId);
+  liveSaveMatchdayExtras_(m, ids);
+  liveLineupSelected.delete(playerId);
+  liveLineupOnField = liveLineupOnField.filter(id=>id!==playerId);
+  renderLiveLineup_();
+};
+
+document.getElementById("liveLineupGuestSearch").oninput = liveLineupGuestResults_;
 
 function liveLineupToggleSelected_(id){
   if(liveLineupSelected.has(id)){

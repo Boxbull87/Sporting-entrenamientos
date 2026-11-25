@@ -363,6 +363,14 @@ All inside `index.html` — search for these comment banners to jump around:
   dashboard a pantalla completa. El cronómetro corre con reloj real (`startedAt` + `elapsed`),
   se puede pausar, reanudar y reiniciar, y sigue contando en el tiempo añadido hasta un tope de
   seguridad de 5 minutos por parte (`minutes + maxAdded`), momento en el que se autopausa.
+  - **Alineación** (`renderLiveLineup_`): se marcan los convocados y los 5 de pista. Incluye un
+    buscador "➕ Convocar jugador de otra categoría" (`liveLineupGuestSearch`) para añadir
+    jugadores de otros equipos del club que suben puntualmente (p. ej. un juvenil con el sénior),
+    sin tener que pasar por Jornadas. Se guardan en el mismo `m.extraPlayerIds` de la jornada
+    (`liveSaveMatchdayExtras_`: actualiza en local y escribe en Firestore; si falla, se guardan al
+    empezar el directo), así que salen también en Jornadas, resúmenes y PDF. Los invitados llevan
+    el badge de su equipo y una ✕ para quitarlos (`liveLineupRemoveGuest_`). No se ofrecen bajas.
+    Al empezar, la lista se congela en `live.base.extraPlayerIds` (no se puede cambiar en directo).
   - **Formato del partido** (`matchFormat`): `{minutes, clock, maxAdded, trackMinutes}`.
     `clock` es `"parado"` (se para con el árbitro) o `"corrido"`; `maxAdded` está fijado en 5 y
     no se edita; `trackMinutes: false` desactiva el conteo de minutos en ese partido. Se resuelve
